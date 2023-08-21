@@ -1,11 +1,11 @@
-# httpxy
+# 🔀 httpxy
 
 [![npm version][npm-version-src]][npm-version-href]
 [![npm downloads][npm-downloads-src]][npm-downloads-href]
 [![bundle][bundle-src]][bundle-href]
 [![Codecov][codecov-src]][codecov-href]
 
-A full-featured HTTP proxy for Node.js.
+> A Full-Featured HTTP and WebSocket Proxy for Node.js forked from [http-party/node-http-proxy](https://github.com/http-party/node-http-proxy) with modern Typescript rewrite.
 
 ## Usage
 
@@ -22,23 +22,23 @@ yarn add httpxy
 pnpm install httpxy
 ```
 
-Import:
-
-```ts
-// CommonJS
-const { createProxyServer } = require("httpxy");
-
-// ESM
-import { createProxyServer } from "httpxy";
-```
-
 Create proxy:
 
 ```ts
-const proxy = createProxyServer();
+import { createServer } from "node:http";
 
-proxy.web(req, res, opts);
-proxy.ws(req, res.opts);
+import { createProxyServer } from "httpxy";
+
+const proxy = createProxyServer({});
+
+createServer((req, res) => {
+  proxy.web(req, res, {
+    target: "http://example.com",
+    headers: { host: "example.com" },
+  });
+}).listen(3000, () => {
+  console.log("Proxy is listening on http://localhost:3000");
+});
 ```
 
 Checkout [http-party/node-http-proxy](https://github.com/http-party/node-http-proxy) for more options and examples.
@@ -54,8 +54,6 @@ Checkout [http-party/node-http-proxy](https://github.com/http-party/node-http-pr
 ## License
 
 Made with 💛
-
-Based on [http-party/node-http-proxy](https://github.com/http-party/node-http-proxy).
 
 Published under [MIT License](./LICENSE).
 
