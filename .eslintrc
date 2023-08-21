@@ -1,0 +1,7 @@
+{
+  "extends": ["eslint-config-unjs"],
+  "rules": {
+    "unicorn/consistent-function-scoping": 0,
+    "@typescript-eslint/no-unused-vars": 0
+  }
+}
