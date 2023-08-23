@@ -31,12 +31,19 @@ import { createProxyServer } from "httpxy";
 
 const proxy = createProxyServer({});
 
-createServer((req, res) => {
-  proxy.web(req, res, {
-    target: "http://example.com",
-    headers: { host: "example.com" },
-  });
-}).listen(3000, () => {
+const server = createServer(async (req, res) => {
+  try {
+    await httpProxy.web(req, res, {
+      target: main.url,
+    });
+  } catch (error) {
+    console.error(error);
+    res.statusCode = 500;
+    res.end("Proxy error: " + error.toString());
+  }
+});
+
+server.listen(3000, () => {
   console.log("Proxy is listening on http://localhost:3000");
 });
 ```

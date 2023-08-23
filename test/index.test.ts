@@ -8,6 +8,9 @@ describe("httpxy", () => {
   let proxyListener: Listener;
   let proxy: ProxyServer;
 
+  let lastResolved: any;
+  let lastRejected: any;
+
   beforeAll(async () => {
     mainListener = await listen((req, res) => {
       res.end(
@@ -21,8 +24,17 @@ describe("httpxy", () => {
 
     proxy = createProxyServer({});
 
-    proxyListener = await listen((req, res) => {
-      proxy.web(req, res, { target: mainListener.url });
+    proxyListener = await listen(async (req, res) => {
+      lastResolved = false;
+      lastRejected = undefined;
+      try {
+        await proxy.web(req, res, { target: mainListener.url });
+        lastResolved = true;
+      } catch (error) {
+        lastRejected = error;
+        res.statusCode = 500;
+        res.end("Proxy error: " + error.toString());
+      }
     });
   });
 
@@ -38,5 +50,8 @@ describe("httpxy", () => {
     expect(maskResponse(await mainResponse)).toMatchObject(
       maskResponse(proxyResponse),
     );
+
+    expect(lastResolved).toBe(true);
+    expect(lastRejected).toBe(undefined);
   });
 });

@@ -11,8 +11,8 @@ import { ProxyMiddleware } from "./middleware/_utils";
 export class ProxyServer extends EventEmitter {
   _server?: http.Server | https.Server;
 
-  webPasses: readonly ProxyMiddleware[] = webIncomingMiddleware;
-  wsPasses: readonly ProxyMiddleware[] = websocketIncomingMiddleware;
+  webPasses: ProxyMiddleware[] = [...webIncomingMiddleware];
+  wsPasses: ProxyMiddleware[] = [...websocketIncomingMiddleware];
 
   options: ProxyServerOptions;
 
@@ -20,13 +20,15 @@ export class ProxyServer extends EventEmitter {
     req: http.IncomingMessage,
     res: http.OutgoingMessage,
     opts?: ProxyServerOptions,
-  ) => any;
+    head?: any,
+  ) => Promise<void>;
 
   ws: (
     req: http.IncomingMessage,
     socket: http.OutgoingMessage,
     opts: ProxyServerOptions,
-  ) => any;
+    head?: any,
+  ) => Promise<void>;
 
   /**
    * Creates the proxy server with specified options.
@@ -38,8 +40,8 @@ export class ProxyServer extends EventEmitter {
     this.options = options || {};
     this.options.prependPath = options.prependPath !== false;
 
-    this.web = _createRightProxy("web")(this);
-    this.ws = _createRightProxy("ws")(this);
+    this.web = _createProxyFn("web", this);
+    this.ws = _createProxyFn("ws", this);
   }
 
   /**
@@ -83,44 +85,38 @@ export class ProxyServer extends EventEmitter {
     }
   }
 
-  before(type, passName, callback) {
+  before(type: "ws" | "web", passName: string, pass: ProxyMiddleware) {
     if (type !== "ws" && type !== "web") {
       throw new Error("type must be `web` or `ws`");
     }
-    const passes = [...(type === "ws" ? this.wsPasses : this.webPasses)];
+    const passes = type === "ws" ? this.wsPasses : this.webPasses;
     let i: false | number = false;
-
     for (const [idx, v] of passes.entries()) {
       if (v.name === passName) {
         i = idx;
       }
     }
-
     if (i === false) {
       throw new Error("No such pass");
     }
-
-    passes.splice(i, 0, callback);
+    passes.splice(i, 0, pass);
   }
 
-  after(type, passName, callback) {
+  after(type: "ws" | "web", passName: string, pass: ProxyMiddleware) {
     if (type !== "ws" && type !== "web") {
       throw new Error("type must be `web` or `ws`");
     }
-    const passes = [...(type === "ws" ? this.wsPasses : this.webPasses)];
+    const passes = type === "ws" ? this.wsPasses : this.webPasses;
     let i: boolean | number = false;
-
     for (const [idx, v] of passes.entries()) {
       if (v.name === passName) {
         i = idx;
       }
     }
-
     if (i === false) {
       throw new Error("No such pass");
     }
-
-    passes.splice(i++, 0, callback);
+    passes.splice(i++, 0, pass);
   }
 }
 
@@ -144,69 +140,60 @@ export function createProxyServer(options: ProxyServerOptions = {}) {
 
 // --- Internal ---
 
-/**
- * Returns a function that creates the loader for
- * either `ws` or `web`'s  passes.
- *
- * Examples:
- *
- *    httpProxy.createRightProxy('ws')
- *    // => [Function]
- *
- * @param {String} Type Either 'ws' or 'web'
- *
- * @return {Function} Loader Function that when called returns an iterator for the right passes
- *
- * @api private
- */
+function _createProxyFn(type: "web" | "ws", server: ProxyServer) {
+  return function (
+    req: http.IncomingMessage,
+    res: http.OutgoingMessage,
+    opts: ProxyServerOptions,
+    head: any,
+  ): Promise<void> {
+    const requestOptions = { ...opts, ...server.options };
 
-function _createRightProxy(type) {
-  return function (server: ProxyServer) {
-    return function (
-      req: http.IncomingMessage,
-      res: http.OutgoingMessage,
-      opts: ProxyServerOptions,
-    ) {
-      const passes = type === "ws" ? this.wsPasses : this.webPasses;
-
-      const requestOptions = { ...opts, ...server.options };
-
-      for (const key of ["target", "forward"]) {
-        if (typeof requestOptions[key] === "string") {
-          requestOptions[key] = new URL(requestOptions[key]);
-        }
+    for (const key of ["target", "forward"]) {
+      if (typeof requestOptions[key] === "string") {
+        requestOptions[key] = new URL(requestOptions[key]);
       }
+    }
 
-      if (!requestOptions.target && !requestOptions.forward) {
-        return this.emit(
-          "error",
-          new Error("Must provide a proper URL as target"),
-        );
-      }
+    if (!requestOptions.target && !requestOptions.forward) {
+      return this.emit(
+        "error",
+        new Error("Must provide a proper URL as target"),
+      );
+    }
 
-      for (const pass of passes) {
-        /**
-         * Call of passes functions
-         * pass(req, res, options, head)
-         *
-         * In WebSockets case the `res` variable
-         * refer to the connection socket
-         * pass(req, socket, options, head)
-         */
-        if (
-          pass(
-            req,
-            res,
-            requestOptions,
-            server,
-            undefined /* head */,
-            undefined /* cb */,
-          )
-        ) {
-          // passes can return a truthy value to halt the loop
-          break;
-        }
+    let _resolve: () => void;
+    let _reject: (error: any) => void;
+    const callbackPromise = new Promise<void>((resolve, reject) => {
+      _resolve = resolve;
+      _reject = reject;
+    });
+
+    res.on("close", () => {
+      _resolve();
+    });
+    res.on("error", (error: any) => {
+      _reject(error);
+    });
+
+    for (const pass of type === "ws" ? server.wsPasses : server.webPasses) {
+      const stop = pass(
+        req,
+        res,
+        requestOptions as ProxyServerOptions & { target: URL; forward: URL },
+        server,
+        head,
+        (error) => {
+          _reject(error);
+        },
+      );
+      // Passes can return a truthy value to halt the loop
+      if (stop) {
+        _resolve();
+        break;
       }
-    };
+    }
+
+    return callbackPromise;
   };
 }
