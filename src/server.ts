@@ -138,7 +138,7 @@ export class ProxyServer extends EventEmitter {
  *
  * @api public
  */
-export function createProxyServer(options: ProxyServerOptions) {
+export function createProxyServer(options: ProxyServerOptions = {}) {
   return new ProxyServer(options);
 }
 
