@@ -9,10 +9,10 @@ import { ProxyMiddleware } from "./middleware/_utils";
 
 // eslint-disable-next-line unicorn/prefer-event-target
 export class ProxyServer extends EventEmitter {
-  _server?: http.Server | https.Server;
+  private _server?: http.Server | https.Server;
 
-  webPasses: ProxyMiddleware[] = [...webIncomingMiddleware];
-  wsPasses: ProxyMiddleware[] = [...websocketIncomingMiddleware];
+  _webPasses: ProxyMiddleware[] = [...webIncomingMiddleware];
+  _wsPasses: ProxyMiddleware[] = [...websocketIncomingMiddleware];
 
   options: ProxyServerOptions;
 
@@ -61,7 +61,7 @@ export class ProxyServer extends EventEmitter {
     if (this.options.ws) {
       this._server.on("upgrade", (req, socket, head) => {
         // @ts-expect-error
-        this.ws(req, socket, head);
+        this._ws(req, socket, head);
       });
     }
 
@@ -89,7 +89,7 @@ export class ProxyServer extends EventEmitter {
     if (type !== "ws" && type !== "web") {
       throw new Error("type must be `web` or `ws`");
     }
-    const passes = type === "ws" ? this.wsPasses : this.webPasses;
+    const passes = type === "ws" ? this._wsPasses : this._webPasses;
     let i: false | number = false;
     for (const [idx, v] of passes.entries()) {
       if (v.name === passName) {
@@ -106,7 +106,7 @@ export class ProxyServer extends EventEmitter {
     if (type !== "ws" && type !== "web") {
       throw new Error("type must be `web` or `ws`");
     }
-    const passes = type === "ws" ? this.wsPasses : this.webPasses;
+    const passes = type === "ws" ? this._wsPasses : this._webPasses;
     let i: boolean | number = false;
     for (const [idx, v] of passes.entries()) {
       if (v.name === passName) {
@@ -176,7 +176,7 @@ function _createProxyFn(type: "web" | "ws", server: ProxyServer) {
       _reject(error);
     });
 
-    for (const pass of type === "ws" ? server.wsPasses : server.webPasses) {
+    for (const pass of type === "ws" ? server._wsPasses : server._webPasses) {
       const stop = pass(
         req,
         res,
