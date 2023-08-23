@@ -39,8 +39,8 @@ describe("httpxy", () => {
   });
 
   it("works", async () => {
-    const mainResponse = await $fetch(mainListener.url);
-    const proxyResponse = await $fetch(proxyListener.url);
+    const mainResponse = await $fetch(mainListener.url + "?foo");
+    const proxyResponse = await $fetch(proxyListener.url + "?foo");
 
     const maskResponse = (obj: any) => ({
       ...obj,

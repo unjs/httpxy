@@ -86,9 +86,10 @@ export function setupOutgoing(outgoing, options, req, forward?) {
   const targetPath =
     target && options.prependPath !== false ? target.path || "" : "";
 
+  const parsed = new URL(req.url, "http://localhost");
   let outgoingPath = options.toProxy
     ? req.url
-    : new URL(req.url, "http://localhost").pathname || "";
+    : parsed.pathname + parsed.search || "";
 
   //
   // Remark: ignorePath will just straight up ignore whatever the request's
