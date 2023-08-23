@@ -1,5 +1,3 @@
-import url from "node:url";
-
 const upgradeHeader = /(^|,)\s*upgrade\s*($|,)/i;
 
 /**
@@ -88,10 +86,9 @@ export function setupOutgoing(outgoing, options, req, forward?) {
   const targetPath =
     target && options.prependPath !== false ? target.path || "" : "";
 
-  //
-  // Remark: Can we somehow not use url.parse as a perf optimization?
-  //
-  let outgoingPath = options.toProxy ? req.url : url.parse(req.url).path || "";
+  let outgoingPath = options.toProxy
+    ? req.url
+    : new URL(req.url, "http://localhost").pathname || "";
 
   //
   // Remark: ignorePath will just straight up ignore whatever the request's
