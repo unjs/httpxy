@@ -1,6 +1,18 @@
 # Changelog
 
 
+## v0.1.2
+
+[compare changes](https://github.com/unjs/httpxy/compare/v0.1.1...v0.1.2)
+
+### 🩹 Fixes
+
+- Presrve search params from parsed url ([8bbaacc](https://github.com/unjs/httpxy/commit/8bbaacc))
+
+### ❤️ Contributors
+
+- Pooya Parsa ([@pi0](http://github.com/pi0))
+
 ## v0.1.1
 
 
