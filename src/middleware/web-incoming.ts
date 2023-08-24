@@ -2,14 +2,14 @@ import httpNative from "node:http";
 import httpsNative from "node:https";
 import { getPort, hasEncryptedConnection, setupOutgoing } from "../_utils";
 import { webOutgoingMiddleware } from "./web-outgoing";
-import { ProxyMiddleware, defineProxyMiddlware } from "./_utils";
+import { ProxyMiddleware, defineProxyMiddleware } from "./_utils";
 
 const nativeAgents = { http: httpNative, https: httpsNative };
 
 /**
  * Sets `content-length` to '0' if request is of DELETE type.
  */
-const deleteLength = defineProxyMiddlware((req) => {
+const deleteLength = defineProxyMiddleware((req) => {
   if (
     (req.method === "DELETE" || req.method === "OPTIONS") &&
     !req.headers["content-length"]
@@ -22,7 +22,7 @@ const deleteLength = defineProxyMiddlware((req) => {
 /**
  * Sets timeout in request socket if it was specified in options.
  */
-const timeout = defineProxyMiddlware((req, res, options) => {
+const timeout = defineProxyMiddleware((req, res, options) => {
   if (options.timeout) {
     req.socket.setTimeout(options.timeout);
   }
@@ -31,7 +31,7 @@ const timeout = defineProxyMiddlware((req, res, options) => {
 /**
  * Sets `x-forwarded-*` headers if specified in config.
  */
-const XHeaders = defineProxyMiddlware((req, res, options) => {
+const XHeaders = defineProxyMiddleware((req, res, options) => {
   if (!options.xfwd) {
     return;
   }
@@ -60,7 +60,7 @@ const XHeaders = defineProxyMiddlware((req, res, options) => {
  * just dies otherwise.
  *
  */
-const stream = defineProxyMiddlware(
+const stream = defineProxyMiddleware(
   (req, res, options, server, head, callback) => {
     // And we begin!
     server.emit("start", req, res, options.target || options.forward);

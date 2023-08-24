@@ -7,13 +7,13 @@ import {
   setupOutgoing,
   setupSocket,
 } from "../_utils";
-import { ProxyMiddleware, defineProxyMiddlware } from "./_utils";
+import { ProxyMiddleware, defineProxyMiddleware } from "./_utils";
 
 /**
  * WebSocket requests must have the `GET` method and
  * the `upgrade:websocket` header
  */
-const checkMethodAndHeader = defineProxyMiddlware((req, socket) => {
+const checkMethodAndHeader = defineProxyMiddleware((req, socket) => {
   if (req.method !== "GET" || !req.headers.upgrade) {
     socket.destroy();
     return true;
@@ -28,7 +28,7 @@ const checkMethodAndHeader = defineProxyMiddlware((req, socket) => {
 /**
  * Sets `x-forwarded-*` headers if specified in config.
  */
-const XHeaders = defineProxyMiddlware((req, socket, options) => {
+const XHeaders = defineProxyMiddleware((req, socket, options) => {
   if (!options.xfwd) {
     return;
   }
@@ -51,7 +51,7 @@ const XHeaders = defineProxyMiddlware((req, socket, options) => {
  * Does the actual proxying. Make the request and upgrade it
  * send the Switching Protocols request and pipe the sockets.
  */
-const stream = defineProxyMiddlware(
+const stream = defineProxyMiddleware(
   (req, socket, options, server, head, callback) => {
     const createHttpHeader = function (line, headers) {
       return (

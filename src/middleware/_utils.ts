@@ -16,7 +16,7 @@ export type ProxyMiddleware = (
   ) => void,
 ) => void | true;
 
-export function defineProxyMiddlware(m: ProxyMiddleware) {
+export function defineProxyMiddleware(m: ProxyMiddleware) {
   return m;
 }
 
@@ -27,6 +27,6 @@ export type ProxyOutgoingMiddleware = (
   opts: ProxyServerOptions & { target: URL; forward: URL },
 ) => void | true;
 
-export function defineProxyOutgoingMiddlware(m: ProxyOutgoingMiddleware) {
+export function defineProxyOutgoingMiddleware(m: ProxyOutgoingMiddleware) {
   return m;
 }
