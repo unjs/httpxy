@@ -1,7 +1,7 @@
 import { rewriteCookieProperty } from "../_utils";
 import {
   ProxyOutgoingMiddleware,
-  defineProxyOutgoingMiddlware,
+  defineProxyOutgoingMiddleware,
 } from "./_utils";
 
 const redirectRegex = /^201|30([1278])$/;
@@ -9,7 +9,7 @@ const redirectRegex = /^201|30([1278])$/;
 /**
  * If is a HTTP 1.0 request, remove chunk headers
  */
-const removeChunked = defineProxyOutgoingMiddlware((req, res, proxyRes) => {
+const removeChunked = defineProxyOutgoingMiddleware((req, res, proxyRes) => {
   if (req.httpVersion === "1.0") {
     delete proxyRes.headers["transfer-encoding"];
   }
@@ -19,7 +19,7 @@ const removeChunked = defineProxyOutgoingMiddlware((req, res, proxyRes) => {
  * If is a HTTP 1.0 request, set the correct connection header
  * or if connection header not present, then use `keep-alive`
  */
-const setConnection = defineProxyOutgoingMiddlware((req, res, proxyRes) => {
+const setConnection = defineProxyOutgoingMiddleware((req, res, proxyRes) => {
   if (req.httpVersion === "1.0") {
     proxyRes.headers.connection = req.headers.connection || "close";
   } else if (req.httpVersion !== "2.0" && !proxyRes.headers.connection) {
@@ -27,7 +27,7 @@ const setConnection = defineProxyOutgoingMiddlware((req, res, proxyRes) => {
   }
 });
 
-const setRedirectHostRewrite = defineProxyOutgoingMiddlware(
+const setRedirectHostRewrite = defineProxyOutgoingMiddleware(
   (req, res, proxyRes, options) => {
     if (
       (options.hostRewrite || options.autoRewrite || options.protocolRewrite) &&
@@ -67,7 +67,7 @@ const setRedirectHostRewrite = defineProxyOutgoingMiddlware(
  *
  * @api private
  */
-const writeHeaders = defineProxyOutgoingMiddlware(
+const writeHeaders = defineProxyOutgoingMiddleware(
   (req, res, proxyRes, options) => {
     let rewriteCookieDomainConfig = options.cookieDomainRewrite;
     let rewriteCookiePathConfig = options.cookiePathRewrite;
@@ -123,7 +123,7 @@ const writeHeaders = defineProxyOutgoingMiddlware(
 /**
  * Set the statusCode from the proxyResponse
  */
-const writeStatusCode = defineProxyOutgoingMiddlware((req, res, proxyRes) => {
+const writeStatusCode = defineProxyOutgoingMiddleware((req, res, proxyRes) => {
   // From Node.js docs: response.writeHead(statusCode[, statusMessage][, headers])
   if (proxyRes.statusMessage) {
     // @ts-expect-error
