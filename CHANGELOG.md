@@ -1,6 +1,31 @@
 # Changelog
 
 
+## v0.1.4
+
+[compare changes](https://github.com/unjs/httpxy/compare/v0.1.2...v0.1.4)
+
+### 🩹 Fixes
+
+- Presrve search params from parsed url ([8bbaacc](https://github.com/unjs/httpxy/commit/8bbaacc))
+- Add `target` pathname currectly ([#6](https://github.com/unjs/httpxy/pull/6))
+
+### 💅 Refactors
+
+- Fix typo in `defineProxyMiddleware` ([#4](https://github.com/unjs/httpxy/pull/4))
+
+### 🏡 Chore
+
+- **release:** V0.1.2 ([b6bd4a8](https://github.com/unjs/httpxy/commit/b6bd4a8))
+- Update dev dependencies ([5704e70](https://github.com/unjs/httpxy/commit/5704e70))
+- **release:** V0.1.3 ([4ced1cc](https://github.com/unjs/httpxy/commit/4ced1cc))
+
+### ❤️ Contributors
+
+- Pooya Parsa ([@pi0](http://github.com/pi0))
+- Jonasolesen 
+- Gacek1123
+
 ## v0.1.3
 
 [compare changes](https://github.com/unjs/httpxy/compare/v0.1.2...v0.1.3)
