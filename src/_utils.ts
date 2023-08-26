@@ -84,7 +84,9 @@ export function setupOutgoing(outgoing, options, req, forward?) {
   // the final path is target path + relative path requested by user:
   const target = options[forward || "target"];
   const targetPath =
-    target && options.prependPath !== false ? target.path || "" : "";
+    target && options.prependPath !== false
+      ? target.pathname || target.path || ""
+      : "";
 
   const parsed = new URL(req.url, "http://localhost");
   let outgoingPath = options.toProxy

@@ -28,7 +28,7 @@ describe("httpxy", () => {
       lastResolved = false;
       lastRejected = undefined;
       try {
-        await proxy.web(req, res, { target: mainListener.url });
+        await proxy.web(req, res, { target: mainListener.url + "base" });
         lastResolved = true;
       } catch (error) {
         lastRejected = error;
@@ -39,8 +39,8 @@ describe("httpxy", () => {
   });
 
   it("works", async () => {
-    const mainResponse = await $fetch(mainListener.url + "?foo");
-    const proxyResponse = await $fetch(proxyListener.url + "?foo");
+    const mainResponse = await $fetch(mainListener.url + "base/test?foo");
+    const proxyResponse = await $fetch(proxyListener.url + "test?foo");
 
     const maskResponse = (obj: any) => ({
       ...obj,
@@ -50,6 +50,8 @@ describe("httpxy", () => {
     expect(maskResponse(await mainResponse)).toMatchObject(
       maskResponse(proxyResponse),
     );
+
+    expect(proxyResponse.path).toBe("/base/test?foo");
 
     expect(lastResolved).toBe(true);
     expect(lastRejected).toBe(undefined);
