@@ -154,6 +154,7 @@ const stream = defineProxyMiddleware(
           server.emit("end", req, res, proxyRes);
         }
       } else {
+        // EventSource close
         res.on("close", function () {
           proxyRes.destroy();
         });
