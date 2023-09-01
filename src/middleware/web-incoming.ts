@@ -154,6 +154,9 @@ const stream = defineProxyMiddleware(
           server.emit("end", req, res, proxyRes);
         }
       } else {
+        res.on('close', function () {
+          proxyRes.destroy()
+        });
         // Allow us to listen when the proxy has completed
         proxyRes.on("end", function () {
           if (server) {
