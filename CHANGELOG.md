@@ -1,6 +1,23 @@
 # Changelog
 
 
+## v0.1.5
+
+[compare changes](https://github.com/unjs/httpxy/compare/v0.1.4...v0.1.5)
+
+### 🩹 Fixes
+
+- Handle client `close` event ([#8](https://github.com/unjs/httpxy/pull/8))
+
+### 🏡 Chore
+
+- Update deps ([2888089](https://github.com/unjs/httpxy/commit/2888089))
+
+### ❤️ Contributors
+
+- Pooya Parsa ([@pi0](http://github.com/pi0))
+- David Tai ([@didavid61202](http://github.com/didavid61202))
+
 ## v0.1.4
 
 [compare changes](https://github.com/unjs/httpxy/compare/v0.1.2...v0.1.4)
