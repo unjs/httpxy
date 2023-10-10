@@ -29,7 +29,7 @@ import { createServer } from "node:http";
 
 import { createProxyServer } from "httpxy";
 
-const proxy = createProxyServer({});
+const httpProxy = createProxyServer({});
 
 const server = createServer(async (req, res) => {
   try {
