@@ -29,7 +29,17 @@ import { createServer } from "node:http";
 
 import { createProxyServer } from "httpxy";
 
-const proxy = createProxyServer({});
+const proxy = createProxyServer({
+  // http-party/node-http-proxy options, for example:
+  target: {
+    host: "localhost",
+    port: 4343
+  },
+  ssl: {
+    key: fs.readFileSync("./your-local-key.pem", "utf8"),
+    cert: fs.readFileSync("./your-local.pem", "utf8")
+  }
+});
 
 const server = createServer(async (req, res) => {
   try {
