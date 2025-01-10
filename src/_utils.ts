@@ -104,10 +104,10 @@ export function setupOutgoing(outgoing, options, req, forward?) {
 
   if (options.changeOrigin) {
     outgoing.headers.host =
-      /* required(outgoing.port, options[forward || "target"].protocol) && TODO: From requires-port */
-      hasPort(outgoing.host)
-        ? outgoing.host
-        : outgoing.host + ":" + outgoing.port;
+      requiresPort(outgoing.port, options[forward || "target"].protocol) &&
+      !hasPort(outgoing.host)
+        ? outgoing.host + ":" + outgoing.port
+        : outgoing.host;
   }
   return outgoing;
 }
@@ -248,4 +248,46 @@ export function rewriteCookieProperty(header, config, property) {
  */
 export function hasPort(host: string) {
   return !!~host.indexOf(":");
+}
+
+/**
+ * Check if the port is required for the protocol
+ *
+ * Ported from https://github.com/unshiftio/requires-port/blob/master/index.js
+ *
+ * @returns {Boolean} Whether the port is required for the protocol
+ *
+ * @api private
+ */
+export function requiresPort(_port: string, _protocol: string) {
+  const protocol = _protocol.split(":")[0];
+  const port = +_port;
+
+  if (!port) return false;
+
+  switch (protocol) {
+    case "http":
+    case "ws": {
+      return port !== 80;
+    }
+
+    case "https":
+    case "wss": {
+      return port !== 443;
+    }
+
+    case "ftp": {
+      return port !== 21;
+    }
+
+    case "gopher": {
+      return port !== 70;
+    }
+
+    case "file": {
+      return false;
+    }
+  }
+
+  return port !== 0;
 }
