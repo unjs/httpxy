@@ -29,14 +29,12 @@ import { createServer } from "node:http";
 
 import { createProxyServer } from "httpxy";
 
-const httpProxy = createProxyServer({});
-
-const address = /* address of your proxy server here */
+const proxy = createProxyServer({});
 
 const server = createServer(async (req, res) => {
   try {
-    await httpProxy.web(req, res, {
-      target: address,
+    await proxy.web(req, res, {
+      target: address /* address of your proxy server here */,
     });
   } catch (error) {
     console.error(error);
