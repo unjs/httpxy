@@ -34,7 +34,7 @@ const proxy = createProxyServer({});
 const server = createServer(async (req, res) => {
   try {
     await proxy.web(req, res, {
-      target: main.url,
+      target: address /* address of your proxy server here */,
     });
   } catch (error) {
     console.error(error);
