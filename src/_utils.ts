@@ -222,7 +222,7 @@ export function rewriteCookieProperty(header, config, property) {
     });
   }
   return header.replace(
-    new RegExp("(;\\s*" + property + "=)([^;]+)", "i"),
+    new RegExp(String.raw`(;\s*` + property + "=)([^;]+)", "i"),
     function (match, prefix, previousValue) {
       let newValue;
       if (previousValue in config) {
