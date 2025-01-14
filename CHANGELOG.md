@@ -1,6 +1,32 @@
 # Changelog
 
 
+## v0.1.6
+
+[compare changes](https://github.com/unjs/httpxy/compare/v0.1.5...v0.1.6)
+
+### 🩹 Fixes
+
+- Omit outgoing port when not required ([#65](https://github.com/unjs/httpxy/pull/65))
+
+### 📖 Documentation
+
+- Remove unsupported `followRedirects` option ([#66](https://github.com/unjs/httpxy/pull/66))
+- Improve example ([#16](https://github.com/unjs/httpxy/pull/16))
+
+### 🏡 Chore
+
+- Fix typo in readme ([#36](https://github.com/unjs/httpxy/pull/36))
+- Update repo ([64f7465](https://github.com/unjs/httpxy/commit/64f7465))
+- Update ci ([b0f08de](https://github.com/unjs/httpxy/commit/b0f08de))
+
+### ❤️ Contributors
+
+- Lsh ([@peterroe](http://github.com/peterroe))
+- Kricsleo ([@kricsleo](http://github.com/kricsleo))
+- Pooya Parsa ([@pi0](http://github.com/pi0))
+- Mohammd Siddiqui <masiddiqui91@gmail.com>
+
 ## v0.1.5
 
 [compare changes](https://github.com/unjs/httpxy/compare/v0.1.4...v0.1.5)
