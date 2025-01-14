@@ -48,7 +48,7 @@ server.listen(3000, () => {
 });
 ```
 
-Checkout [http-party/node-http-proxy](https://github.com/http-party/node-http-proxy) for more options (except 'followRedirects') and examples.
+Checkout [http-party/node-http-proxy](https://github.com/http-party/node-http-proxy) for more options and examples (note: `followRedirects` is not supported).
 
 ## Development
 
