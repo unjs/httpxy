@@ -1,3 +1,5 @@
+import { ProxyServerOptions } from "./types";
+
 const upgradeHeader = /(^|,)\s*upgrade\s*($|,)/i;
 
 /**
@@ -100,7 +102,7 @@ export function setupOutgoing(outgoing, options, req, forward?) {
   //
   outgoingPath = options.ignorePath ? "" : outgoingPath;
 
-  outgoing.path = urlJoin(targetPath, outgoingPath);
+  outgoing.path = urlJoin(options, targetPath, outgoingPath);
 
   if (options.changeOrigin) {
     outgoing.headers.host =
@@ -176,7 +178,7 @@ export function hasEncryptedConnection(req) {
  * @api private
  */
 
-export function urlJoin(...args: string[]) {
+export function urlJoin(options: ProxyServerOptions, ...args: string[]) {
   // We do not want to mess with the query string. All we want to touch is the path.
   const lastIndex = args.length - 1;
   const last = args[lastIndex];
@@ -188,11 +190,17 @@ export function urlJoin(...args: string[]) {
   // Join all strings, but remove empty strings so we don't get extra slashes from
   // joining e.g. ['', 'am']
   //
+  let retStr = args
+    .filter(Boolean)
+    .join("/");
+
+  // Avoid normalize url if option is set
+  if (options.normalizeUrl) {
+    retStr = retStr.replace(/\/+/g, "/")
+  }
+
   const retSegs = [
-    args
-      .filter(Boolean)
-      .join("/")
-      .replace(/\/+/g, "/")
+    retStr
       .replace("http:/", "http://")
       .replace("https:/", "https://"),
   ];
