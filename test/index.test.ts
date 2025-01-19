@@ -41,7 +41,7 @@ describe("httpxy", () => {
         res.end("Proxy error: " + error.toString());
       }
     });
-  }
+  };
 
   it("works", async () => {
     await makeProxy({});
@@ -72,5 +72,4 @@ describe("httpxy", () => {
     expect(lastResolved).toBe(true);
     expect(lastRejected).toBe(undefined);
   });
-
 });

@@ -190,19 +190,15 @@ export function urlJoin(options: ProxyServerOptions, ...args: string[]) {
   // Join all strings, but remove empty strings so we don't get extra slashes from
   // joining e.g. ['', 'am']
   //
-  let retStr = args
-    .filter(Boolean)
-    .join("/");
+  let retStr = args.filter(Boolean).join("/");
 
   // Avoid normalize url if option is set
   if (options.normalizeUrl) {
-    retStr = retStr.replace(/\/+/g, "/")
+    retStr = retStr.replace(/\/+/g, "/");
   }
 
   const retSegs = [
-    retStr
-      .replace("http:/", "http://")
-      .replace("https:/", "https://"),
+    retStr.replace("http:/", "http://").replace("https:/", "https://"),
   ];
 
   // Only join the query string if it exists so we don't have trailing a '?'
