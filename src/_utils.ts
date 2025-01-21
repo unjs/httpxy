@@ -101,9 +101,6 @@ export function setupOutgoing(outgoing, options, req, forward?) {
   // you are doing and are using conflicting options.
   //
   outgoingPath = options.ignorePath ? "" : outgoingPath;
-
-  console.log(targetPath, outgoingPath);
-
   outgoing.path = joinURL(targetPath, outgoingPath);
 
   if (options.changeOrigin) {
