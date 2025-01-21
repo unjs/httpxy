@@ -39,7 +39,6 @@ export class ProxyServer extends EventEmitter {
 
     this.options = options || {};
     this.options.prependPath = options.prependPath !== false;
-    this.options.normalizeUrl = options.normalizeUrl !== false;
 
     this.web = _createProxyFn("web", this);
     this.ws = _createProxyFn("ws", this);

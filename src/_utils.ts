@@ -1,4 +1,4 @@
-import { ProxyServerOptions } from "./types";
+import { joinURL } from "ufo";
 
 const upgradeHeader = /(^|,)\s*upgrade\s*($|,)/i;
 
@@ -102,7 +102,9 @@ export function setupOutgoing(outgoing, options, req, forward?) {
   //
   outgoingPath = options.ignorePath ? "" : outgoingPath;
 
-  outgoing.path = urlJoin(options, targetPath, outgoingPath);
+  console.log(targetPath, outgoingPath);
+
+  outgoing.path = joinURL(targetPath, outgoingPath);
 
   if (options.changeOrigin) {
     outgoing.headers.host =
@@ -168,46 +170,6 @@ export function getPort(req) {
  */
 export function hasEncryptedConnection(req) {
   return Boolean(req.connection.encrypted || req.connection.pair);
-}
-
-/**
- * OS-agnostic join (doesn't break on URLs like path.join does on Windows)>
- *
- * @return {String} The generated path.
- *
- * @api private
- */
-
-export function urlJoin(options: ProxyServerOptions, ...args: string[]) {
-  // We do not want to mess with the query string. All we want to touch is the path.
-  const lastIndex = args.length - 1;
-  const last = args[lastIndex];
-  const lastSegs = last.split("?");
-
-  args[lastIndex] = lastSegs.shift();
-
-  //
-  // Join all strings, but remove empty strings so we don't get extra slashes from
-  // joining e.g. ['', 'am']
-  //
-  let retStr = args.filter(Boolean).join("/");
-
-  // Avoid normalize url if option is set
-  if (options.normalizeUrl) {
-    retStr = retStr.replace(/\/+/g, "/");
-  }
-
-  const retSegs = [
-    retStr.replace("http:/", "http://").replace("https:/", "https://"),
-  ];
-
-  // Only join the query string if it exists so we don't have trailing a '?'
-  // on every request
-
-  // Handle case where there could be multiple ? in the URL.
-  retSegs.push(...lastSegs);
-
-  return retSegs.join("?");
 }
 
 /**

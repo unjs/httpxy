@@ -68,6 +68,4 @@ export interface ProxyServerOptions {
   selfHandleResponse?: boolean;
   /** Buffer */
   buffer?: stream.Stream;
-  /** If set to true, the path will be normalized by removing double slashes. Default: true */
-  normalizeUrl?: boolean;
 }

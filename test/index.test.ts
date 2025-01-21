@@ -59,15 +59,14 @@ describe("httpxy", () => {
   });
 
   it("should avoid normalize url", async () => {
-    await makeProxy({ normalizeUrl: false });
-    const mainResponse = await $fetch(mainListener.url + "base//test?foo");
-    const proxyResponse = await $fetch(proxyListener.url + "test?foo");
+    const mainResponse = await $fetch(mainListener.url + "base/a/b//c");
+    const proxyResponse = await $fetch(proxyListener.url + "a/b//c");
 
     expect(maskResponse(await mainResponse)).toMatchObject(
       maskResponse(proxyResponse),
     );
 
-    expect(proxyResponse.path).toBe("/base//test?foo");
+    expect(proxyResponse.path).toBe("/base/a/b//c");
 
     expect(lastResolved).toBe(true);
     expect(lastRejected).toBe(undefined);
