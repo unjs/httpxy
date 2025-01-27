@@ -1,6 +1,23 @@
 # Changelog
 
 
+## v0.1.7
+
+[compare changes](https://github.com/unjs/httpxy/compare/v0.1.6...v0.1.7)
+
+### 🩹 Fixes
+
+- Preserve double slashes in url ([#70](https://github.com/unjs/httpxy/pull/70))
+
+### 🏡 Chore
+
+- Update deps ([c9c9de8](https://github.com/unjs/httpxy/commit/c9c9de8))
+
+### ❤️ Contributors
+
+- Oskar Lebuda ([@OskarLebuda](http://github.com/OskarLebuda))
+- Pooya Parsa ([@pi0](http://github.com/pi0))
+
 ## v0.1.6
 
 [compare changes](https://github.com/unjs/httpxy/compare/v0.1.5...v0.1.6)
