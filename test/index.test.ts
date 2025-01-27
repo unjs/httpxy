@@ -1,7 +1,7 @@
-import { expect, it, describe, beforeAll } from "vitest";
+import { expect, it, describe } from "vitest";
 import { listen, Listener } from "listhen";
 import { $fetch } from "ofetch";
-import { createProxyServer, ProxyServer } from "../src";
+import { createProxyServer, ProxyServer, ProxyServerOptions } from "../src";
 
 describe("httpxy", () => {
   let mainListener: Listener;
@@ -11,7 +11,12 @@ describe("httpxy", () => {
   let lastResolved: any;
   let lastRejected: any;
 
-  beforeAll(async () => {
+  const maskResponse = (obj: any) => ({
+    ...obj,
+    headers: { ...obj.headers, connection: "<>", host: "<>" },
+  });
+
+  const makeProxy = async (options: ProxyServerOptions) => {
     mainListener = await listen((req, res) => {
       res.end(
         JSON.stringify({
@@ -22,7 +27,7 @@ describe("httpxy", () => {
       );
     });
 
-    proxy = createProxyServer({});
+    proxy = createProxyServer(options);
 
     proxyListener = await listen(async (req, res) => {
       lastResolved = false;
@@ -36,22 +41,32 @@ describe("httpxy", () => {
         res.end("Proxy error: " + error.toString());
       }
     });
-  });
+  };
 
   it("works", async () => {
+    await makeProxy({});
     const mainResponse = await $fetch(mainListener.url + "base/test?foo");
     const proxyResponse = await $fetch(proxyListener.url + "test?foo");
-
-    const maskResponse = (obj: any) => ({
-      ...obj,
-      headers: { ...obj.headers, connection: "<>", host: "<>" },
-    });
 
     expect(maskResponse(await mainResponse)).toMatchObject(
       maskResponse(proxyResponse),
     );
 
     expect(proxyResponse.path).toBe("/base/test?foo");
+
+    expect(lastResolved).toBe(true);
+    expect(lastRejected).toBe(undefined);
+  });
+
+  it("should avoid normalize url", async () => {
+    const mainResponse = await $fetch(mainListener.url + "base/a/b//c");
+    const proxyResponse = await $fetch(proxyListener.url + "a/b//c");
+
+    expect(maskResponse(await mainResponse)).toMatchObject(
+      maskResponse(proxyResponse),
+    );
+
+    expect(proxyResponse.path).toBe("/base/a/b//c");
 
     expect(lastResolved).toBe(true);
     expect(lastRejected).toBe(undefined);

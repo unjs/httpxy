@@ -99,8 +99,7 @@ export function setupOutgoing(outgoing, options, req, forward?) {
   // you are doing and are using conflicting options.
   //
   outgoingPath = options.ignorePath ? "" : outgoingPath;
-
-  outgoing.path = urlJoin(targetPath, outgoingPath);
+  outgoing.path = joinURL(targetPath, outgoingPath);
 
   if (options.changeOrigin) {
     outgoing.headers.host =
@@ -110,6 +109,29 @@ export function setupOutgoing(outgoing, options, req, forward?) {
         : outgoing.host;
   }
   return outgoing;
+}
+
+// From https://github.com/unjs/h3/blob/e8adfa/src/utils/internal/path.ts#L16C1-L36C2
+export function joinURL(
+  base: string | undefined,
+  path: string | undefined,
+): string {
+  if (!base || base === "/") {
+    return path || "/";
+  }
+  if (!path || path === "/") {
+    return base || "/";
+  }
+  // eslint-disable-next-line unicorn/prefer-at
+  const baseHasTrailing = base[base.length - 1] === "/";
+  const pathHasLeading = path[0] === "/";
+  if (baseHasTrailing && pathHasLeading) {
+    return base + path.slice(1);
+  }
+  if (!baseHasTrailing && !pathHasLeading) {
+    return base + "/" + path;
+  }
+  return base + path;
 }
 
 /**
@@ -166,44 +188,6 @@ export function getPort(req) {
  */
 export function hasEncryptedConnection(req) {
   return Boolean(req.connection.encrypted || req.connection.pair);
-}
-
-/**
- * OS-agnostic join (doesn't break on URLs like path.join does on Windows)>
- *
- * @return {String} The generated path.
- *
- * @api private
- */
-
-export function urlJoin(...args: string[]) {
-  // We do not want to mess with the query string. All we want to touch is the path.
-  const lastIndex = args.length - 1;
-  const last = args[lastIndex];
-  const lastSegs = last.split("?");
-
-  args[lastIndex] = lastSegs.shift();
-
-  //
-  // Join all strings, but remove empty strings so we don't get extra slashes from
-  // joining e.g. ['', 'am']
-  //
-  const retSegs = [
-    args
-      .filter(Boolean)
-      .join("/")
-      .replace(/\/+/g, "/")
-      .replace("http:/", "http://")
-      .replace("https:/", "https://"),
-  ];
-
-  // Only join the query string if it exists so we don't have trailing a '?'
-  // on every request
-
-  // Handle case where there could be multiple ? in the URL.
-  retSegs.push(...lastSegs);
-
-  return retSegs.join("?");
 }
 
 /**
