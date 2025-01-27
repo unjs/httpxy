@@ -1,5 +1,3 @@
-import { joinURL } from "ufo";
-
 const upgradeHeader = /(^|,)\s*upgrade\s*($|,)/i;
 
 /**
@@ -111,6 +109,29 @@ export function setupOutgoing(outgoing, options, req, forward?) {
         : outgoing.host;
   }
   return outgoing;
+}
+
+// From https://github.com/unjs/h3/blob/e8adfa/src/utils/internal/path.ts#L16C1-L36C2
+export function joinURL(
+  base: string | undefined,
+  path: string | undefined,
+): string {
+  if (!base || base === "/") {
+    return path || "/";
+  }
+  if (!path || path === "/") {
+    return base || "/";
+  }
+  // eslint-disable-next-line unicorn/prefer-at
+  const baseHasTrailing = base[base.length - 1] === "/";
+  const pathHasLeading = path[0] === "/";
+  if (baseHasTrailing && pathHasLeading) {
+    return base + path.slice(1);
+  }
+  if (!baseHasTrailing && !pathHasLeading) {
+    return base + "/" + path;
+  }
+  return base + path;
 }
 
 /**

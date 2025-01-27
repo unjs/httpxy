@@ -38,9 +38,6 @@ importers:
       typescript:
         specifier: ^5.7.3
         version: 5.7.3
-      ufo:
-        specifier: ^1.5.4
-        version: 1.5.4
       unbuild:
         specifier: ^3.3.1
         version: 3.3.1(typescript@5.7.3)
