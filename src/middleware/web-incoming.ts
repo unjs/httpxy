@@ -120,7 +120,10 @@ const stream = defineProxyMiddleware(
     req.on("error", proxyError);
     proxyReq.on("error", proxyError);
 
-    function createErrorHandler(proxyReq: httpNative.ClientRequest, url: NormalizedProxyTarget) {
+    function createErrorHandler(
+      proxyReq: httpNative.ClientRequest,
+      url: NormalizedProxyTarget,
+    ) {
       return function proxyError(err: Error) {
         if (
           req.socket.destroyed &&
