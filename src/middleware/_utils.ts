@@ -1,22 +1,35 @@
 import type { IncomingMessage, OutgoingMessage } from "node:http";
 import type { ProxyServer } from "../server";
-import type { ProxyServerOptions } from "../types";
+import type {
+  NormalizedProxyTarget,
+  NormalizedProxyTargetUrl,
+  ProxyServerOptions,
+} from "../types";
+import type { Socket } from "node:net";
 
-export type ProxyMiddleware = (
+export type ResOfType<T extends "web" | "ws"> = T extends "ws"
+  ? T extends "web"
+    ? OutgoingMessage | Socket
+    : Socket
+  : T extends "web"
+    ? OutgoingMessage
+    : never;
+
+export type ProxyMiddleware<T extends OutgoingMessage | Socket> = (
   req: IncomingMessage,
-  res: OutgoingMessage,
-  opts: ProxyServerOptions & { target: URL; forward: URL },
-  server?: ProxyServer,
+  res: T,
+  opts: ProxyServerOptions & {
+    target: NormalizedProxyTarget;
+    forward: NormalizedProxyTargetUrl;
+  },
+  server: ProxyServer,
   head?: Buffer,
-  callback?: (
-    err: any,
-    req: IncomingMessage,
-    socket: OutgoingMessage,
-    url?: any,
-  ) => void,
+  callback?: (err: any, req: IncomingMessage, socket: T, url?: any) => void,
 ) => void | true;
 
-export function defineProxyMiddleware(m: ProxyMiddleware) {
+export function defineProxyMiddleware<
+  T extends OutgoingMessage | Socket = OutgoingMessage,
+>(m: ProxyMiddleware<T>) {
   return m;
 }
 
@@ -24,7 +37,10 @@ export type ProxyOutgoingMiddleware = (
   req: IncomingMessage,
   res: OutgoingMessage,
   proxyRes: IncomingMessage,
-  opts: ProxyServerOptions & { target: URL; forward: URL },
+  opts: ProxyServerOptions & {
+    target: NormalizedProxyTarget;
+    forward: NormalizedProxyTargetUrl;
+  },
 ) => void | true;
 
 export function defineProxyOutgoingMiddleware(m: ProxyOutgoingMiddleware) {

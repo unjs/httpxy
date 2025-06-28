@@ -8,12 +8,13 @@ import {
   setupSocket,
 } from "../_utils";
 import { ProxyMiddleware, defineProxyMiddleware } from "./_utils";
+import type { Socket } from "node:net";
 
 /**
  * WebSocket requests must have the `GET` method and
  * the `upgrade:websocket` header
  */
-const checkMethodAndHeader = defineProxyMiddleware((req, socket) => {
+const checkMethodAndHeader = defineProxyMiddleware<Socket>((req, socket) => {
   if (req.method !== "GET" || !req.headers.upgrade) {
     socket.destroy();
     return true;
@@ -28,7 +29,7 @@ const checkMethodAndHeader = defineProxyMiddleware((req, socket) => {
 /**
  * Sets `x-forwarded-*` headers if specified in config.
  */
-const XHeaders = defineProxyMiddleware((req, socket, options) => {
+const XHeaders = defineProxyMiddleware<Socket>((req, socket, options) => {
   if (!options.xfwd) {
     return;
   }
@@ -39,7 +40,7 @@ const XHeaders = defineProxyMiddleware((req, socket, options) => {
     proto: hasEncryptedConnection(req) ? "wss" : "ws",
   };
 
-  for (const header of ["for", "port", "proto"]) {
+  for (const header of ["for", "port", "proto"] as const) {
     req.headers["x-forwarded-" + header] =
       (req.headers["x-forwarded-" + header] || "") +
       (req.headers["x-forwarded-" + header] ? "," : "") +
@@ -51,9 +52,12 @@ const XHeaders = defineProxyMiddleware((req, socket, options) => {
  * Does the actual proxying. Make the request and upgrade it
  * send the Switching Protocols request and pipe the sockets.
  */
-const stream = defineProxyMiddleware(
+const stream = defineProxyMiddleware<Socket>(
   (req, socket, options, server, head, callback) => {
-    const createHttpHeader = function (line, headers) {
+    const createHttpHeader = function (
+      line: string,
+      headers: http.OutgoingHttpHeaders,
+    ) {
       return (
         Object.keys(headers)
           // eslint-disable-next-line unicorn/no-array-reduce
@@ -80,12 +84,11 @@ const stream = defineProxyMiddleware(
     setupSocket(socket);
 
     if (head && head.length > 0) {
-      // @ts-expect-error
       socket.unshift(head);
     }
 
     const proxyReq = (
-      isSSL.test(options.target.protocol) ? https : http
+      isSSL.test(options.target.protocol || "undefined") ? https : http
     ).request(setupOutgoing(options.ssl || {}, options, req));
 
     // Enable developers to modify the proxyReq before headers are sent
@@ -162,7 +165,7 @@ const stream = defineProxyMiddleware(
   },
 );
 
-export const websocketIncomingMiddleware: readonly ProxyMiddleware[] = [
+export const websocketIncomingMiddleware: readonly ProxyMiddleware<Socket>[] = [
   checkMethodAndHeader,
   XHeaders,
   stream,
