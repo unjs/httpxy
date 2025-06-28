@@ -16,8 +16,10 @@ export interface ProxyTargetDetailed {
 }
 
 type ProxyTarget = ProxyTargetUrl | ProxyTargetDetailed;
+export type NormalizedProxyTarget = Exclude<ProxyTarget, string>;
 
-type ProxyTargetUrl = string | Partial<URL>;
+type ProxyTargetUrl = string | URL;
+export type NormalizedProxyTargetUrl = Exclude<ProxyTargetUrl, string>;
 
 export interface ProxyServerOptions {
   /** URL string to be parsed with the url module. */

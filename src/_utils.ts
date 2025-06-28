@@ -1,3 +1,15 @@
+import httpNative from "node:http";
+import httpsNative from "node:https";
+import type tls from "node:tls";
+import net from "node:net";
+import type {
+  NormalizedProxyTarget,
+  NormalizedProxyTargetUrl,
+  ProxyServerOptions,
+  ProxyTargetDetailed,
+} from "./types";
+import type url from "node:url";
+
 const upgradeHeader = /(^|,)\s*upgrade\s*($|,)/i;
 
 /**
@@ -15,19 +27,29 @@ export const isSSL = /^https|wss/;
  *    common.setupOutgoing(outgoing, options, req)
  *    // => { host: ..., hostname: ...}
  *
- * @param {Object} Outgoing Base object to be filled with required properties
- * @param {Object} Options Config object passed to the proxy
- * @param {ClientRequest} Req Request Object
- * @param {String} Forward String to select forward or target
+ * @param outgoing Base object to be filled with required properties
+ * @param options Config object passed to the proxy
+ * @param req Request Object
+ * @param forward String to select forward or target
  *
- * @return {Object} Outgoing Object with all required properties set
+ * @return Outgoing Object with all required properties set
  *
  * @api private
  */
-export function setupOutgoing(outgoing, options, req, forward?) {
+export function setupOutgoing(
+  outgoing: httpNative.RequestOptions & httpsNative.RequestOptions,
+  options: ProxyServerOptions & {
+    target: NormalizedProxyTarget;
+    forward: NormalizedProxyTargetUrl;
+  },
+  req: httpNative.IncomingMessage,
+  forward?: "forward" | "target",
+): httpNative.RequestOptions | httpsNative.RequestOptions {
   outgoing.port =
     options[forward || "target"].port ||
-    (isSSL.test(options[forward || "target"].protocol) ? 443 : 80);
+    (isSSL.test(options[forward || "target"].protocol ?? "undefined")
+      ? 443
+      : 80);
 
   for (const e of [
     "host",
@@ -40,10 +62,13 @@ export function setupOutgoing(outgoing, options, req, forward?) {
     "ca",
     "ciphers",
     "secureProtocol",
-  ]) {
-    outgoing[e] = options[forward || "target"][e];
+  ] as const) {
+    const value = (options[forward || "target"] as ProxyTargetDetailed)[e];
+    // @ts-expect-error -- this mapping is valid
+    outgoing[e] = value;
   }
 
+  // @ts-expect-error - options.method is undocumented
   outgoing.method = options.method || req.method;
   outgoing.headers = { ...req.headers };
 
@@ -55,11 +80,13 @@ export function setupOutgoing(outgoing, options, req, forward?) {
     outgoing.auth = options.auth;
   }
 
+  // @ts-expect-error - options.ca is undocumented
   if (options.ca) {
+    // @ts-expect-error - options.ca is undocumented
     outgoing.ca = options.ca;
   }
 
-  if (isSSL.test(options[forward || "target"].protocol)) {
+  if (isSSL.test(options[forward || "target"].protocol ?? "undefined")) {
     outgoing.rejectUnauthorized =
       options.secure === undefined ? true : options.secure;
   }
@@ -85,10 +112,13 @@ export function setupOutgoing(outgoing, options, req, forward?) {
   const target = options[forward || "target"];
   const targetPath =
     target && options.prependPath !== false
-      ? target.pathname || target.path || ""
+      ? (target as URL).pathname ||
+        // NOTE: http-proxy receives url.Url instead of URL
+        (target as Partial<url.Url>).path ||
+        ""
       : "";
 
-  const parsed = new URL(req.url, "http://localhost");
+  const parsed = new URL(req.url!, "http://localhost");
   let outgoingPath = options.toProxy
     ? req.url
     : parsed.pathname + parsed.search || "";
@@ -106,7 +136,7 @@ export function setupOutgoing(outgoing, options, req, forward?) {
       requiresPort(outgoing.port, options[forward || "target"].protocol) &&
       !hasPort(outgoing.host)
         ? outgoing.host + ":" + outgoing.port
-        : outgoing.host;
+        : (outgoing.host as string | undefined);
   }
   return outgoing;
 }
@@ -144,14 +174,14 @@ export function joinURL(
  *    common.setupSocket(socket)
  *    // => Socket
  *
- * @param {Socket} Socket instance to setup
+ * @param socket instance to setup
  *
- * @return {Socket} Return the configured socket.
+ * @return Return the configured socket.
  *
  * @api private
  */
 
-export function setupSocket(socket) {
+export function setupSocket(socket: net.Socket): net.Socket {
   socket.setTimeout(0);
   socket.setNoDelay(true);
 
@@ -163,13 +193,13 @@ export function setupSocket(socket) {
 /**
  * Get the port number from the host. Or guess it based on the connection type.
  *
- * @param {Request} req Incoming HTTP request.
+ * @param req Incoming HTTP request.
  *
- * @return {String} The port number.
+ * @return The port number.
  *
  * @api private
  */
-export function getPort(req) {
+export function getPort(req: httpNative.IncomingMessage): string {
   const res = req.headers.host ? req.headers.host.match(/:(\d+)/) : "";
   if (res) {
     return res[1];
@@ -180,26 +210,45 @@ export function getPort(req) {
 /**
  * Check if the request has an encrypted connection.
  *
- * @param {Request} req Incoming HTTP request.
+ * @param req Incoming HTTP request.
  *
- * @return {Boolean} Whether the connection is encrypted or not.
+ * @return Whether the connection is encrypted or not.
  *
  * @api private
  */
-export function hasEncryptedConnection(req) {
-  return Boolean(req.connection.encrypted || req.connection.pair);
+export function hasEncryptedConnection(
+  req: httpNative.IncomingMessage,
+): boolean {
+  return Boolean(
+    // req.connection.pair probably does not exist anymore
+    (req.connection as tls.TLSSocket).encrypted || (req.connection as any).pair,
+  );
 }
 
 /**
  * Rewrites or removes the domain of a cookie header
  *
- * @param {String|Array} Header
- * @param {Object} Config, mapping of domain to rewritten domain.
- *                 '*' key to match any domain, null value to remove the domain.
+ * @param header
+ * @param config, mapping of domain to rewritten domain.
+ *        '*' key to match any domain, null value to remove the domain.
  *
  * @api private
  */
-export function rewriteCookieProperty(header, config, property) {
+export function rewriteCookieProperty(
+  header: string,
+  config: Record<string, string>,
+  property: string,
+): string;
+export function rewriteCookieProperty(
+  header: string | string[],
+  config: Record<string, string>,
+  property: string,
+): string | string[];
+export function rewriteCookieProperty(
+  header: string | string[],
+  config: Record<string, string>,
+  property: string,
+): string | string[] {
   if (Array.isArray(header)) {
     return header.map(function (headerElement) {
       return rewriteCookieProperty(headerElement, config, property);
@@ -226,12 +275,12 @@ export function rewriteCookieProperty(header, config, property) {
 /**
  * Check the host and see if it potentially has a port in it (keep it simple)
  *
- * @returns {Boolean} Whether we have one or not
+ * @returns Whether we have one or not
  *
  * @api private
  */
-export function hasPort(host: string) {
-  return !!~host.indexOf(":");
+export function hasPort(host: string | null | undefined): boolean {
+  return host ? !!~host.indexOf(":") : false;
 }
 
 /**
@@ -239,12 +288,15 @@ export function hasPort(host: string) {
  *
  * Ported from https://github.com/unshiftio/requires-port/blob/master/index.js
  *
- * @returns {Boolean} Whether the port is required for the protocol
+ * @returns Whether the port is required for the protocol
  *
  * @api private
  */
-export function requiresPort(_port: string, _protocol: string) {
-  const protocol = _protocol.split(":")[0];
+export function requiresPort(
+  _port: string | number,
+  _protocol: string | undefined,
+): boolean {
+  const protocol = _protocol?.split(":")[0];
   const port = +_port;
 
   if (!port) return false;

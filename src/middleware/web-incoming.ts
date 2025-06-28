@@ -3,6 +3,7 @@ import httpsNative from "node:https";
 import { getPort, hasEncryptedConnection, setupOutgoing } from "../_utils";
 import { webOutgoingMiddleware } from "./web-outgoing";
 import { ProxyMiddleware, defineProxyMiddleware } from "./_utils";
+import type { NormalizedProxyTarget } from "../types";
 
 const nativeAgents = { http: httpNative, https: httpsNative };
 
@@ -43,7 +44,7 @@ const XHeaders = defineProxyMiddleware((req, res, options) => {
     proto: encrypted ? "https" : "http",
   };
 
-  for (const header of ["for", "port", "proto"]) {
+  for (const header of ["for", "port", "proto"] as const) {
     req.headers["x-forwarded-" + header] =
       (req.headers["x-forwarded-" + header] || "") +
       (req.headers["x-forwarded-" + header] ? "," : "") +
@@ -95,7 +96,7 @@ const stream = defineProxyMiddleware(
     ).request(setupOutgoing(options.ssl || {}, options, req));
 
     // Enable developers to modify the proxyReq before headers are sent
-    proxyReq.on("socket", (socket) => {
+    proxyReq.on("socket", (_socket) => {
       if (server && !proxyReq.getHeader("expect")) {
         server.emit("proxyReq", proxyReq, req, res, options);
       }
@@ -119,9 +120,12 @@ const stream = defineProxyMiddleware(
     req.on("error", proxyError);
     proxyReq.on("error", proxyError);
 
-    function createErrorHandler(proxyReq, url) {
-      return function proxyError(err) {
-        if (req.socket.destroyed && err.code === "ECONNRESET") {
+    function createErrorHandler(proxyReq: httpNative.ClientRequest, url: NormalizedProxyTarget) {
+      return function proxyError(err: Error) {
+        if (
+          req.socket.destroyed &&
+          (err as NodeJS.ErrnoException).code === "ECONNRESET"
+        ) {
           server.emit("econnreset", err, req, res, url);
           return proxyReq.abort();
         }
@@ -173,9 +177,5 @@ const stream = defineProxyMiddleware(
   },
 );
 
-export const webIncomingMiddleware: readonly ProxyMiddleware[] = [
-  deleteLength,
-  timeout,
-  XHeaders,
-  stream,
-] as const;
+export const webIncomingMiddleware: readonly ProxyMiddleware<httpNative.OutgoingMessage>[] =
+  [deleteLength, timeout, XHeaders, stream] as const;
