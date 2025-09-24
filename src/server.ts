@@ -49,7 +49,7 @@ export class ProxyServer extends EventEmitter {
    * @param port - Port to listen on
    * @param hostname - The hostname to listen on
    */
-  listen(port: number, hostname: string) {
+  listen(port: number, hostname?: string) {
     const closure = (req, res) => {
       this.web(req, res);
     };
@@ -61,7 +61,7 @@ export class ProxyServer extends EventEmitter {
     if (this.options.ws) {
       this._server.on("upgrade", (req, socket, head) => {
         // @ts-expect-error
-        this._ws(req, socket, head);
+        this.ws(req, socket, head);
       });
     }
 

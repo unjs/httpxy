@@ -31,18 +31,30 @@
     "test:types": "tsc --noEmit"
   },
   "devDependencies": {
+    "@types/async": "^3.2.25",
+    "@types/concat-stream": "^2.0.3",
     "@types/node": "^24.5.2",
+    "@types/sse": "^0.0.0",
+    "@types/ws": "^8.18.1",
     "@vitest/coverage-v8": "^3.2.4",
+    "async": "^3.2.6",
     "changelogen": "^0.6.2",
+    "concat-stream": "^2.0.0",
     "eslint": "^9.36.0",
     "eslint-config-unjs": "^0.5.0",
+    "expect.js": "^0.3.1",
     "jiti": "^2.6.0",
     "listhen": "^1.9.0",
     "ofetch": "^1.4.1",
     "prettier": "^3.6.2",
+    "semver": "^7.7.2",
+    "socket.io": "^4.8.1",
+    "socket.io-client": "^4.8.1",
+    "sse": "^0.0.8",
     "typescript": "^5.9.2",
     "unbuild": "^3.6.1",
-    "vitest": "^3.2.4"
+    "vitest": "^3.2.4",
+    "ws": "^8.18.3"
   },
   "packageManager": "pnpm@10.17.1"
 }

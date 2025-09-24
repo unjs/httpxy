@@ -38,7 +38,7 @@ describe("httpxy", () => {
       } catch (error) {
         lastRejected = error;
         res.statusCode = 500;
-        res.end("Proxy error: " + error.toString());
+        res.end("Proxy error: " + (error as Error).toString());
       }
     });
   };
