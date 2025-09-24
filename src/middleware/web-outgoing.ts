@@ -9,25 +9,29 @@ const redirectRegex = /^201|30([1278])$/;
 /**
  * If is a HTTP 1.0 request, remove chunk headers
  */
-const removeChunked = defineProxyOutgoingMiddleware((req, res, proxyRes) => {
-  if (req.httpVersion === "1.0") {
-    delete proxyRes.headers["transfer-encoding"];
-  }
-});
+export const removeChunked = defineProxyOutgoingMiddleware(
+  (req, res, proxyRes) => {
+    if (req.httpVersion === "1.0") {
+      delete proxyRes.headers["transfer-encoding"];
+    }
+  },
+);
 
 /**
  * If is a HTTP 1.0 request, set the correct connection header
  * or if connection header not present, then use `keep-alive`
  */
-const setConnection = defineProxyOutgoingMiddleware((req, res, proxyRes) => {
-  if (req.httpVersion === "1.0") {
-    proxyRes.headers.connection = req.headers.connection || "close";
-  } else if (req.httpVersion !== "2.0" && !proxyRes.headers.connection) {
-    proxyRes.headers.connection = req.headers.connection || "keep-alive";
-  }
-});
+export const setConnection = defineProxyOutgoingMiddleware(
+  (req, res, proxyRes) => {
+    if (req.httpVersion === "1.0") {
+      proxyRes.headers.connection = req.headers.connection || "close";
+    } else if (req.httpVersion !== "2.0" && !proxyRes.headers.connection) {
+      proxyRes.headers.connection = req.headers.connection || "keep-alive";
+    }
+  },
+);
 
-const setRedirectHostRewrite = defineProxyOutgoingMiddleware(
+export const setRedirectHostRewrite = defineProxyOutgoingMiddleware(
   (req, res, proxyRes, options) => {
     if (
       (options.hostRewrite || options.autoRewrite || options.protocolRewrite) &&
@@ -67,7 +71,7 @@ const setRedirectHostRewrite = defineProxyOutgoingMiddleware(
  *
  * @api private
  */
-const writeHeaders = defineProxyOutgoingMiddleware(
+export const writeHeaders = defineProxyOutgoingMiddleware(
   (req, res, proxyRes, options) => {
     let rewriteCookieDomainConfig = options.cookieDomainRewrite;
     let rewriteCookiePathConfig = options.cookiePathRewrite;
@@ -123,18 +127,20 @@ const writeHeaders = defineProxyOutgoingMiddleware(
 /**
  * Set the statusCode from the proxyResponse
  */
-const writeStatusCode = defineProxyOutgoingMiddleware((req, res, proxyRes) => {
-  // From Node.js docs: response.writeHead(statusCode[, statusMessage][, headers])
-  if (proxyRes.statusMessage) {
-    // @ts-expect-error
-    res.statusCode = proxyRes.statusCode;
-    // @ts-expect-error
-    res.statusMessage = proxyRes.statusMessage;
-  } else {
-    // @ts-expect-error
-    res.statusCode = proxyRes.statusCode;
-  }
-});
+export const writeStatusCode = defineProxyOutgoingMiddleware(
+  (req, res, proxyRes) => {
+    // From Node.js docs: response.writeHead(statusCode[, statusMessage][, headers])
+    if (proxyRes.statusMessage) {
+      // @ts-expect-error
+      res.statusCode = proxyRes.statusCode;
+      // @ts-expect-error
+      res.statusMessage = proxyRes.statusMessage;
+    } else {
+      // @ts-expect-error
+      res.statusCode = proxyRes.statusCode;
+    }
+  },
+);
 
 export const webOutgoingMiddleware: readonly ProxyOutgoingMiddleware[] = [
   removeChunked,
