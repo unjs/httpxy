@@ -131,7 +131,7 @@ export function setupOutgoing(
       requiresPort(outgoing.port, options[forward || "target"].protocol) &&
       !hasPort(outgoing.host)
         ? outgoing.host + ":" + outgoing.port
-        : (outgoing.host as string | undefined);
+        : outgoing.host ?? undefined;
   }
   return outgoing;
 }
