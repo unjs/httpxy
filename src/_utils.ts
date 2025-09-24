@@ -1,8 +1,13 @@
 import httpNative from "node:http";
 import httpsNative from "node:https";
 import type tls from "node:tls";
+import type { Url as LegacyURL } from "node:url";
 import net from "node:net";
-import type { ProxyServerOptions, ProxyTargetDetailed } from "./types";
+import type {
+  ProxyServerOptions,
+  ProxyTarget,
+  ProxyTargetDetailed,
+} from "./types";
 
 const upgradeHeader = /(^|,)\s*upgrade\s*($|,)/i;
 
@@ -33,15 +38,17 @@ export const isSSL = /^https|wss/;
 export function setupOutgoing(
   outgoing: httpNative.RequestOptions & httpsNative.RequestOptions,
   options: ProxyServerOptions & {
-    target: URL | ProxyTargetDetailed;
-    forward: URL;
+    target: ProxyTarget;
+    forward?: ProxyTarget;
   },
   req: httpNative.IncomingMessage,
   forward?: "forward" | "target",
 ): httpNative.RequestOptions | httpsNative.RequestOptions {
   outgoing.port =
-    options[forward || "target"].port ||
-    (isSSL.test(options[forward || "target"].protocol ?? "http") ? 443 : 80);
+    (options[forward || "target"] as URL).port ||
+    (isSSL.test((options[forward || "target"] as URL).protocol ?? "http")
+      ? 443
+      : 80);
 
   for (const e of [
     "host",
@@ -78,7 +85,7 @@ export function setupOutgoing(
     outgoing.ca = options.ca;
   }
 
-  if (isSSL.test(options[forward || "target"].protocol ?? "undefined")) {
+  if (isSSL.test((options[forward || "target"] as URL).protocol ?? "http")) {
     outgoing.rejectUnauthorized =
       options.secure === undefined ? true : options.secure;
   }
@@ -104,7 +111,7 @@ export function setupOutgoing(
   const target = options[forward || "target"];
   const targetPath =
     target && options.prependPath !== false
-      ? (target as URL).pathname || ""
+      ? (target as URL).pathname || (target as LegacyURL).path || ""
       : "";
 
   const parsed = new URL(req.url!, "http://localhost");
@@ -122,8 +129,10 @@ export function setupOutgoing(
 
   if (options.changeOrigin) {
     outgoing.headers.host =
-      requiresPort(outgoing.port, options[forward || "target"].protocol) &&
-      !hasPort(outgoing.host)
+      requiresPort(
+        outgoing.port,
+        (options[forward || "target"] as URL).protocol,
+      ) && !hasPort(outgoing.host)
         ? outgoing.host + ":" + outgoing.port
         : (outgoing.host ?? undefined);
   }
