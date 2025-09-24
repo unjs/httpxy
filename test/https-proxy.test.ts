@@ -31,7 +31,7 @@ describe("lib/http-proxy.js", () => {
 
         const proxy = httpProxy
           .createProxyServer({
-            target: "http://127.0.0.1:" + ports.source,
+            target: "http://localhost:" + ports.source,
             ssl: {
               key: fs.readFileSync(
                 path.join(__dirname, "fixtures", "agent2-key.pem"),
@@ -100,7 +100,7 @@ describe("lib/http-proxy.js", () => {
 
         const proxy = httpProxy
           .createProxyServer({
-            target: "https://127.0.0.1:" + ports.source,
+            target: "https://localhost:" + ports.source,
             // Allow to use SSL self signed
             secure: false,
           })
@@ -109,7 +109,7 @@ describe("lib/http-proxy.js", () => {
         http
           .request(
             {
-              hostname: "127.0.0.1",
+              hostname: "localhost",
               port: ports.proxy,
               method: "GET",
             },
@@ -160,7 +160,7 @@ describe("lib/http-proxy.js", () => {
 
         const proxy = httpProxy
           .createProxyServer({
-            target: "https://127.0.0.1:" + ports.source,
+            target: "https://localhost:" + ports.source,
             ssl: {
               key: fs.readFileSync(
                 path.join(__dirname, "fixtures", "agent2-key.pem"),
@@ -218,7 +218,7 @@ describe("lib/http-proxy.js", () => {
           .listen(ports.source);
 
         const proxy = httpProxy.createProxyServer({
-          target: "https://127.0.0.1:" + ports.source,
+          target: "https://localhost:" + ports.source,
           secure: true,
         });
 
@@ -238,7 +238,7 @@ describe("lib/http-proxy.js", () => {
 
         http
           .request({
-            hostname: "127.0.0.1",
+            hostname: "localhost",
             port: ports.proxy,
             method: "GET",
           })
@@ -281,7 +281,7 @@ describe("lib/http-proxy.js", () => {
             },
             function (req, res) {
               proxy.web(req, res, {
-                target: "http://127.0.0.1:" + ports.source,
+                target: "http://localhost:" + ports.source,
               });
             },
           )

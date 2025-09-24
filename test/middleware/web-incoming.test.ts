@@ -86,7 +86,7 @@ describe("#createProxyServer.web() using own http server", () => {
   it("should proxy the request using the web proxy handler", async () => {
     const { resolve, promise } = Promise.withResolvers<void>();
     const proxy = httpProxy.createProxyServer({
-      target: "http://127.0.0.1:8080",
+      target: "http://localhost:8080",
     });
 
     function requestHandler(req: any, res: any) {
@@ -106,7 +106,7 @@ describe("#createProxyServer.web() using own http server", () => {
     proxyServer.listen("8081");
     source.listen("8080");
 
-    http.request("http://127.0.0.1:8081", () => {}).end();
+    http.request("http://localhost:8081", () => {}).end();
 
     await promise;
   });
@@ -114,7 +114,7 @@ describe("#createProxyServer.web() using own http server", () => {
   it("should detect a proxyReq event and modify headers", async () => {
     const { resolve, promise } = Promise.withResolvers<void>();
     const proxy = httpProxy.createProxyServer({
-      target: "http://127.0.0.1:8080",
+      target: "http://localhost:8080",
     });
 
     proxy.on("proxyReq", function (proxyReq, req, res, options) {
@@ -137,14 +137,14 @@ describe("#createProxyServer.web() using own http server", () => {
     proxyServer.listen("8081");
     source.listen("8080");
 
-    http.request("http://127.0.0.1:8081", () => {}).end();
+    http.request("http://localhost:8081", () => {}).end();
     await promise;
   });
 
   it('should skip proxyReq event when handling a request with header "expect: 100-continue" [https://www.npmjs.com/advisories/1486]', async () => {
     const { resolve, promise } = Promise.withResolvers<void>();
     const proxy = httpProxy.createProxyServer({
-      target: "http://127.0.0.1:8080",
+      target: "http://localhost:8080",
     });
 
     proxy.on("proxyReq", function (proxyReq, req, res, options) {
@@ -170,7 +170,7 @@ describe("#createProxyServer.web() using own http server", () => {
     const postData = "".padStart(1025, "x");
 
     const postOptions = {
-      hostname: "127.0.0.1",
+      hostname: "localhost",
       port: 8081,
       path: "/",
       method: "POST",
@@ -191,7 +191,7 @@ describe("#createProxyServer.web() using own http server", () => {
   it("should proxy the request and handle error via callback", async () => {
     const { resolve, promise } = Promise.withResolvers<void>();
     const proxy = httpProxy.createProxyServer({
-      target: "http://127.0.0.1:8080",
+      target: "http://localhost:8080",
     });
 
     const proxyServer = http.createServer(requestHandler);
@@ -209,7 +209,7 @@ describe("#createProxyServer.web() using own http server", () => {
     http
       .request(
         {
-          hostname: "127.0.0.1",
+          hostname: "localhost",
           port: "8082",
           method: "GET",
         },
@@ -224,7 +224,7 @@ describe("#createProxyServer.web() using own http server", () => {
     async () => {
       const { resolve, promise } = Promise.withResolvers<void>();
       const proxy = httpProxy.createProxyServer({
-        target: "http://127.0.0.1:8080",
+        target: "http://localhost:8080",
       });
 
       const proxyServer = http.createServer(requestHandler);
@@ -247,7 +247,7 @@ describe("#createProxyServer.web() using own http server", () => {
       http
         .request(
           {
-            hostname: "127.0.0.1",
+            hostname: "localhost",
             port: "8083",
             method: "GET",
           },
@@ -263,7 +263,7 @@ describe("#createProxyServer.web() using own http server", () => {
     async () => {
       const { resolve, promise } = Promise.withResolvers<void>();
       const proxy = httpProxy.createProxyServer({
-        forward: "http://127.0.0.1:8080",
+        forward: "http://localhost:8080",
       });
 
       const proxyServer = http.createServer(requestHandler);
@@ -286,7 +286,7 @@ describe("#createProxyServer.web() using own http server", () => {
       http
         .request(
           {
-            hostname: "127.0.0.1",
+            hostname: "localhost",
             port: "9083",
             method: "GET",
           },
@@ -302,7 +302,7 @@ describe("#createProxyServer.web() using own http server", () => {
     async () => {
       const { resolve, promise } = Promise.withResolvers<void>();
       const proxy = httpProxy.createProxyServer({
-        target: "http://127.0.0.1:45000",
+        target: "http://localhost:45000",
         proxyTimeout: 100,
       });
 
@@ -330,7 +330,7 @@ describe("#createProxyServer.web() using own http server", () => {
       http
         .request(
           {
-            hostname: "127.0.0.1",
+            hostname: "localhost",
             port: "8084",
             method: "GET",
           },
@@ -344,7 +344,7 @@ describe("#createProxyServer.web() using own http server", () => {
   it.todo("should proxy the request and handle timeout error", async () => {
     const { resolve, promise } = Promise.withResolvers<void>();
     const proxy = httpProxy.createProxyServer({
-      target: "http://127.0.0.1:45001",
+      target: "http://localhost:45001",
       timeout: 100,
     });
 
@@ -376,7 +376,7 @@ describe("#createProxyServer.web() using own http server", () => {
 
     const req = http.request(
       {
-        hostname: "127.0.0.1",
+        hostname: "localhost",
         port: "8085",
         method: "GET",
       },
@@ -396,7 +396,7 @@ describe("#createProxyServer.web() using own http server", () => {
   it("should proxy the request and provide a proxyRes event with the request and response parameters", async () => {
     const { resolve, promise } = Promise.withResolvers<void>();
     const proxy = httpProxy.createProxyServer({
-      target: "http://127.0.0.1:8080",
+      target: "http://localhost:8080",
     });
 
     function requestHandler(req: any, res: any) {
@@ -419,14 +419,14 @@ describe("#createProxyServer.web() using own http server", () => {
 
     proxyServer.listen("8086");
     source.listen("8080");
-    http.request("http://127.0.0.1:8086", () => {}).end();
+    http.request("http://localhost:8086", () => {}).end();
     await promise;
   });
 
   it("should proxy the request and provide and respond to manual user response when using modifyResponse", async () => {
     const { resolve, promise } = Promise.withResolvers<void>();
     const proxy = httpProxy.createProxyServer({
-      target: "http://127.0.0.1:8080",
+      target: "http://localhost:8080",
       selfHandleResponse: true,
     });
 
@@ -456,7 +456,7 @@ describe("#createProxyServer.web() using own http server", () => {
       ],
       function (err) {
         http
-          .get("http://127.0.0.1:8086", function (res) {
+          .get("http://localhost:8086", function (res) {
             res.pipe(
               concat(function (body) {
                 expect(body.toString("utf8")).eql("my-custom-response");
@@ -475,7 +475,7 @@ describe("#createProxyServer.web() using own http server", () => {
   it("should proxy the request and handle changeOrigin option", async () => {
     const { resolve, promise } = Promise.withResolvers<void>();
     const proxy = httpProxy.createProxyServer({
-      target: "http://127.0.0.1:8080",
+      target: "http://localhost:8080",
       changeOrigin: true,
     });
 
@@ -496,14 +496,14 @@ describe("#createProxyServer.web() using own http server", () => {
     proxyServer.listen("8081");
     source.listen("8080");
 
-    http.request("http://127.0.0.1:8081", () => {}).end();
+    http.request("http://localhost:8081", () => {}).end();
     await promise;
   });
 
   it("should proxy the request with the Authorization header set", async () => {
     const { resolve, promise } = Promise.withResolvers<void>();
     const proxy = httpProxy.createProxyServer({
-      target: "http://127.0.0.1:8080",
+      target: "http://localhost:8080",
       auth: "user:pass",
     });
 
@@ -528,7 +528,7 @@ describe("#createProxyServer.web() using own http server", () => {
     proxyServer.listen("8081");
     source.listen("8080");
 
-    http.request("http://127.0.0.1:8081", () => {}).end();
+    http.request("http://localhost:8081", () => {}).end();
     await promise;
   });
 
@@ -537,17 +537,17 @@ describe("#createProxyServer.web() using own http server", () => {
     const proxy = httpProxy.createProxyServer();
 
     // proxies to two servers depending on url, rewriting the url as well
-    // http://127.0.0.1:8080/s1/ -> http://127.0.0.1:8081/
-    // http://127.0.0.1:8080/ -> http://127.0.0.1:8082/
+    // http://localhost:8080/s1/ -> http://localhost:8081/
+    // http://localhost:8080/ -> http://localhost:8082/
     function requestHandler(req: any, res: any) {
       if (req.url.indexOf("/s1/") === 0) {
         proxy.web(req, res, {
           ignorePath: true,
-          target: "http://127.0.0.1:8081" + req.url.slice(3),
+          target: "http://localhost:8081" + req.url.slice(3),
         });
       } else {
         proxy.web(req, res, {
-          target: "http://127.0.0.1:8082",
+          target: "http://localhost:8082",
         });
       }
     }
@@ -574,8 +574,8 @@ describe("#createProxyServer.web() using own http server", () => {
     source1.listen("8081");
     source2.listen("8082");
 
-    http.request("http://127.0.0.1:8080/s1/test1", () => {}).end();
-    http.request("http://127.0.0.1:8080/test2", () => {}).end();
+    http.request("http://localhost:8080/s1/test1", () => {}).end();
+    http.request("http://localhost:8080/test2", () => {}).end();
     await promise;
   });
 });
@@ -584,7 +584,7 @@ describe.todo("#followRedirects", () => {
   it("should proxy the request follow redirects", async () => {
     const { resolve, promise } = Promise.withResolvers<void>();
     const proxy = httpProxy.createProxyServer({
-      target: "http://127.0.0.1:8080",
+      target: "http://localhost:8080",
       // followRedirects: true,
     });
 
@@ -608,7 +608,7 @@ describe.todo("#followRedirects", () => {
     source.listen("8080");
 
     http
-      .request("http://127.0.0.1:8081", function (res) {
+      .request("http://localhost:8081", function (res) {
         source.close();
         proxyServer.close();
         expect(res.statusCode).to.eql(200);
