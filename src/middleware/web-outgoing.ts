@@ -45,7 +45,9 @@ const setRedirectHostRewrite = defineProxyOutgoingMiddleware(
       if (options.hostRewrite) {
         u.host = options.hostRewrite;
       } else if (options.autoRewrite) {
-        u.host = req.headers.host ?? "undefined";
+        if (req.headers.host) {
+          u.host = req.headers.host;
+        }
       }
       if (options.protocolRewrite) {
         u.protocol = options.protocolRewrite;
