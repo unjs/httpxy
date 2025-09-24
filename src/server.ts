@@ -64,7 +64,7 @@ export class ProxyServer extends EventEmitter {
     if (this.options.ws) {
       this._server.on("upgrade", (req, socket, head) => {
         // @ts-expect-error
-        this._ws(req, socket, head);
+        this.ws(req, socket, head);
       });
     }
 

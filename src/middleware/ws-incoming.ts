@@ -14,45 +14,49 @@ import type { Socket } from "node:net";
  * WebSocket requests must have the `GET` method and
  * the `upgrade:websocket` header
  */
-const checkMethodAndHeader = defineProxyMiddleware<Socket>((req, socket) => {
-  if (req.method !== "GET" || !req.headers.upgrade) {
-    socket.destroy();
-    return true;
-  }
+export const checkMethodAndHeader = defineProxyMiddleware<Socket>(
+  (req, socket) => {
+    if (req.method !== "GET" || !req.headers.upgrade) {
+      socket.destroy();
+      return true;
+    }
 
-  if (req.headers.upgrade.toLowerCase() !== "websocket") {
-    socket.destroy();
-    return true;
-  }
-});
+    if (req.headers.upgrade.toLowerCase() !== "websocket") {
+      socket.destroy();
+      return true;
+    }
+  },
+);
 
 /**
  * Sets `x-forwarded-*` headers if specified in config.
  */
-const XHeaders = defineProxyMiddleware<Socket>((req, socket, options) => {
-  if (!options.xfwd) {
-    return;
-  }
+export const XHeaders = defineProxyMiddleware<Socket>(
+  (req, socket, options) => {
+    if (!options.xfwd) {
+      return;
+    }
 
-  const values = {
-    for: req.connection.remoteAddress || req.socket.remoteAddress,
-    port: getPort(req),
-    proto: hasEncryptedConnection(req) ? "wss" : "ws",
-  };
+    const values = {
+      for: req.connection.remoteAddress || req.socket.remoteAddress,
+      port: getPort(req),
+      proto: hasEncryptedConnection(req) ? "wss" : "ws",
+    };
 
-  for (const header of ["for", "port", "proto"] as const) {
-    req.headers["x-forwarded-" + header] =
-      (req.headers["x-forwarded-" + header] || "") +
-      (req.headers["x-forwarded-" + header] ? "," : "") +
-      values[header];
-  }
-});
+    for (const header of ["for", "port", "proto"] as const) {
+      req.headers["x-forwarded-" + header] =
+        (req.headers["x-forwarded-" + header] || "") +
+        (req.headers["x-forwarded-" + header] ? "," : "") +
+        values[header];
+    }
+  },
+);
 
 /**
  * Does the actual proxying. Make the request and upgrade it
  * send the Switching Protocols request and pipe the sockets.
  */
-const stream = defineProxyMiddleware<Socket>(
+export const stream = defineProxyMiddleware<Socket>(
   (req, socket, options, server, head, callback) => {
     const createHttpHeader = function (
       line: string,
