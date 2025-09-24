@@ -112,8 +112,7 @@ export function setupOutgoing(
   const target = options[forward || "target"];
   const targetPath =
     target && options.prependPath !== false
-      ? (target as URL).pathname ||
-        ""
+      ? (target as URL).pathname || ""
       : "";
 
   const parsed = new URL(req.url!, "http://localhost");
