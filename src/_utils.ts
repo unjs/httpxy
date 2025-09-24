@@ -113,8 +113,6 @@ export function setupOutgoing(
   const targetPath =
     target && options.prependPath !== false
       ? (target as URL).pathname ||
-        // NOTE: http-proxy receives url.Url instead of URL
-        (target as Partial<url.Url>).path ||
         ""
       : "";
 
