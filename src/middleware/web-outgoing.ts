@@ -38,7 +38,10 @@ export const setRedirectHostRewrite = defineProxyOutgoingMiddleware(
       proxyRes.headers.location &&
       redirectRegex.test(String(proxyRes.statusCode))
     ) {
-      const target = options.target;
+      const target =
+        options.target instanceof URL
+          ? options.target
+          : new URL(options.target as string | URL); // TODO: handle legacy url?
       const u = new URL(proxyRes.headers.location);
 
       // Make sure the redirected host matches the target host before rewriting
