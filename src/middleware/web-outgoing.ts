@@ -38,7 +38,10 @@ export const setRedirectHostRewrite = defineProxyOutgoingMiddleware(
       proxyRes.headers.location &&
       redirectRegex.test(String(proxyRes.statusCode))
     ) {
-      const target = new URL(options.target);
+      const target =
+        options.target instanceof URL
+          ? options.target
+          : new URL(options.target as string | URL); // TODO: handle legacy url?
       const u = new URL(proxyRes.headers.location);
 
       // Make sure the redirected host matches the target host before rewriting
@@ -48,7 +51,7 @@ export const setRedirectHostRewrite = defineProxyOutgoingMiddleware(
 
       if (options.hostRewrite) {
         u.host = options.hostRewrite;
-      } else if (options.autoRewrite) {
+      } else if (options.autoRewrite && req.headers.host) {
         u.host = req.headers.host;
       }
       if (options.protocolRewrite) {
@@ -73,11 +76,23 @@ export const setRedirectHostRewrite = defineProxyOutgoingMiddleware(
  */
 export const writeHeaders = defineProxyOutgoingMiddleware(
   (req, res, proxyRes, options) => {
-    let rewriteCookieDomainConfig = options.cookieDomainRewrite;
-    let rewriteCookiePathConfig = options.cookiePathRewrite;
+    const rewriteCookieDomainConfig =
+      typeof options.cookieDomainRewrite === "string"
+        ? // also test for ''
+          { "*": options.cookieDomainRewrite }
+        : options.cookieDomainRewrite;
+    const rewriteCookiePathConfig =
+      typeof options.cookiePathRewrite === "string"
+        ? // also test for ''
+          { "*": options.cookiePathRewrite }
+        : options.cookiePathRewrite;
+
     const preserveHeaderKeyCase = options.preserveHeaderKeyCase;
-    let rawHeaderKeyMap;
-    const setHeader = function (key, header) {
+    let rawHeaderKeyMap: Record<string, string> | undefined;
+    const setHeader = function (
+      key: string,
+      header: string | string[] | undefined,
+    ) {
       if (header === undefined) {
         return;
       }
@@ -93,16 +108,6 @@ export const writeHeaders = defineProxyOutgoingMiddleware(
       }
       res.setHeader(String(key).trim(), header);
     };
-
-    if (typeof rewriteCookieDomainConfig === "string") {
-      // also test for ''
-      rewriteCookieDomainConfig = { "*": rewriteCookieDomainConfig };
-    }
-
-    if (typeof rewriteCookiePathConfig === "string") {
-      // also test for ''
-      rewriteCookiePathConfig = { "*": rewriteCookiePathConfig };
-    }
 
     // message.rawHeaders is added in: v0.11.6
     // https://nodejs.org/api/http.html#http_message_rawheaders

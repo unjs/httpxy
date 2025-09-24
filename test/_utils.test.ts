@@ -20,6 +20,7 @@ describe("lib/http-proxy/common.js", () => {
             socketPath: "are",
             port: "you",
           },
+          // @ts-expect-error
           headers: { fizz: "bang", overwritten: true },
           localAddress: "local.address",
           auth: "username:pass",
@@ -65,7 +66,7 @@ describe("lib/http-proxy/common.js", () => {
           method: "i",
           url: "am",
           headers: { pro: "xy", overwritten: false },
-        },
+        } as any,
       );
       expect(outgoing.headers.connection).to.eql("upgrade");
     });
@@ -81,14 +82,14 @@ describe("lib/http-proxy/common.js", () => {
             hostname: "how",
             socketPath: "are",
             port: "you",
-          },
+          } as any,
           headers: { connection: "keep-alive, upgrade" }, // this is what Firefox sets
         },
         {
           method: "i",
           url: "am",
           headers: { pro: "xy", overwritten: false },
-        },
+        } as any,
       );
       expect(outgoing.headers.connection).to.eql("keep-alive, upgrade");
     });
@@ -112,7 +113,7 @@ describe("lib/http-proxy/common.js", () => {
           method: "i",
           url: "am",
           headers: { pro: "xy", overwritten: false },
-        },
+        } as any,
       );
       expect(outgoing.headers.connection).to.eql("close");
     });
@@ -135,18 +136,16 @@ describe("lib/http-proxy/common.js", () => {
           method: "i",
           url: "am",
           headers: { pro: "xy", overwritten: false },
-        },
+        } as any,
       );
       expect(outgoing.headers.connection).to.eql("close");
     });
 
     it("should set the agent to false if none is given", () => {
       const outgoing = {} as any;
-      common.setupOutgoing(
-        outgoing,
-        { target: "http://localhost" },
-        { url: "/" },
-      );
+      common.setupOutgoing(outgoing, { target: "http://localhost" }, {
+        url: "/",
+      } as any);
       expect(outgoing.agent).to.eql(false);
     });
 
@@ -167,7 +166,7 @@ describe("lib/http-proxy/common.js", () => {
           method: "i",
           url: "am",
           headers: { pro: "xy" },
-        },
+        } as any,
       );
 
       expect(outgoing.host).to.eql("how");
@@ -184,11 +183,9 @@ describe("lib/http-proxy/common.js", () => {
 
     it("should keep the original target path in the outgoing path", () => {
       const outgoing = {} as any;
-      common.setupOutgoing(
-        outgoing,
-        { target: { path: "some-path" } },
-        { url: "am" },
-      );
+      common.setupOutgoing(outgoing, { target: { path: "some-path" } }, {
+        url: "am",
+      } as any);
 
       expect(outgoing.path).to.eql("some-path/am");
     });
@@ -205,7 +202,7 @@ describe("lib/http-proxy/common.js", () => {
         },
         {
           url: "am",
-        },
+        } as any,
         "forward",
       );
 
@@ -222,7 +219,7 @@ describe("lib/http-proxy/common.js", () => {
             host: "whatever.com",
           },
         },
-        { url: "/" },
+        { url: "/" } as any,
       );
 
       expect(outgoing.port).to.eql(443);
@@ -236,7 +233,7 @@ describe("lib/http-proxy/common.js", () => {
           target: { path: "hellothere" },
           prependPath: false,
         },
-        { url: "hi" },
+        { url: "hi" } as any,
       );
 
       expect(outgoing.path).to.eql("/hi");
@@ -249,7 +246,7 @@ describe("lib/http-proxy/common.js", () => {
         {
           target: { path: "/forward" },
         },
-        { url: "/static/path" },
+        { url: "/static/path" } as any,
       );
 
       expect(outgoing.path).to.eql("/forward/static/path");
@@ -262,7 +259,9 @@ describe("lib/http-proxy/common.js", () => {
         {
           target: { path: "/forward" },
         },
-        { url: "/?foo=bar//&target=http://foobar.com/?a=1%26b=2&other=2" },
+        {
+          url: "/?foo=bar//&target=http://foobar.com/?a=1%26b=2&other=2",
+        } as any,
       );
 
       expect(outgoing.path).to.eql(
@@ -279,10 +278,10 @@ describe("lib/http-proxy/common.js", () => {
       common.setupOutgoing(
         outgoing,
         {
-          target: URL.parse("http://sometarget.com:80"),
+          target: URL.parse("http://sometarget.com:80")!,
           toProxy: true,
         },
-        { url: google },
+        { url: google } as any,
       );
 
       expect(outgoing.path).to.eql("/" + google);
@@ -295,10 +294,10 @@ describe("lib/http-proxy/common.js", () => {
       common.setupOutgoing(
         outgoing,
         {
-          target: URL.parse("http://sometarget.com:80"),
+          target: URL.parse("http://sometarget.com:80")!,
           toProxy: true,
         },
-        { url: google },
+        { url: google } as any,
       );
 
       expect(outgoing.path).to.eql("/" + google);
@@ -311,10 +310,10 @@ describe("lib/http-proxy/common.js", () => {
       common.setupOutgoing(
         outgoing,
         {
-          target: URL.parse("http://sometarget.com:80"),
+          target: URL.parse("http://sometarget.com:80")!,
           toProxy: true,
         },
-        { url: google },
+        { url: google } as any,
       );
 
       expect(outgoing.path).to.eql("/" + google);
@@ -327,10 +326,10 @@ describe("lib/http-proxy/common.js", () => {
         common.setupOutgoing(
           outgoing,
           {
-            target: URL.parse(myEndpoint),
+            target: URL.parse(myEndpoint)!,
             ignorePath: true,
           },
-          { url: "/more/crazy/pathness" },
+          { url: "/more/crazy/pathness" } as any,
         );
 
         expect(outgoing.path).to.eql("/some/crazy/path/whoooo");
@@ -342,11 +341,11 @@ describe("lib/http-proxy/common.js", () => {
         common.setupOutgoing(
           outgoing,
           {
-            target: URL.parse(myEndpoint),
+            target: URL.parse(myEndpoint)!,
             ignorePath: true,
             prependPath: false,
           },
-          { url: "/more/crazy/pathness" },
+          { url: "/more/crazy/pathness" } as any,
         );
 
         expect(outgoing.path).to.eql("/");
@@ -360,10 +359,10 @@ describe("lib/http-proxy/common.js", () => {
         common.setupOutgoing(
           outgoing,
           {
-            target: URL.parse(myEndpoint),
+            target: URL.parse(myEndpoint)!,
             changeOrigin: true,
           },
-          { url: "/" },
+          { url: "/" } as any,
         );
 
         expect(outgoing.headers.host).to.eql("mycouch.com:6984");
@@ -381,7 +380,7 @@ describe("lib/http-proxy/common.js", () => {
             },
             changeOrigin: true,
           },
-          { url: "/" },
+          { url: "/" } as any,
         );
         expect(outgoing.headers.host).to.eql("mycouch.com:6984");
       });
@@ -410,7 +409,7 @@ describe("lib/http-proxy/common.js", () => {
         {
           method: "i",
           url: "am",
-        },
+        } as any,
       );
 
       expect(outgoing.pfx).eql("my-pfx");
@@ -427,10 +426,11 @@ describe("lib/http-proxy/common.js", () => {
       common.setupOutgoing(
         outgoing,
         {
-          target: URL.parse("https://whooooo.com"),
+          target: "https://whooooo.com",
+          // @ts-expect-error
           method: "POST",
         },
-        { method: "GET", url: "" },
+        { method: "GET", url: "" } as any,
       );
 
       expect(outgoing.method).eql("POST");
@@ -439,7 +439,9 @@ describe("lib/http-proxy/common.js", () => {
     // url.parse('').path => null
     it("should not pass null as last arg to #urlJoin", () => {
       const outgoing = {} as any;
-      common.setupOutgoing(outgoing, { target: { path: "" } }, { url: "" });
+      common.setupOutgoing(outgoing, { target: { path: "" } }, {
+        url: "",
+      } as any);
 
       expect(outgoing.path).toBe("/"); // leading slash is new in httpxy
     });
@@ -463,7 +465,7 @@ describe("lib/http-proxy/common.js", () => {
             socketConfig.keepalive = bol;
           },
         };
-      const returnValue = common.setupSocket(stubSocket);
+      const returnValue = common.setupSocket(stubSocket as any);
 
       expect(socketConfig.timeout).to.eql(0);
       expect(socketConfig.nodelay).to.eql(true);

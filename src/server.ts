@@ -5,14 +5,17 @@ import { EventEmitter } from "node:events";
 import { webIncomingMiddleware } from "./middleware/web-incoming";
 import { websocketIncomingMiddleware } from "./middleware/ws-incoming";
 import { ProxyServerOptions } from "./types";
-import { ProxyMiddleware } from "./middleware/_utils";
+import { ProxyMiddleware, type ResOfType } from "./middleware/_utils";
+import type net from "node:net";
 
 // eslint-disable-next-line unicorn/prefer-event-target
 export class ProxyServer extends EventEmitter {
   private _server?: http.Server | https.Server;
 
-  _webPasses: ProxyMiddleware[] = [...webIncomingMiddleware];
-  _wsPasses: ProxyMiddleware[] = [...websocketIncomingMiddleware];
+  _webPasses: ProxyMiddleware<http.OutgoingMessage>[] = [
+    ...webIncomingMiddleware,
+  ];
+  _wsPasses: ProxyMiddleware<net.Socket>[] = [...websocketIncomingMiddleware];
 
   options: ProxyServerOptions;
 
@@ -25,7 +28,7 @@ export class ProxyServer extends EventEmitter {
 
   ws: (
     req: http.IncomingMessage,
-    socket: http.OutgoingMessage,
+    socket: net.Socket,
     opts: ProxyServerOptions,
     head?: any,
   ) => Promise<void>;
@@ -49,8 +52,8 @@ export class ProxyServer extends EventEmitter {
    * @param port - Port to listen on
    * @param hostname - The hostname to listen on
    */
-  listen(port: number, hostname?: string) {
-    const closure = (req, res) => {
+  listen(port: number, hostname: string) {
+    const closure = (req: http.IncomingMessage, res: http.ServerResponse) => {
       this.web(req, res);
     };
 
@@ -85,11 +88,15 @@ export class ProxyServer extends EventEmitter {
     }
   }
 
-  before(type: "ws" | "web", passName: string, pass: ProxyMiddleware) {
+  before<Type extends "ws" | "web">(
+    type: Type,
+    passName: string,
+    pass: ProxyMiddleware<ResOfType<Type>>,
+  ) {
     if (type !== "ws" && type !== "web") {
       throw new Error("type must be `web` or `ws`");
     }
-    const passes = type === "ws" ? this._wsPasses : this._webPasses;
+    const passes = this._getPasses(type);
     let i: false | number = false;
     for (const [idx, v] of passes.entries()) {
       if (v.name === passName) {
@@ -102,11 +109,15 @@ export class ProxyServer extends EventEmitter {
     passes.splice(i, 0, pass);
   }
 
-  after(type: "ws" | "web", passName: string, pass: ProxyMiddleware) {
+  after<Type extends "ws" | "web">(
+    type: Type,
+    passName: string,
+    pass: ProxyMiddleware<ResOfType<Type>>,
+  ) {
     if (type !== "ws" && type !== "web") {
       throw new Error("type must be `web` or `ws`");
     }
-    const passes = type === "ws" ? this._wsPasses : this._webPasses;
+    const passes = this._getPasses(type);
     let i: boolean | number = false;
     for (const [idx, v] of passes.entries()) {
       if (v.name === passName) {
@@ -117,6 +128,15 @@ export class ProxyServer extends EventEmitter {
       throw new Error("No such pass");
     }
     passes.splice(i++, 0, pass);
+  }
+
+  /** @internal */
+  _getPasses<Type extends "ws" | "web">(
+    type: Type,
+  ): ProxyMiddleware<ResOfType<Type>>[] {
+    return (type === "ws"
+      ? this._wsPasses
+      : this._webPasses) as unknown as ProxyMiddleware<ResOfType<Type>>[];
   }
 }
 
@@ -140,29 +160,32 @@ export function createProxyServer(options: ProxyServerOptions = {}) {
 
 // --- Internal ---
 
-function _createProxyFn(type: "web" | "ws", server: ProxyServer) {
+function _createProxyFn<Type extends "web" | "ws">(
+  type: Type,
+  server: ProxyServer,
+) {
+  type Res = ResOfType<Type>;
   return function (
+    this: ProxyServer,
     req: http.IncomingMessage,
-    res: http.OutgoingMessage,
-    opts: ProxyServerOptions,
-    head: any,
+    res: Res,
+    opts?: ProxyServerOptions,
+    head?: any,
   ): Promise<void> {
     const requestOptions = { ...opts, ...server.options };
 
-    for (const key of ["target", "forward"]) {
+    for (const key of ["target", "forward"] as const) {
       if (typeof requestOptions[key] === "string") {
         requestOptions[key] = new URL(requestOptions[key]);
       }
     }
 
     if (!requestOptions.target && !requestOptions.forward) {
-      return this.emit(
-        "error",
-        new Error("Must provide a proper URL as target"),
-      );
+      this.emit("error", new Error("Must provide a proper URL as target"));
+      return Promise.resolve();
     }
 
-    let _resolve: () => void;
+    let _resolve!: () => void;
     let _reject: (error: any) => void;
     const callbackPromise = new Promise<void>((resolve, reject) => {
       _resolve = resolve;
@@ -176,7 +199,7 @@ function _createProxyFn(type: "web" | "ws", server: ProxyServer) {
       _reject(error);
     });
 
-    for (const pass of type === "ws" ? server._wsPasses : server._webPasses) {
+    for (const pass of server._getPasses(type)) {
       const stop = pass(
         req,
         res,
