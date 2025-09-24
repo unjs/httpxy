@@ -45,9 +45,7 @@ export function setupOutgoing(
 ): httpNative.RequestOptions | httpsNative.RequestOptions {
   outgoing.port =
     options[forward || "target"].port ||
-    (isSSL.test(options[forward || "target"].protocol ?? "http")
-      ? 443
-      : 80);
+    (isSSL.test(options[forward || "target"].protocol ?? "http") ? 443 : 80);
 
   for (const e of [
     "host",
@@ -131,7 +129,7 @@ export function setupOutgoing(
       requiresPort(outgoing.port, options[forward || "target"].protocol) &&
       !hasPort(outgoing.host)
         ? outgoing.host + ":" + outgoing.port
-        : outgoing.host ?? undefined;
+        : (outgoing.host ?? undefined);
   }
   return outgoing;
 }
