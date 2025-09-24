@@ -45,7 +45,7 @@ export function setupOutgoing(
 ): httpNative.RequestOptions | httpsNative.RequestOptions {
   outgoing.port =
     options[forward || "target"].port ||
-    (isSSL.test(options[forward || "target"].protocol ?? "undefined")
+    (isSSL.test(options[forward || "target"].protocol ?? "http")
       ? 443
       : 80);
 
