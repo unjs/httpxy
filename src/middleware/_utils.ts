@@ -1,11 +1,7 @@
 import type { IncomingMessage, OutgoingMessage } from "node:http";
-import type { ProxyServer } from "../server";
-import type {
-  NormalizedProxyTarget,
-  NormalizedProxyTargetUrl,
-  ProxyServerOptions,
-} from "../types";
 import type { Socket } from "node:net";
+import type { ProxyServer } from "../server";
+import type { NormalizedProxyTarget, ProxyServerOptions } from "../types";
 
 export type ResOfType<T extends "web" | "ws"> = T extends "ws"
   ? T extends "web"
@@ -20,7 +16,7 @@ export type ProxyMiddleware<T extends OutgoingMessage | Socket> = (
   res: T,
   opts: ProxyServerOptions & {
     target: NormalizedProxyTarget;
-    forward: NormalizedProxyTargetUrl;
+    forward: URL;
   },
   server: ProxyServer,
   head?: Buffer,
@@ -39,7 +35,7 @@ export type ProxyOutgoingMiddleware = (
   proxyRes: IncomingMessage,
   opts: ProxyServerOptions & {
     target: NormalizedProxyTarget;
-    forward: NormalizedProxyTargetUrl;
+    forward: URL;
   },
 ) => void | true;
 

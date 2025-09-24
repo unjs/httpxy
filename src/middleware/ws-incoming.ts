@@ -1,5 +1,5 @@
-import http from "node:http";
-import https from "node:https";
+import nodeHTTP from "node:http";
+import nodeHTTPS from "node:https";
 import {
   getPort,
   hasEncryptedConnection,
@@ -56,7 +56,7 @@ const stream = defineProxyMiddleware<Socket>(
   (req, socket, options, server, head, callback) => {
     const createHttpHeader = function (
       line: string,
-      headers: http.OutgoingHttpHeaders,
+      headers: nodeHTTP.OutgoingHttpHeaders,
     ) {
       return (
         Object.keys(headers)
@@ -88,7 +88,7 @@ const stream = defineProxyMiddleware<Socket>(
     }
 
     const proxyReq = (
-      isSSL.test(options.target.protocol || "undefined") ? https : http
+      isSSL.test(options.target.protocol || "undefined") ? nodeHTTPS : nodeHTTP
     ).request(setupOutgoing(options.ssl || {}, options, req));
 
     // Enable developers to modify the proxyReq before headers are sent

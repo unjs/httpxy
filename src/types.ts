@@ -15,17 +15,13 @@ export interface ProxyTargetDetailed {
   secureProtocol?: string;
 }
 
-type ProxyTarget = ProxyTargetUrl | ProxyTargetDetailed;
-export type NormalizedProxyTarget = Exclude<ProxyTarget, string>;
-
-type ProxyTargetUrl = string | URL;
-export type NormalizedProxyTargetUrl = Exclude<ProxyTargetUrl, string>;
+export type NormalizedProxyTarget = URL | ProxyTargetDetailed;
 
 export interface ProxyServerOptions {
   /** URL string to be parsed with the url module. */
-  target?: ProxyTarget;
-  /** URL string to be parsed with the url module. */
-  forward?: ProxyTargetUrl;
+  target?: string | URL | ProxyTargetDetailed;
+  /** URL string to be parsed. */
+  forward?: string | URL;
   /** Object to be passed to http(s).request. */
   agent?: any;
   /** Object to be passed to https.createServer(). */

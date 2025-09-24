@@ -1,11 +1,11 @@
-import httpNative from "node:http";
-import httpsNative from "node:https";
+import nodeHTTP from "node:http";
+import nodeHTTPS from "node:https";
 import { getPort, hasEncryptedConnection, setupOutgoing } from "../_utils";
 import { webOutgoingMiddleware } from "./web-outgoing";
 import { ProxyMiddleware, defineProxyMiddleware } from "./_utils";
 import type { NormalizedProxyTarget } from "../types";
 
-const nativeAgents = { http: httpNative, https: httpsNative };
+const nativeAgents = { http: nodeHTTP, https: nodeHTTPS };
 
 /**
  * Sets `content-length` to '0' if request is of DELETE type.

@@ -4,11 +4,9 @@ import type tls from "node:tls";
 import net from "node:net";
 import type {
   NormalizedProxyTarget,
-  NormalizedProxyTargetUrl,
   ProxyServerOptions,
   ProxyTargetDetailed,
 } from "./types";
-import type url from "node:url";
 
 const upgradeHeader = /(^|,)\s*upgrade\s*($|,)/i;
 
@@ -40,7 +38,7 @@ export function setupOutgoing(
   outgoing: httpNative.RequestOptions & httpsNative.RequestOptions,
   options: ProxyServerOptions & {
     target: NormalizedProxyTarget;
-    forward: NormalizedProxyTargetUrl;
+    forward: URL;
   },
   req: httpNative.IncomingMessage,
   forward?: "forward" | "target",
