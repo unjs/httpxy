@@ -2,11 +2,7 @@ import httpNative from "node:http";
 import httpsNative from "node:https";
 import type tls from "node:tls";
 import net from "node:net";
-import type {
-  NormalizedProxyTarget,
-  ProxyServerOptions,
-  ProxyTargetDetailed,
-} from "./types";
+import type { ProxyServerOptions, ProxyTargetDetailed } from "./types";
 
 const upgradeHeader = /(^|,)\s*upgrade\s*($|,)/i;
 
@@ -37,7 +33,7 @@ export const isSSL = /^https|wss/;
 export function setupOutgoing(
   outgoing: httpNative.RequestOptions & httpsNative.RequestOptions,
   options: ProxyServerOptions & {
-    target: NormalizedProxyTarget;
+    target: URL | ProxyTargetDetailed;
     forward: URL;
   },
   req: httpNative.IncomingMessage,

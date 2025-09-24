@@ -1,9 +1,10 @@
+import type { ClientRequest, OutgoingMessage } from "node:http";
+import type { ProxyTargetDetailed } from "../types";
 import nodeHTTP from "node:http";
 import nodeHTTPS from "node:https";
 import { getPort, hasEncryptedConnection, setupOutgoing } from "../_utils";
 import { webOutgoingMiddleware } from "./web-outgoing";
 import { ProxyMiddleware, defineProxyMiddleware } from "./_utils";
-import type { NormalizedProxyTarget } from "../types";
 
 const nativeAgents = { http: nodeHTTP, https: nodeHTTPS };
 
@@ -121,8 +122,8 @@ const stream = defineProxyMiddleware(
     proxyReq.on("error", proxyError);
 
     function createErrorHandler(
-      proxyReq: httpNative.ClientRequest,
-      url: NormalizedProxyTarget,
+      proxyReq: ClientRequest,
+      url: URL | ProxyTargetDetailed,
     ) {
       return function proxyError(err: Error) {
         if (
@@ -180,5 +181,5 @@ const stream = defineProxyMiddleware(
   },
 );
 
-export const webIncomingMiddleware: readonly ProxyMiddleware<httpNative.OutgoingMessage>[] =
+export const webIncomingMiddleware: readonly ProxyMiddleware<OutgoingMessage>[] =
   [deleteLength, timeout, XHeaders, stream] as const;

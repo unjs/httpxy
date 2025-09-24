@@ -15,8 +15,6 @@ export interface ProxyTargetDetailed {
   secureProtocol?: string;
 }
 
-export type NormalizedProxyTarget = URL | ProxyTargetDetailed;
-
 export interface ProxyServerOptions {
   /** URL string to be parsed with the url module. */
   target?: string | URL | ProxyTargetDetailed;

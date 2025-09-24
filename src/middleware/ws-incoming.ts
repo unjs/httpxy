@@ -88,7 +88,7 @@ const stream = defineProxyMiddleware<Socket>(
     }
 
     const proxyReq = (
-      isSSL.test(options.target.protocol || "undefined") ? nodeHTTPS : nodeHTTP
+      isSSL.test(options.target.protocol || "http") ? nodeHTTPS : nodeHTTP
     ).request(setupOutgoing(options.ssl || {}, options, req));
 
     // Enable developers to modify the proxyReq before headers are sent
