@@ -40,7 +40,7 @@
     "async": "^3.2.6",
     "changelogen": "^0.6.2",
     "concat-stream": "^2.0.0",
-    "eslint": "^9.36.0",
+    "eslint": "^10.0.0",
     "eslint-config-unjs": "^0.5.0",
     "expect.js": "^0.3.1",
     "jiti": "^2.6.0",
