@@ -1,17 +1,17 @@
-import type { IncomingMessage, OutgoingMessage } from "node:http";
+import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Socket } from "node:net";
 import type { ProxyServer } from "../server";
 import type { ProxyServerOptions, ProxyTargetDetailed } from "../types";
 
 export type ResOfType<T extends "web" | "ws"> = T extends "ws"
   ? T extends "web"
-    ? OutgoingMessage | Socket
+    ? ServerResponse | Socket
     : Socket
   : T extends "web"
-    ? OutgoingMessage
+    ? ServerResponse
     : never;
 
-export type ProxyMiddleware<T extends OutgoingMessage | Socket> = (
+export type ProxyMiddleware<T extends ServerResponse | Socket> = (
   req: IncomingMessage,
   res: T,
   opts: ProxyServerOptions & {
@@ -24,14 +24,14 @@ export type ProxyMiddleware<T extends OutgoingMessage | Socket> = (
 ) => void | true;
 
 export function defineProxyMiddleware<
-  T extends OutgoingMessage | Socket = OutgoingMessage,
+  T extends ServerResponse | Socket = ServerResponse,
 >(m: ProxyMiddleware<T>) {
   return m;
 }
 
 export type ProxyOutgoingMiddleware = (
   req: IncomingMessage,
-  res: OutgoingMessage,
+  res: ServerResponse,
   proxyRes: IncomingMessage,
   opts: ProxyServerOptions & {
     target: URL | ProxyTargetDetailed;

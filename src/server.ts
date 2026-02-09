@@ -4,15 +4,66 @@ import { EventEmitter } from "node:events";
 // import type { Duplex } from "node:stream";
 import { webIncomingMiddleware } from "./middleware/web-incoming";
 import { websocketIncomingMiddleware } from "./middleware/ws-incoming";
-import { ProxyServerOptions } from "./types";
+import { type ProxyServerOptions, type ProxyTarget } from "./types";
 import { ProxyMiddleware, type ResOfType } from "./middleware/_utils";
 import type net from "node:net";
 
+export interface ProxyServerEventMap {
+  error: [
+    err: Error,
+    req?: http.IncomingMessage,
+    res?: http.ServerResponse<http.IncomingMessage> | net.Socket,
+    target?: URL | ProxyTarget,
+  ];
+  start: [
+    req: http.IncomingMessage,
+    res: http.ServerResponse<http.IncomingMessage>,
+    target: URL | ProxyTarget,
+  ];
+  econnreset: [
+    err: Error,
+    req: http.IncomingMessage,
+    res: http.ServerResponse<http.IncomingMessage>,
+    target: URL | ProxyTarget,
+  ];
+  proxyReq: [
+    proxyReq: http.ClientRequest,
+    req: http.IncomingMessage,
+    res: http.ServerResponse<http.IncomingMessage>,
+    options: ProxyServerOptions,
+  ];
+  proxyReqWs: [
+    proxyReq: http.ClientRequest,
+    req: http.IncomingMessage,
+    socket: net.Socket,
+    options: ProxyServerOptions,
+    head: any,
+  ];
+  proxyRes: [
+    proxyRes: http.IncomingMessage,
+    req: http.IncomingMessage,
+    res: http.ServerResponse<http.IncomingMessage>,
+  ];
+  end: [
+    req: http.IncomingMessage,
+    res: http.ServerResponse<http.IncomingMessage>,
+    proxyRes: http.IncomingMessage,
+  ];
+  open: [proxySocket: net.Socket];
+  /** @deprecated */
+  proxySocket: [proxySocket: net.Socket];
+  close: [
+    proxyRes: http.IncomingMessage,
+    proxySocket: net.Socket,
+    proxyHead: any,
+  ];
+}
+
 // eslint-disable-next-line unicorn/prefer-event-target
-export class ProxyServer extends EventEmitter {
+export class ProxyServer extends EventEmitter<ProxyServerEventMap> {
   private _server?: http.Server | https.Server;
 
-  _webPasses: ProxyMiddleware<http.OutgoingMessage>[] = [
+  _webPasses: ProxyMiddleware<http.ServerResponse>[] = [
     ...webIncomingMiddleware,
   ];
   _wsPasses: ProxyMiddleware<net.Socket>[] = [...websocketIncomingMiddleware];
@@ -21,7 +72,7 @@ export class ProxyServer extends EventEmitter {
 
   web: (
     req: http.IncomingMessage,
-    res: http.OutgoingMessage,
+    res: http.ServerResponse,
     opts?: ProxyServerOptions,
     head?: any,
   ) => Promise<void>;

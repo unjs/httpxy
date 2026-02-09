@@ -1,4 +1,4 @@
-import type { ClientRequest, OutgoingMessage } from "node:http";
+import type { ClientRequest, ServerResponse } from "node:http";
 import type { ProxyTargetDetailed } from "../types";
 import nodeHTTP from "node:http";
 import nodeHTTPS from "node:https";
@@ -181,5 +181,5 @@ export const stream = defineProxyMiddleware(
   },
 );
 
-export const webIncomingMiddleware: readonly ProxyMiddleware<OutgoingMessage>[] =
+export const webIncomingMiddleware: readonly ProxyMiddleware<ServerResponse>[] =
   [deleteLength, timeout, XHeaders, stream] as const;
