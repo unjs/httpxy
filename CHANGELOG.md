@@ -1,5 +1,36 @@
 # Changelog
 
+## v0.2.0
+
+[compare changes](https://github.com/unjs/httpxy/compare/v0.1.7...v0.2.0)
+
+### 💅 Refactors
+
+- ⚠️  Code improvements ([#78](https://github.com/unjs/httpxy/pull/78))
+
+### 🌊 Types
+
+- Implement typed proxy server event ([#95](https://github.com/unjs/httpxy/pull/95), [#96](https://github.com/unjs/httpxy/pull/96))
+
+### 🏡 Chore
+
+- Update dev dependencies ([81f5e57](https://github.com/unjs/httpxy/commit/81f5e57))
+- Migrate to oxfmt and oxlint ([edd6cff](https://github.com/unjs/httpxy/commit/edd6cff))
+
+### ✅ Tests
+
+- Port tests from node-http-proxy ([#88](https://github.com/unjs/httpxy/pull/88))
+
+#### ⚠️ Breaking Changes
+
+- ⚠️  Code improvements ([#78](https://github.com/unjs/httpxy/pull/78))
+
+### ❤️ Contributors
+
+- Pooya Parsa ([@pi0](https://github.com/pi0))
+- Sukka ([@SukkaW](https://github.com/SukkaW))
+- 翠 <green@sapphi.red>
+
 ## v0.1.7
 
 [compare changes](https://github.com/unjs/httpxy/compare/v0.1.6...v0.1.7)
