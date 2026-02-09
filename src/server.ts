@@ -9,17 +9,54 @@ import { ProxyMiddleware, type ResOfType } from "./middleware/_utils";
 import type net from "node:net";
 
 export interface ProxyServerEventMap {
-  error: [err: Error, req?: http.IncomingMessage, res?: http.ServerResponse<http.IncomingMessage> | net.Socket, target?: URL | ProxyTarget];
-  start: [req: http.IncomingMessage, res: http.ServerResponse<http.IncomingMessage>, target: URL | ProxyTarget];
-  econnreset: [err: Error, req: http.IncomingMessage, res: http.ServerResponse<http.IncomingMessage>, target: URL | ProxyTarget];
-  proxyReq: [proxyReq: http.ClientRequest, req: http.IncomingMessage, res: http.ServerResponse<http.IncomingMessage>, options: ProxyServerOptions];
-  proxyReqWs: [proxyReq: http.ClientRequest, req: http.IncomingMessage, socket: net.Socket, options: ProxyServerOptions, head: any];
-  proxyRes: [proxyRes: http.IncomingMessage, req: http.IncomingMessage, res: http.ServerResponse<http.IncomingMessage>];
-  end: [req: http.IncomingMessage, res: http.ServerResponse<http.IncomingMessage>, proxyRes: http.IncomingMessage];
+  error: [
+    err: Error,
+    req?: http.IncomingMessage,
+    res?: http.ServerResponse<http.IncomingMessage> | net.Socket,
+    target?: URL | ProxyTarget,
+  ];
+  start: [
+    req: http.IncomingMessage,
+    res: http.ServerResponse<http.IncomingMessage>,
+    target: URL | ProxyTarget,
+  ];
+  econnreset: [
+    err: Error,
+    req: http.IncomingMessage,
+    res: http.ServerResponse<http.IncomingMessage>,
+    target: URL | ProxyTarget,
+  ];
+  proxyReq: [
+    proxyReq: http.ClientRequest,
+    req: http.IncomingMessage,
+    res: http.ServerResponse<http.IncomingMessage>,
+    options: ProxyServerOptions,
+  ];
+  proxyReqWs: [
+    proxyReq: http.ClientRequest,
+    req: http.IncomingMessage,
+    socket: net.Socket,
+    options: ProxyServerOptions,
+    head: any,
+  ];
+  proxyRes: [
+    proxyRes: http.IncomingMessage,
+    req: http.IncomingMessage,
+    res: http.ServerResponse<http.IncomingMessage>,
+  ];
+  end: [
+    req: http.IncomingMessage,
+    res: http.ServerResponse<http.IncomingMessage>,
+    proxyRes: http.IncomingMessage,
+  ];
   open: [proxySocket: net.Socket];
   /** @deprecated */
   proxySocket: [proxySocket: net.Socket];
-  close: [proxyRes: http.IncomingMessage, proxySocket: net.Socket, proxyHead: any]
+  close: [
+    proxyRes: http.IncomingMessage,
+    proxySocket: net.Socket,
+    proxyHead: any,
+  ];
 }
 
 // eslint-disable-next-line unicorn/prefer-event-target
