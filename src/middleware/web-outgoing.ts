@@ -1,35 +1,28 @@
 import { rewriteCookieProperty } from "../_utils";
-import {
-  ProxyOutgoingMiddleware,
-  defineProxyOutgoingMiddleware,
-} from "./_utils";
+import { ProxyOutgoingMiddleware, defineProxyOutgoingMiddleware } from "./_utils";
 
 const redirectRegex = /^201|30([1278])$/;
 
 /**
  * If is a HTTP 1.0 request, remove chunk headers
  */
-export const removeChunked = defineProxyOutgoingMiddleware(
-  (req, res, proxyRes) => {
-    if (req.httpVersion === "1.0") {
-      delete proxyRes.headers["transfer-encoding"];
-    }
-  },
-);
+export const removeChunked = defineProxyOutgoingMiddleware((req, res, proxyRes) => {
+  if (req.httpVersion === "1.0") {
+    delete proxyRes.headers["transfer-encoding"];
+  }
+});
 
 /**
  * If is a HTTP 1.0 request, set the correct connection header
  * or if connection header not present, then use `keep-alive`
  */
-export const setConnection = defineProxyOutgoingMiddleware(
-  (req, res, proxyRes) => {
-    if (req.httpVersion === "1.0") {
-      proxyRes.headers.connection = req.headers.connection || "close";
-    } else if (req.httpVersion !== "2.0" && !proxyRes.headers.connection) {
-      proxyRes.headers.connection = req.headers.connection || "keep-alive";
-    }
-  },
-);
+export const setConnection = defineProxyOutgoingMiddleware((req, res, proxyRes) => {
+  if (req.httpVersion === "1.0") {
+    proxyRes.headers.connection = req.headers.connection || "close";
+  } else if (req.httpVersion !== "2.0" && !proxyRes.headers.connection) {
+    proxyRes.headers.connection = req.headers.connection || "keep-alive";
+  }
+});
 
 export const setRedirectHostRewrite = defineProxyOutgoingMiddleware(
   (req, res, proxyRes, options) => {
@@ -39,9 +32,7 @@ export const setRedirectHostRewrite = defineProxyOutgoingMiddleware(
       redirectRegex.test(String(proxyRes.statusCode))
     ) {
       const target =
-        options.target instanceof URL
-          ? options.target
-          : new URL(options.target as string | URL); // TODO: handle legacy url?
+        options.target instanceof URL ? options.target : new URL(options.target as string | URL); // TODO: handle legacy url?
       const u = new URL(proxyRes.headers.location);
 
       // Make sure the redirected host matches the target host before rewriting
@@ -74,77 +65,66 @@ export const setRedirectHostRewrite = defineProxyOutgoingMiddleware(
  *
  * @api private
  */
-export const writeHeaders = defineProxyOutgoingMiddleware(
-  (req, res, proxyRes, options) => {
-    const rewriteCookieDomainConfig =
-      typeof options.cookieDomainRewrite === "string"
-        ? // also test for ''
-          { "*": options.cookieDomainRewrite }
-        : options.cookieDomainRewrite;
-    const rewriteCookiePathConfig =
-      typeof options.cookiePathRewrite === "string"
-        ? // also test for ''
-          { "*": options.cookiePathRewrite }
-        : options.cookiePathRewrite;
+export const writeHeaders = defineProxyOutgoingMiddleware((req, res, proxyRes, options) => {
+  const rewriteCookieDomainConfig =
+    typeof options.cookieDomainRewrite === "string"
+      ? // also test for ''
+        { "*": options.cookieDomainRewrite }
+      : options.cookieDomainRewrite;
+  const rewriteCookiePathConfig =
+    typeof options.cookiePathRewrite === "string"
+      ? // also test for ''
+        { "*": options.cookiePathRewrite }
+      : options.cookiePathRewrite;
 
-    const preserveHeaderKeyCase = options.preserveHeaderKeyCase;
-    let rawHeaderKeyMap: Record<string, string> | undefined;
-    const setHeader = function (
-      key: string,
-      header: string | string[] | undefined,
-    ) {
-      if (header === undefined) {
-        return;
-      }
-      if (rewriteCookieDomainConfig && key.toLowerCase() === "set-cookie") {
-        header = rewriteCookieProperty(
-          header,
-          rewriteCookieDomainConfig,
-          "domain",
-        );
-      }
-      if (rewriteCookiePathConfig && key.toLowerCase() === "set-cookie") {
-        header = rewriteCookieProperty(header, rewriteCookiePathConfig, "path");
-      }
-      res.setHeader(String(key).trim(), header);
-    };
-
-    // message.rawHeaders is added in: v0.11.6
-    // https://nodejs.org/api/http.html#http_message_rawheaders
-    if (preserveHeaderKeyCase && proxyRes.rawHeaders !== undefined) {
-      rawHeaderKeyMap = {};
-      for (let i = 0; i < proxyRes.rawHeaders.length; i += 2) {
-        const key = proxyRes.rawHeaders[i];
-        rawHeaderKeyMap[key.toLowerCase()] = key;
-      }
+  const preserveHeaderKeyCase = options.preserveHeaderKeyCase;
+  let rawHeaderKeyMap: Record<string, string> | undefined;
+  const setHeader = function (key: string, header: string | string[] | undefined) {
+    if (header === undefined) {
+      return;
     }
-
-    for (let key of Object.keys(proxyRes.headers)) {
-      const header = proxyRes.headers[key];
-      if (preserveHeaderKeyCase && rawHeaderKeyMap) {
-        key = rawHeaderKeyMap[key] || key;
-      }
-      setHeader(key, header);
+    if (rewriteCookieDomainConfig && key.toLowerCase() === "set-cookie") {
+      header = rewriteCookieProperty(header, rewriteCookieDomainConfig, "domain");
     }
-  },
-);
+    if (rewriteCookiePathConfig && key.toLowerCase() === "set-cookie") {
+      header = rewriteCookieProperty(header, rewriteCookiePathConfig, "path");
+    }
+    res.setHeader(String(key).trim(), header);
+  };
+
+  // message.rawHeaders is added in: v0.11.6
+  // https://nodejs.org/api/http.html#http_message_rawheaders
+  if (preserveHeaderKeyCase && proxyRes.rawHeaders !== undefined) {
+    rawHeaderKeyMap = {};
+    for (let i = 0; i < proxyRes.rawHeaders.length; i += 2) {
+      const key = proxyRes.rawHeaders[i];
+      rawHeaderKeyMap[key.toLowerCase()] = key;
+    }
+  }
+
+  for (let key of Object.keys(proxyRes.headers)) {
+    const header = proxyRes.headers[key];
+    if (preserveHeaderKeyCase && rawHeaderKeyMap) {
+      key = rawHeaderKeyMap[key] || key;
+    }
+    setHeader(key, header);
+  }
+});
 
 /**
  * Set the statusCode from the proxyResponse
  */
-export const writeStatusCode = defineProxyOutgoingMiddleware(
-  (req, res, proxyRes) => {
-    // From Node.js docs: response.writeHead(statusCode[, statusMessage][, headers])
-    if (proxyRes.statusMessage) {
-      // @ts-expect-error
-      res.statusCode = proxyRes.statusCode;
-      res.statusMessage = proxyRes.statusMessage;
-    } else {
-      // @ts-expect-error
-      res.statusCode = proxyRes.statusCode;
-    }
-  },
-);
+export const writeStatusCode = defineProxyOutgoingMiddleware((req, res, proxyRes) => {
+  // From Node.js docs: response.writeHead(statusCode[, statusMessage][, headers])
+  if (proxyRes.statusMessage) {
+    // @ts-expect-error
+    res.statusCode = proxyRes.statusCode;
+    res.statusMessage = proxyRes.statusMessage;
+  } else {
+    // @ts-expect-error
+    res.statusCode = proxyRes.statusCode;
+  }
+});
 
 export const webOutgoingMiddleware: readonly ProxyOutgoingMiddleware[] = [
   removeChunked,

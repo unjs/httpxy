@@ -52,20 +52,14 @@ export interface ProxyServerEventMap {
   open: [proxySocket: net.Socket];
   /** @deprecated */
   proxySocket: [proxySocket: net.Socket];
-  close: [
-    proxyRes: http.IncomingMessage,
-    proxySocket: net.Socket,
-    proxyHead: any,
-  ];
+  close: [proxyRes: http.IncomingMessage, proxySocket: net.Socket, proxyHead: any];
 }
 
 // eslint-disable-next-line unicorn/prefer-event-target
 export class ProxyServer extends EventEmitter<ProxyServerEventMap> {
   private _server?: http.Server | https.Server;
 
-  _webPasses: ProxyMiddleware<http.ServerResponse>[] = [
-    ...webIncomingMiddleware,
-  ];
+  _webPasses: ProxyMiddleware<http.ServerResponse>[] = [...webIncomingMiddleware];
   _wsPasses: ProxyMiddleware<net.Socket>[] = [...websocketIncomingMiddleware];
 
   options: ProxyServerOptions;
@@ -182,12 +176,10 @@ export class ProxyServer extends EventEmitter<ProxyServerEventMap> {
   }
 
   /** @internal */
-  _getPasses<Type extends "ws" | "web">(
-    type: Type,
-  ): ProxyMiddleware<ResOfType<Type>>[] {
-    return (type === "ws"
-      ? this._wsPasses
-      : this._webPasses) as unknown as ProxyMiddleware<ResOfType<Type>>[];
+  _getPasses<Type extends "ws" | "web">(type: Type): ProxyMiddleware<ResOfType<Type>>[] {
+    return (type === "ws" ? this._wsPasses : this._webPasses) as unknown as ProxyMiddleware<
+      ResOfType<Type>
+    >[];
   }
 }
 
@@ -211,10 +203,7 @@ export function createProxyServer(options: ProxyServerOptions = {}) {
 
 // --- Internal ---
 
-function _createProxyFn<Type extends "web" | "ws">(
-  type: Type,
-  server: ProxyServer,
-) {
+function _createProxyFn<Type extends "web" | "ws">(type: Type, server: ProxyServer) {
   type Res = ResOfType<Type>;
   return function (
     this: ProxyServer,

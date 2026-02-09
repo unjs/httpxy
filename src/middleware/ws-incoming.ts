@@ -1,12 +1,6 @@
 import nodeHTTP from "node:http";
 import nodeHTTPS from "node:https";
-import {
-  getPort,
-  hasEncryptedConnection,
-  isSSL,
-  setupOutgoing,
-  setupSocket,
-} from "../_utils";
+import { getPort, hasEncryptedConnection, isSSL, setupOutgoing, setupSocket } from "../_utils";
 import { ProxyMiddleware, defineProxyMiddleware } from "./_utils";
 import type { Socket } from "node:net";
 
@@ -14,43 +8,39 @@ import type { Socket } from "node:net";
  * WebSocket requests must have the `GET` method and
  * the `upgrade:websocket` header
  */
-export const checkMethodAndHeader = defineProxyMiddleware<Socket>(
-  (req, socket) => {
-    if (req.method !== "GET" || !req.headers.upgrade) {
-      socket.destroy();
-      return true;
-    }
+export const checkMethodAndHeader = defineProxyMiddleware<Socket>((req, socket) => {
+  if (req.method !== "GET" || !req.headers.upgrade) {
+    socket.destroy();
+    return true;
+  }
 
-    if (req.headers.upgrade.toLowerCase() !== "websocket") {
-      socket.destroy();
-      return true;
-    }
-  },
-);
+  if (req.headers.upgrade.toLowerCase() !== "websocket") {
+    socket.destroy();
+    return true;
+  }
+});
 
 /**
  * Sets `x-forwarded-*` headers if specified in config.
  */
-export const XHeaders = defineProxyMiddleware<Socket>(
-  (req, socket, options) => {
-    if (!options.xfwd) {
-      return;
-    }
+export const XHeaders = defineProxyMiddleware<Socket>((req, socket, options) => {
+  if (!options.xfwd) {
+    return;
+  }
 
-    const values = {
-      for: req.connection.remoteAddress || req.socket.remoteAddress,
-      port: getPort(req),
-      proto: hasEncryptedConnection(req) ? "wss" : "ws",
-    };
+  const values = {
+    for: req.connection.remoteAddress || req.socket.remoteAddress,
+    port: getPort(req),
+    proto: hasEncryptedConnection(req) ? "wss" : "ws",
+  };
 
-    for (const header of ["for", "port", "proto"] as const) {
-      req.headers["x-forwarded-" + header] =
-        (req.headers["x-forwarded-" + header] || "") +
-        (req.headers["x-forwarded-" + header] ? "," : "") +
-        values[header];
-    }
-  },
-);
+  for (const header of ["for", "port", "proto"] as const) {
+    req.headers["x-forwarded-" + header] =
+      (req.headers["x-forwarded-" + header] || "") +
+      (req.headers["x-forwarded-" + header] ? "," : "") +
+      values[header];
+  }
+});
 
 /**
  * Does the actual proxying. Make the request and upgrade it
@@ -58,10 +48,7 @@ export const XHeaders = defineProxyMiddleware<Socket>(
  */
 export const stream = defineProxyMiddleware<Socket>(
   (req, socket, options, server, head, callback) => {
-    const createHttpHeader = function (
-      line: string,
-      headers: nodeHTTP.OutgoingHttpHeaders,
-    ) {
+    const createHttpHeader = function (line: string, headers: nodeHTTP.OutgoingHttpHeaders) {
       return (
         Object.keys(headers)
           // eslint-disable-next-line unicorn/no-array-reduce
@@ -91,9 +78,9 @@ export const stream = defineProxyMiddleware<Socket>(
       socket.unshift(head);
     }
 
-    const proxyReq = (
-      isSSL.test(options.target.protocol || "http") ? nodeHTTPS : nodeHTTP
-    ).request(setupOutgoing(options.ssl || {}, options, req));
+    const proxyReq = (isSSL.test(options.target.protocol || "http") ? nodeHTTPS : nodeHTTP).request(
+      setupOutgoing(options.ssl || {}, options, req),
+    );
 
     // Enable developers to modify the proxyReq before headers are sent
     if (server) {
@@ -107,12 +94,7 @@ export const stream = defineProxyMiddleware<Socket>(
       if (!(res as any).upgrade) {
         socket.write(
           createHttpHeader(
-            "HTTP/" +
-              res.httpVersion +
-              " " +
-              res.statusCode +
-              " " +
-              res.statusMessage,
+            "HTTP/" + res.httpVersion + " " + res.statusCode + " " + res.statusMessage,
             res.headers,
           ),
         );
@@ -145,9 +127,7 @@ export const stream = defineProxyMiddleware<Socket>(
       // Remark: Handle writing the headers to the socket when switching protocols
       // Also handles when a header is an array
       //
-      socket.write(
-        createHttpHeader("HTTP/1.1 101 Switching Protocols", proxyRes.headers),
-      );
+      socket.write(createHttpHeader("HTTP/1.1 101 Switching Protocols", proxyRes.headers));
 
       proxySocket.pipe(socket).pipe(proxySocket);
 

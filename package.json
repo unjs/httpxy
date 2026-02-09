@@ -2,10 +2,16 @@
   "name": "httpxy",
   "version": "0.1.7",
   "description": "A full-featured HTTP proxy for Node.js.",
-  "repository": "unjs/httpxy",
   "license": "MIT",
-  "sideEffects": false,
+  "repository": "unjs/httpxy",
+  "files": [
+    "dist"
+  ],
   "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -13,48 +19,43 @@
       "require": "./dist/index.cjs"
     }
   },
-  "main": "./dist/index.cjs",
-  "module": "./dist/index.mjs",
-  "types": "./dist/index.d.ts",
-  "files": [
-    "dist"
-  ],
   "scripts": {
     "build": "unbuild",
     "dev": "vitest",
     "play": "jiti ./playground",
-    "lint": "eslint --cache . && prettier -c src test",
-    "lint:fix": "eslint --cache . --fix && prettier -c src test -w",
+    "lint": "oxlint . && oxfmt --check src test",
+    "lint:fix": "oxlint . --fix && oxfmt src test",
     "prepack": "pnpm run build",
     "release": "pnpm test && changelogen --release && npm publish && git push --follow-tags",
     "test": "pnpm lint && pnpm test:types && vitest run --coverage",
-    "test:types": "tsc --noEmit"
+    "test:types": "tsgo --noEmit"
   },
   "devDependencies": {
     "@types/async": "^3.2.25",
     "@types/concat-stream": "^2.0.3",
-    "@types/node": "^24.5.2",
+    "@types/node": "^25.2.2",
     "@types/sse": "^0.0.0",
     "@types/ws": "^8.18.1",
-    "@vitest/coverage-v8": "^3.2.4",
+    "@typescript/native-preview": "7.0.0-dev.20260209.1",
+    "@vitest/coverage-v8": "^4.0.18",
     "async": "^3.2.6",
     "changelogen": "^0.6.2",
     "concat-stream": "^2.0.0",
-    "eslint": "^9.36.0",
-    "eslint-config-unjs": "^0.5.0",
+    "eslint-config-unjs": "^0.6.2",
     "expect.js": "^0.3.1",
-    "jiti": "^2.6.0",
+    "jiti": "^2.6.1",
     "listhen": "^1.9.0",
-    "ofetch": "^1.4.1",
-    "prettier": "^3.6.2",
-    "semver": "^7.7.2",
-    "socket.io": "^4.8.1",
-    "socket.io-client": "^4.8.1",
+    "ofetch": "^1.5.1",
+    "oxfmt": "^0.28.0",
+    "oxlint": "^1.43.0",
+    "semver": "^7.7.4",
+    "socket.io": "^4.8.3",
+    "socket.io-client": "^4.8.3",
     "sse": "^0.0.8",
-    "typescript": "^5.9.2",
+    "typescript": "^5.9.3",
     "unbuild": "^3.6.1",
-    "vitest": "^3.2.4",
-    "ws": "^8.18.3"
+    "vitest": "^4.0.18",
+    "ws": "^8.19.0"
   },
-  "packageManager": "pnpm@10.17.1"
+  "packageManager": "pnpm@10.29.2"
 }

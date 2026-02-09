@@ -3,11 +3,7 @@ import httpsNative from "node:https";
 import type tls from "node:tls";
 import type { Url as LegacyURL } from "node:url";
 import net from "node:net";
-import type {
-  ProxyServerOptions,
-  ProxyTarget,
-  ProxyTargetDetailed,
-} from "./types";
+import type { ProxyServerOptions, ProxyTarget, ProxyTargetDetailed } from "./types";
 
 const upgradeHeader = /(^|,)\s*upgrade\s*($|,)/i;
 
@@ -46,9 +42,7 @@ export function setupOutgoing(
 ): httpNative.RequestOptions | httpsNative.RequestOptions {
   outgoing.port =
     (options[forward || "target"] as URL).port ||
-    (isSSL.test((options[forward || "target"] as URL).protocol ?? "http")
-      ? 443
-      : 80);
+    (isSSL.test((options[forward || "target"] as URL).protocol ?? "http") ? 443 : 80);
 
   for (const e of [
     "host",
@@ -86,8 +80,7 @@ export function setupOutgoing(
   }
 
   if (isSSL.test((options[forward || "target"] as URL).protocol ?? "http")) {
-    outgoing.rejectUnauthorized =
-      options.secure === undefined ? true : options.secure;
+    outgoing.rejectUnauthorized = options.secure === undefined ? true : options.secure;
   }
 
   outgoing.agent = options.agent || false;
@@ -115,9 +108,7 @@ export function setupOutgoing(
       : "";
 
   const parsed = new URL(req.url!, "http://localhost");
-  let outgoingPath = options.toProxy
-    ? req.url
-    : parsed.pathname + parsed.search || "";
+  let outgoingPath = options.toProxy ? req.url : parsed.pathname + parsed.search || "";
 
   //
   // Remark: ignorePath will just straight up ignore whatever the request's
@@ -129,10 +120,8 @@ export function setupOutgoing(
 
   if (options.changeOrigin) {
     outgoing.headers.host =
-      requiresPort(
-        outgoing.port,
-        (options[forward || "target"] as URL).protocol,
-      ) && !hasPort(outgoing.host)
+      requiresPort(outgoing.port, (options[forward || "target"] as URL).protocol) &&
+      !hasPort(outgoing.host)
         ? outgoing.host + ":" + outgoing.port
         : (outgoing.host ?? undefined);
   }
@@ -140,10 +129,7 @@ export function setupOutgoing(
 }
 
 // From https://github.com/unjs/h3/blob/e8adfa/src/utils/internal/path.ts#L16C1-L36C2
-export function joinURL(
-  base: string | undefined,
-  path: string | undefined,
-): string {
+export function joinURL(base: string | undefined, path: string | undefined): string {
   if (!base || base === "/") {
     return path || "/";
   }
@@ -214,9 +200,7 @@ export function getPort(req: httpNative.IncomingMessage): string {
  *
  * @api private
  */
-export function hasEncryptedConnection(
-  req: httpNative.IncomingMessage,
-): boolean {
+export function hasEncryptedConnection(req: httpNative.IncomingMessage): boolean {
   return Boolean(
     // req.connection.pair probably does not exist anymore
     (req.connection as tls.TLSSocket).encrypted || (req.connection as any).pair,
@@ -290,10 +274,7 @@ export function hasPort(host: string | null | undefined): boolean {
  *
  * @api private
  */
-export function requiresPort(
-  _port: string | number,
-  _protocol: string | undefined,
-): boolean {
+export function requiresPort(_port: string | number, _protocol: string | undefined): boolean {
   const protocol = _protocol?.split(":")[0];
   const port = +_port;
 

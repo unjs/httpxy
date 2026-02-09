@@ -20,9 +20,7 @@ describe("lib/http-proxy.js", () => {
         const ports = { source: getPort(), proxy: getPort() };
         const source = http.createServer(function (req, res) {
           expect(req.method).to.eql("GET");
-          expect(Number.parseInt(req.headers.host!.split(":")[1])).to.eql(
-            ports.proxy,
-          );
+          expect(Number.parseInt(req.headers.host!.split(":")[1])).to.eql(ports.proxy);
           res.writeHead(200, { "Content-Type": "text/plain" });
           res.end("Hello from " + ports.source);
         });
@@ -33,12 +31,8 @@ describe("lib/http-proxy.js", () => {
           .createProxyServer({
             target: "http://localhost:" + ports.source,
             ssl: {
-              key: fs.readFileSync(
-                path.join(__dirname, "fixtures", "agent2-key.pem"),
-              ),
-              cert: fs.readFileSync(
-                path.join(__dirname, "fixtures", "agent2-cert.pem"),
-              ),
+              key: fs.readFileSync(path.join(__dirname, "fixtures", "agent2-key.pem")),
+              cert: fs.readFileSync(path.join(__dirname, "fixtures", "agent2-cert.pem")),
               ciphers: "AES128-GCM-SHA256",
             },
           })
@@ -78,19 +72,13 @@ describe("lib/http-proxy.js", () => {
         const ports = { source: getPort(), proxy: getPort() };
         const source = https.createServer(
           {
-            key: fs.readFileSync(
-              path.join(__dirname, "fixtures", "agent2-key.pem"),
-            ),
-            cert: fs.readFileSync(
-              path.join(__dirname, "fixtures", "agent2-cert.pem"),
-            ),
+            key: fs.readFileSync(path.join(__dirname, "fixtures", "agent2-key.pem")),
+            cert: fs.readFileSync(path.join(__dirname, "fixtures", "agent2-cert.pem")),
             ciphers: "AES128-GCM-SHA256",
           },
           function (req, res) {
             expect(req.method).to.eql("GET");
-            expect(Number.parseInt(req.headers.host!.split(":")[1])).to.eql(
-              ports.proxy,
-            );
+            expect(Number.parseInt(req.headers.host!.split(":")[1])).to.eql(ports.proxy);
             res.writeHead(200, { "Content-Type": "text/plain" });
             res.end("Hello from " + ports.source);
           },
@@ -138,19 +126,13 @@ describe("lib/http-proxy.js", () => {
         const ports = { source: getPort(), proxy: getPort() };
         const source = https.createServer(
           {
-            key: fs.readFileSync(
-              path.join(__dirname, "fixtures", "agent2-key.pem"),
-            ),
-            cert: fs.readFileSync(
-              path.join(__dirname, "fixtures", "agent2-cert.pem"),
-            ),
+            key: fs.readFileSync(path.join(__dirname, "fixtures", "agent2-key.pem")),
+            cert: fs.readFileSync(path.join(__dirname, "fixtures", "agent2-cert.pem")),
             ciphers: "AES128-GCM-SHA256",
           },
           function (req, res) {
             expect(req.method).to.eql("GET");
-            expect(Number.parseInt(req.headers.host!.split(":")[1])).to.eql(
-              ports.proxy,
-            );
+            expect(Number.parseInt(req.headers.host!.split(":")[1])).to.eql(ports.proxy);
             res.writeHead(200, { "Content-Type": "text/plain" });
             res.end("Hello from " + ports.source);
           },
@@ -162,12 +144,8 @@ describe("lib/http-proxy.js", () => {
           .createProxyServer({
             target: "https://localhost:" + ports.source,
             ssl: {
-              key: fs.readFileSync(
-                path.join(__dirname, "fixtures", "agent2-key.pem"),
-              ),
-              cert: fs.readFileSync(
-                path.join(__dirname, "fixtures", "agent2-cert.pem"),
-              ),
+              key: fs.readFileSync(path.join(__dirname, "fixtures", "agent2-key.pem")),
+              cert: fs.readFileSync(path.join(__dirname, "fixtures", "agent2-cert.pem")),
               ciphers: "AES128-GCM-SHA256",
             },
             secure: false,
@@ -207,12 +185,8 @@ describe("lib/http-proxy.js", () => {
         const ports = { source: getPort(), proxy: getPort() };
         const source = https
           .createServer({
-            key: fs.readFileSync(
-              path.join(__dirname, "fixtures", "agent2-key.pem"),
-            ),
-            cert: fs.readFileSync(
-              path.join(__dirname, "fixtures", "agent2-cert.pem"),
-            ),
+            key: fs.readFileSync(path.join(__dirname, "fixtures", "agent2-key.pem")),
+            cert: fs.readFileSync(path.join(__dirname, "fixtures", "agent2-cert.pem")),
             ciphers: "AES128-GCM-SHA256",
           })
           .listen(ports.source);
@@ -227,9 +201,7 @@ describe("lib/http-proxy.js", () => {
         proxy.on("error", function (err, req, res) {
           expect(err).toBeInstanceOf(Error);
           if (semver.gt(process.versions.node, "0.12.0")) {
-            expect(err.toString()).toBe(
-              "Error: unable to verify the first certificate",
-            );
+            expect(err.toString()).toBe("Error: unable to verify the first certificate");
           } else {
             expect(err.toString()).toBe("Error: DEPTH_ZERO_SELF_SIGNED_CERT");
           }
@@ -255,9 +227,7 @@ describe("lib/http-proxy.js", () => {
         const ports = { source: getPort(), proxy: getPort() };
         const source = http.createServer(function (req, res) {
           expect(req.method).to.eql("GET");
-          expect(Number.parseInt(req.headers.host!.split(":")[1])).to.eql(
-            ports.proxy,
-          );
+          expect(Number.parseInt(req.headers.host!.split(":")[1])).to.eql(ports.proxy);
           res.writeHead(200, { "Content-Type": "text/plain" });
           res.end("Hello from " + ports.source);
         });
@@ -271,12 +241,8 @@ describe("lib/http-proxy.js", () => {
         const ownServer = https
           .createServer(
             {
-              key: fs.readFileSync(
-                path.join(__dirname, "fixtures", "agent2-key.pem"),
-              ),
-              cert: fs.readFileSync(
-                path.join(__dirname, "fixtures", "agent2-cert.pem"),
-              ),
+              key: fs.readFileSync(path.join(__dirname, "fixtures", "agent2-key.pem")),
+              cert: fs.readFileSync(path.join(__dirname, "fixtures", "agent2-cert.pem")),
               ciphers: "AES128-GCM-SHA256",
             },
             function (req, res) {

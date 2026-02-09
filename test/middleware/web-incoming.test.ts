@@ -53,11 +53,7 @@ describe("middleware:web-incoming", () => {
         },
       };
 
-      webPasses.timeout(
-        stubRequest as any,
-        {} as any,
-        { timeout: 5000 } as any,
-      );
+      webPasses.timeout(stubRequest as any, {} as any, { timeout: 5000 } as any);
       expect(done).to.eql(5000);
     });
   });
@@ -219,127 +215,118 @@ describe("#createProxyServer.web() using own http server", () => {
     await promise;
   });
 
-  it.todo(
-    "should proxy the request and handle error via event listener",
-    async () => {
-      const { resolve, promise } = Promise.withResolvers<void>();
-      const proxy = httpProxy.createProxyServer({
-        target: "http://localhost:8080",
+  it.todo("should proxy the request and handle error via event listener", async () => {
+    const { resolve, promise } = Promise.withResolvers<void>();
+    const proxy = httpProxy.createProxyServer({
+      target: "http://localhost:8080",
+    });
+
+    const proxyServer = http.createServer(requestHandler);
+
+    function requestHandler(req: any, res: any) {
+      proxy.once("error", function (err, errReq, errRes) {
+        proxyServer.close();
+        expect(err).toBeInstanceOf(Error);
+        expect(errReq).toBe(req);
+        expect(errRes).toBe(res);
+        expect(err.code).toBe("ECONNREFUSED");
+        resolve();
       });
 
-      const proxyServer = http.createServer(requestHandler);
+      proxy.web(req, res);
+    }
 
-      function requestHandler(req: any, res: any) {
-        proxy.once("error", function (err, errReq, errRes) {
-          proxyServer.close();
-          expect(err).toBeInstanceOf(Error);
-          expect(errReq).toBe(req);
-          expect(errRes).toBe(res);
-          expect(err.code).toBe("ECONNREFUSED");
-          resolve();
-        });
+    proxyServer.listen("8083");
 
-        proxy.web(req, res);
-      }
+    http
+      .request(
+        {
+          hostname: "localhost",
+          port: "8083",
+          method: "GET",
+        },
+        () => {},
+      )
+      .end();
+    await promise;
+  });
 
-      proxyServer.listen("8083");
+  it.todo("should forward the request and handle error via event listener", async () => {
+    const { resolve, promise } = Promise.withResolvers<void>();
+    const proxy = httpProxy.createProxyServer({
+      forward: "http://localhost:8080",
+    });
 
-      http
-        .request(
-          {
-            hostname: "localhost",
-            port: "8083",
-            method: "GET",
-          },
-          () => {},
-        )
-        .end();
-      await promise;
-    },
-  );
+    const proxyServer = http.createServer(requestHandler);
 
-  it.todo(
-    "should forward the request and handle error via event listener",
-    async () => {
-      const { resolve, promise } = Promise.withResolvers<void>();
-      const proxy = httpProxy.createProxyServer({
-        forward: "http://localhost:8080",
+    function requestHandler(req: any, res: any) {
+      proxy.once("error", function (err, errReq, errRes) {
+        proxyServer.close();
+        expect(err).toBeInstanceOf(Error);
+        expect(errReq).toBe(req);
+        expect(errRes).toBe(res);
+        expect(err.code).toBe("ECONNREFUSED");
+        resolve();
       });
 
-      const proxyServer = http.createServer(requestHandler);
+      proxy.web(req, res);
+    }
 
-      function requestHandler(req: any, res: any) {
-        proxy.once("error", function (err, errReq, errRes) {
-          proxyServer.close();
-          expect(err).toBeInstanceOf(Error);
-          expect(errReq).toBe(req);
-          expect(errRes).toBe(res);
-          expect(err.code).toBe("ECONNREFUSED");
-          resolve();
-        });
+    proxyServer.listen("9083");
 
-        proxy.web(req, res);
-      }
+    http
+      .request(
+        {
+          hostname: "localhost",
+          port: "9083",
+          method: "GET",
+        },
+        () => {},
+      )
+      .end();
+    await promise;
+  });
 
-      proxyServer.listen("9083");
+  it.todo("should proxy the request and handle timeout error (proxyTimeout)", async () => {
+    const { resolve, promise } = Promise.withResolvers<void>();
+    const proxy = httpProxy.createProxyServer({
+      target: "http://localhost:45000",
+      proxyTimeout: 100,
+    });
 
-      http
-        .request(
-          {
-            hostname: "localhost",
-            port: "9083",
-            method: "GET",
-          },
-          () => {},
-        )
-        .end();
-      await promise;
-    },
-  );
+    process.getBuiltinModule("node:net").createServer().listen(45_000);
 
-  it.todo(
-    "should proxy the request and handle timeout error (proxyTimeout)",
-    async () => {
-      const { resolve, promise } = Promise.withResolvers<void>();
-      const proxy = httpProxy.createProxyServer({
-        target: "http://localhost:45000",
-        proxyTimeout: 100,
+    const proxyServer = http.createServer(requestHandler);
+
+    const started = Date.now();
+    function requestHandler(req: any, res: any) {
+      proxy.once("error", function (err, errReq, errRes) {
+        proxyServer.close();
+        expect(err).toBeInstanceOf(Error);
+        expect(errReq).toBe(req);
+        expect(errRes).toBe(res);
+        expect(Date.now() - started).toBeGreaterThan(99);
+        expect(err.code).toBe("ECONNRESET");
+        resolve();
       });
 
-      process.getBuiltinModule("node:net").createServer().listen(45_000);
+      proxy.web(req, res);
+    }
 
-      const proxyServer = http.createServer(requestHandler);
+    proxyServer.listen("8084");
 
-      const started = Date.now();
-      function requestHandler(req: any, res: any) {
-        proxy.once("error", function (err, errReq, errRes) {
-          proxyServer.close();
-          expect(err).toBeInstanceOf(Error);
-          expect(errReq).toBe(req);
-          expect(errRes).toBe(res);
-          expect(Date.now() - started).toBeGreaterThan(99);
-          expect(err.code).toBe("ECONNRESET");
-          resolve();
-        });
-
-        proxy.web(req, res);
-      }
-
-      proxyServer.listen("8084");
-
-      http
-        .request(
-          {
-            hostname: "localhost",
-            port: "8084",
-            method: "GET",
-          },
-          () => {},
-        )
-        .end();
-      await promise;
-    },
-  );
+    http
+      .request(
+        {
+          hostname: "localhost",
+          port: "8084",
+          method: "GET",
+        },
+        () => {},
+      )
+      .end();
+    await promise;
+  });
 
   it.todo("should proxy the request and handle timeout error", async () => {
     const { resolve, promise } = Promise.withResolvers<void>();
@@ -450,10 +437,7 @@ describe("#createProxyServer.web() using own http server", () => {
     });
 
     async.parallel(
-      [
-        (next) => proxyServer.listen(8086, next),
-        (next) => source.listen(8080, next),
-      ],
+      [(next) => proxyServer.listen(8086, next), (next) => source.listen(8080, next)],
       function (err) {
         http
           .get("http://localhost:8086", function (res) {
@@ -516,10 +500,7 @@ describe("#createProxyServer.web() using own http server", () => {
     const source = http.createServer(function (req: any, res: any) {
       source.close();
       proxyServer.close();
-      const auth = Buffer.from(
-        req.headers.authorization.split(" ")[1],
-        "base64",
-      );
+      const auth = Buffer.from(req.headers.authorization.split(" ")[1], "base64");
       expect(req.method).to.eql("GET");
       expect(auth.toString()).to.eql("user:pass");
       resolve();

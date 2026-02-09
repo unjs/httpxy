@@ -32,75 +32,41 @@ describe("middleware:web-outgoing", () => {
       for (const code of [201, 301, 302, 307, 308]) {
         it("on " + code, () => {
           ctx.proxyRes.statusCode = code;
-          webOutgoing.setRedirectHostRewrite(
-            ctx.req,
-            {} as any,
-            ctx.proxyRes,
-            ctx.options,
-          );
-          expect(ctx.proxyRes.headers.location).to.eql(
-            "http://ext-manual.com/",
-          );
+          webOutgoing.setRedirectHostRewrite(ctx.req, {} as any, ctx.proxyRes, ctx.options);
+          expect(ctx.proxyRes.headers.location).to.eql("http://ext-manual.com/");
         });
       }
 
       it("not on 200", () => {
         ctx.proxyRes.statusCode = 200;
-        webOutgoing.setRedirectHostRewrite(
-          ctx.req,
-          {} as any,
-          ctx.proxyRes,
-          ctx.options,
-        );
+        webOutgoing.setRedirectHostRewrite(ctx.req, {} as any, ctx.proxyRes, ctx.options);
         expect(ctx.proxyRes.headers.location).to.eql("http://backend.com/");
       });
 
       it("not when hostRewrite is unset", () => {
         delete ctx.options.hostRewrite;
-        webOutgoing.setRedirectHostRewrite(
-          ctx.req,
-          {} as any,
-          ctx.proxyRes,
-          ctx.options,
-        );
+        webOutgoing.setRedirectHostRewrite(ctx.req, {} as any, ctx.proxyRes, ctx.options);
         expect(ctx.proxyRes.headers.location).to.eql("http://backend.com/");
       });
 
       it("takes precedence over autoRewrite", () => {
         ctx.options.autoRewrite = true;
-        webOutgoing.setRedirectHostRewrite(
-          ctx.req,
-          {} as any,
-          ctx.proxyRes,
-          ctx.options,
-        );
+        webOutgoing.setRedirectHostRewrite(ctx.req, {} as any, ctx.proxyRes, ctx.options);
         expect(ctx.proxyRes.headers.location).to.eql("http://ext-manual.com/");
       });
 
       it("not when the redirected location does not match target host", () => {
         ctx.proxyRes.statusCode = 302;
         ctx.proxyRes.headers.location = "http://some-other/";
-        webOutgoing.setRedirectHostRewrite(
-          ctx.req,
-          {} as any,
-          ctx.proxyRes,
-          ctx.options,
-        );
+        webOutgoing.setRedirectHostRewrite(ctx.req, {} as any, ctx.proxyRes, ctx.options);
         expect(ctx.proxyRes.headers.location).to.eql("http://some-other/");
       });
 
       it("not when the redirected location does not match target port", () => {
         ctx.proxyRes.statusCode = 302;
         ctx.proxyRes.headers.location = "http://backend.com:8080/";
-        webOutgoing.setRedirectHostRewrite(
-          ctx.req,
-          {} as any,
-          ctx.proxyRes,
-          ctx.options,
-        );
-        expect(ctx.proxyRes.headers.location).to.eql(
-          "http://backend.com:8080/",
-        );
+        webOutgoing.setRedirectHostRewrite(ctx.req, {} as any, ctx.proxyRes, ctx.options);
+        expect(ctx.proxyRes.headers.location).to.eql("http://backend.com:8080/");
       });
     });
 
@@ -111,62 +77,35 @@ describe("middleware:web-outgoing", () => {
       for (const code of [201, 301, 302, 307, 308]) {
         it("on " + code, () => {
           ctx.proxyRes.statusCode = code;
-          webOutgoing.setRedirectHostRewrite(
-            ctx.req,
-            {} as any,
-            ctx.proxyRes,
-            ctx.options,
-          );
+          webOutgoing.setRedirectHostRewrite(ctx.req, {} as any, ctx.proxyRes, ctx.options);
           expect(ctx.proxyRes.headers.location).to.eql("http://ext-auto.com/");
         });
       }
 
       it("not on 200", () => {
         ctx.proxyRes.statusCode = 200;
-        webOutgoing.setRedirectHostRewrite(
-          ctx.req,
-          {} as any,
-          ctx.proxyRes,
-          ctx.options,
-        );
+        webOutgoing.setRedirectHostRewrite(ctx.req, {} as any, ctx.proxyRes, ctx.options);
         expect(ctx.proxyRes.headers.location).to.eql("http://backend.com/");
       });
 
       it("not when autoRewrite is unset", () => {
         delete ctx.options.autoRewrite;
-        webOutgoing.setRedirectHostRewrite(
-          ctx.req,
-          {} as any,
-          ctx.proxyRes,
-          ctx.options,
-        );
+        webOutgoing.setRedirectHostRewrite(ctx.req, {} as any, ctx.proxyRes, ctx.options);
         expect(ctx.proxyRes.headers.location).to.eql("http://backend.com/");
       });
 
       it("not when the redirected location does not match target host", () => {
         ctx.proxyRes.statusCode = 302;
         ctx.proxyRes.headers.location = "http://some-other/";
-        webOutgoing.setRedirectHostRewrite(
-          ctx.req,
-          {} as any,
-          ctx.proxyRes,
-          ctx.options,
-        );
+        webOutgoing.setRedirectHostRewrite(ctx.req, {} as any, ctx.proxyRes, ctx.options);
         expect(ctx.proxyRes.headers.location).to.eql("http://some-other/");
       });
 
       it("not when the redirected location does not match target port", () => {
         ctx.proxyRes.statusCode = 302;
         ctx.proxyRes.headers.location = "http://backend.com:8080/";
-        webOutgoing.setRedirectHostRewrite(
-          ctx.req,
-          {} as any,
-          ctx.proxyRes,
-          ctx.options,
-        );
-        expect(ctx.proxyRes.headers.location).to.eql(
-          "http://backend.com:8080/",
-        );
+        webOutgoing.setRedirectHostRewrite(ctx.req, {} as any, ctx.proxyRes, ctx.options);
+        expect(ctx.proxyRes.headers.location).to.eql("http://backend.com:8080/");
       });
     });
 
@@ -177,57 +116,32 @@ describe("middleware:web-outgoing", () => {
       for (const code of [201, 301, 302, 307, 308]) {
         it("on " + code, () => {
           ctx.proxyRes.statusCode = code;
-          webOutgoing.setRedirectHostRewrite(
-            ctx.req,
-            {} as any,
-            ctx.proxyRes,
-            ctx.options,
-          );
+          webOutgoing.setRedirectHostRewrite(ctx.req, {} as any, ctx.proxyRes, ctx.options);
           expect(ctx.proxyRes.headers.location).to.eql("https://backend.com/");
         });
       }
 
       it("not on 200", () => {
         ctx.proxyRes.statusCode = 200;
-        webOutgoing.setRedirectHostRewrite(
-          ctx.req,
-          {} as any,
-          ctx.proxyRes,
-          ctx.options,
-        );
+        webOutgoing.setRedirectHostRewrite(ctx.req, {} as any, ctx.proxyRes, ctx.options);
         expect(ctx.proxyRes.headers.location).to.eql("http://backend.com/");
       });
 
       it("not when protocolRewrite is unset", () => {
         delete ctx.options.protocolRewrite;
-        webOutgoing.setRedirectHostRewrite(
-          ctx.req,
-          {} as any,
-          ctx.proxyRes,
-          ctx.options,
-        );
+        webOutgoing.setRedirectHostRewrite(ctx.req, {} as any, ctx.proxyRes, ctx.options);
         expect(ctx.proxyRes.headers.location).to.eql("http://backend.com/");
       });
 
       it("works together with hostRewrite", () => {
         ctx.options.hostRewrite = "ext-manual.com";
-        webOutgoing.setRedirectHostRewrite(
-          ctx.req,
-          {} as any,
-          ctx.proxyRes,
-          ctx.options,
-        );
+        webOutgoing.setRedirectHostRewrite(ctx.req, {} as any, ctx.proxyRes, ctx.options);
         expect(ctx.proxyRes.headers.location).to.eql("https://ext-manual.com/");
       });
 
       it("works together with autoRewrite", () => {
         ctx.options.autoRewrite = true;
-        webOutgoing.setRedirectHostRewrite(
-          ctx.req,
-          {} as any,
-          ctx.proxyRes,
-          ctx.options,
-        );
+        webOutgoing.setRedirectHostRewrite(ctx.req, {} as any, ctx.proxyRes, ctx.options);
         expect(ctx.proxyRes.headers.location).to.eql("https://ext-auto.com/");
       });
     });
@@ -338,11 +252,7 @@ describe("middleware:web-outgoing", () => {
         },
       };
 
-      webOutgoing.writeStatusCode(
-        {} as any,
-        res as any,
-        { statusCode: 200 } as any,
-      );
+      webOutgoing.writeStatusCode({} as any, res as any, { statusCode: 200 } as any);
     });
   });
 
@@ -352,20 +262,14 @@ describe("middleware:web-outgoing", () => {
         headers: {
           hey: "hello",
           how: "are you?",
-          "set-cookie": [
-            "hello; domain=my.domain; path=/",
-            "there; domain=my.domain; path=/",
-          ],
+          "set-cookie": ["hello; domain=my.domain; path=/", "there; domain=my.domain; path=/"],
         },
       };
       ctx.rawProxyRes = {
         headers: {
           hey: "hello",
           how: "are you?",
-          "set-cookie": [
-            "hello; domain=my.domain; path=/",
-            "there; domain=my.domain; path=/",
-          ],
+          "set-cookie": ["hello; domain=my.domain; path=/", "there; domain=my.domain; path=/"],
         },
         rawHeaders: [
           "Hey",
@@ -390,12 +294,7 @@ describe("middleware:web-outgoing", () => {
 
     it("writes headers", () => {
       const options = {};
-      webOutgoing.writeHeaders(
-        {} as any,
-        ctx.res,
-        ctx.proxyRes,
-        options as any,
-      );
+      webOutgoing.writeHeaders({} as any, ctx.res, ctx.proxyRes, options as any);
 
       expect(ctx.res.headers.hey).to.eql("hello");
       expect(ctx.res.headers.how).to.eql("are you?");
@@ -406,12 +305,7 @@ describe("middleware:web-outgoing", () => {
 
     it("writes raw headers", () => {
       const options = {};
-      webOutgoing.writeHeaders(
-        {} as any,
-        ctx.res,
-        ctx.rawProxyRes,
-        options as any,
-      );
+      webOutgoing.writeHeaders({} as any, ctx.res, ctx.rawProxyRes, options as any);
 
       expect(ctx.res.headers.hey).to.eql("hello");
       expect(ctx.res.headers.how).to.eql("are you?");
@@ -425,31 +319,17 @@ describe("middleware:web-outgoing", () => {
         cookiePathRewrite: "/dummyPath",
       };
 
-      webOutgoing.writeHeaders(
-        {} as any,
-        ctx.res,
-        ctx.proxyRes,
-        options as any,
-      );
+      webOutgoing.writeHeaders({} as any, ctx.res, ctx.proxyRes, options as any);
 
-      expect(ctx.res.headers["set-cookie"]).to.contain(
-        "hello; domain=my.domain; path=/dummyPath",
-      );
+      expect(ctx.res.headers["set-cookie"]).to.contain("hello; domain=my.domain; path=/dummyPath");
     });
 
     it("does not rewrite path", () => {
       const options = {};
 
-      webOutgoing.writeHeaders(
-        {} as any,
-        ctx.res,
-        ctx.proxyRes,
-        options as any,
-      );
+      webOutgoing.writeHeaders({} as any, ctx.res, ctx.proxyRes, options as any);
 
-      expect(ctx.res.headers["set-cookie"]).to.contain(
-        "hello; domain=my.domain; path=/",
-      );
+      expect(ctx.res.headers["set-cookie"]).to.contain("hello; domain=my.domain; path=/");
     });
 
     it("removes path", () => {
@@ -457,31 +337,17 @@ describe("middleware:web-outgoing", () => {
         cookiePathRewrite: "",
       };
 
-      webOutgoing.writeHeaders(
-        {} as any,
-        ctx.res,
-        ctx.proxyRes,
-        options as any,
-      );
+      webOutgoing.writeHeaders({} as any, ctx.res, ctx.proxyRes, options as any);
 
-      expect(ctx.res.headers["set-cookie"]).to.contain(
-        "hello; domain=my.domain",
-      );
+      expect(ctx.res.headers["set-cookie"]).to.contain("hello; domain=my.domain");
     });
 
     it("does not rewrite domain", () => {
       const options = {};
 
-      webOutgoing.writeHeaders(
-        {} as any,
-        ctx.res,
-        ctx.proxyRes,
-        options as any,
-      );
+      webOutgoing.writeHeaders({} as any, ctx.res, ctx.proxyRes, options as any);
 
-      expect(ctx.res.headers["set-cookie"]).to.contain(
-        "hello; domain=my.domain; path=/",
-      );
+      expect(ctx.res.headers["set-cookie"]).to.contain("hello; domain=my.domain; path=/");
     });
 
     it("rewrites domain", () => {
@@ -489,16 +355,9 @@ describe("middleware:web-outgoing", () => {
         cookieDomainRewrite: "my.new.domain",
       };
 
-      webOutgoing.writeHeaders(
-        {} as any,
-        ctx.res,
-        ctx.proxyRes,
-        options as any,
-      );
+      webOutgoing.writeHeaders({} as any, ctx.res, ctx.proxyRes, options as any);
 
-      expect(ctx.res.headers["set-cookie"]).to.contain(
-        "hello; domain=my.new.domain; path=/",
-      );
+      expect(ctx.res.headers["set-cookie"]).to.contain("hello; domain=my.new.domain; path=/");
     });
 
     it("removes domain", () => {
@@ -506,12 +365,7 @@ describe("middleware:web-outgoing", () => {
         cookieDomainRewrite: "",
       };
 
-      webOutgoing.writeHeaders(
-        {} as any,
-        ctx.res,
-        ctx.proxyRes,
-        options as any,
-      );
+      webOutgoing.writeHeaders({} as any, ctx.res, ctx.proxyRes, options as any);
 
       expect(ctx.res.headers["set-cookie"]).to.contain("hello; path=/");
     });
@@ -529,16 +383,9 @@ describe("middleware:web-outgoing", () => {
         "hello-on-my.old.domain; domain=my.old.domain; path=/",
         "hello-on-my.special.domain; domain=my.special.domain; path=/",
       ];
-      webOutgoing.writeHeaders(
-        {} as any,
-        ctx.res,
-        ctx.proxyRes,
-        options as any,
-      );
+      webOutgoing.writeHeaders({} as any, ctx.res, ctx.proxyRes, options as any);
 
-      expect(ctx.res.headers["set-cookie"]).to.contain(
-        "hello-on-my.domain; path=/",
-      );
+      expect(ctx.res.headers["set-cookie"]).to.contain("hello-on-my.domain; path=/");
       expect(ctx.res.headers["set-cookie"]).to.contain(
         "hello-on-my.old.domain; domain=my.new.domain; path=/",
       );
@@ -569,16 +416,9 @@ describe("middleware:web-outgoing", () => {
         "Set-Cookie",
         "hello-on-my.special.domain; domain=my.special.domain; path=/",
       ];
-      webOutgoing.writeHeaders(
-        {} as any,
-        ctx.res,
-        ctx.rawProxyRes,
-        options as any,
-      );
+      webOutgoing.writeHeaders({} as any, ctx.res, ctx.rawProxyRes, options as any);
 
-      expect(ctx.res.headers["set-cookie"]).to.include(
-        "hello-on-my.domain; path=/",
-      );
+      expect(ctx.res.headers["set-cookie"]).to.include("hello-on-my.domain; path=/");
       expect(ctx.res.headers["set-cookie"]).to.contain(
         "hello-on-my.old.domain; domain=my.new.domain; path=/",
       );
@@ -594,11 +434,7 @@ describe("middleware:web-outgoing", () => {
         "transfer-encoding": "hello",
       },
     };
-    webOutgoing.removeChunked(
-      { httpVersion: "1.0" } as any,
-      {} as any,
-      proxyRes as any,
-    );
+    webOutgoing.removeChunked({ httpVersion: "1.0" } as any, {} as any, proxyRes as any);
     expect(proxyRes.headers["transfer-encoding"]).to.eql(undefined);
   });
 });

@@ -48,9 +48,7 @@ describe("http-proxy", () => {
       const { promise, resolve } = Promise.withResolvers<void>();
       const source = http.createServer((req, res) => {
         expect(req.method).to.eql("GET");
-        expect(Number.parseInt(req.headers.host!.split(":")[1])).toBe(
-          ports.proxy,
-        );
+        expect(Number.parseInt(req.headers.host!.split(":")[1])).toBe(ports.proxy);
         source.close();
         proxy.close(resolve);
       });
@@ -113,9 +111,7 @@ describe("http-proxy", () => {
       const source = http.createServer((req, res) => {
         expect(req.method).to.eql("POST");
         expect(req.headers["x-forwarded-for"]).to.eql("localhost");
-        expect(Number.parseInt(req.headers.host!.split(":")[1])).to.eql(
-          ports.proxy,
-        );
+        expect(Number.parseInt(req.headers.host!.split(":")[1])).to.eql(ports.proxy);
         source.close();
         proxy.close(() => {});
         resolve();
@@ -153,9 +149,7 @@ describe("http-proxy", () => {
 
       const source = http.createServer((req, res) => {
         expect(req.method).to.eql("GET");
-        expect(Number.parseInt(req.headers.host!.split(":")[1])).to.eql(
-          ports.proxy,
-        );
+        expect(Number.parseInt(req.headers.host!.split(":")[1])).to.eql(ports.proxy);
         res.writeHead(200, { "Content-Type": "text/plain" });
         res.end("Hello from " + (source.address()! as any).port);
       });
@@ -283,9 +277,7 @@ describe("http-proxy", () => {
       const { promise, resolve } = Promise.withResolvers<void>();
       const source = http.createServer(function (req, res) {
         expect(req.method).to.eql("GET");
-        expect(Number.parseInt(req.headers.host!.split(":")[1])).to.eql(
-          ports.source,
-        );
+        expect(Number.parseInt(req.headers.host!.split(":")[1])).to.eql(ports.source);
         source.close();
         proxy.close(resolve);
       });
@@ -434,12 +426,7 @@ describe("http-proxy", () => {
       const ports = { source: getPort(), proxy: getPort() };
       const server = http.createServer();
       server.on("upgrade", function (req, socket, head) {
-        const response = [
-          "HTTP/1.1 404 Not Found",
-          "Content-type: text/html",
-          "",
-          "",
-        ];
+        const response = ["HTTP/1.1 404 Not Found", "Content-type: text/html", "", ""];
         socket.write(response.join("\r\n"));
         socket.end();
       });
@@ -501,45 +488,42 @@ describe("http-proxy", () => {
       await promise;
     });
 
-    it.todo(
-      "should emit open and close events when socket.io client connects and disconnects",
-      async () => {
-        const ports = { source: getPort(), proxy: getPort() };
-        const proxy = httpProxy.createProxyServer({
-          target: "ws://localhost:" + ports.source,
-          ws: true,
-        });
-        const proxyServer = proxy.listen(ports.proxy);
-        const server = http.createServer();
-        const destiny = io.Server.listen(server);
+    it.todo("should emit open and close events when socket.io client connects and disconnects", async () => {
+      const ports = { source: getPort(), proxy: getPort() };
+      const proxy = httpProxy.createProxyServer({
+        target: "ws://localhost:" + ports.source,
+        ws: true,
+      });
+      const proxyServer = proxy.listen(ports.proxy);
+      const server = http.createServer();
+      const destiny = io.Server.listen(server);
 
-        function startSocketIo() {
-          const client = ioClient("ws://localhost:" + ports.proxy, {
-            rejectUnauthorized: undefined,
-          });
-          client.on("connect", () => {
-            client.disconnect();
-          });
+      function startSocketIo() {
+        const client = ioClient("ws://localhost:" + ports.proxy, {
+          rejectUnauthorized: undefined,
+        });
+        client.on("connect", () => {
+          client.disconnect();
+        });
+      }
+      let count = 0;
+
+      proxyServer.on("open", () => {
+        count += 1;
+      });
+
+      proxyServer.on("close", () => {
+        proxyServer.close();
+        server.close();
+        destiny.close();
+        if (count == 1) {
+          done();
         }
-        let count = 0;
+      });
 
-        proxyServer.on("open", () => {
-          count += 1;
-        });
-
-        proxyServer.on("close", () => {
-          proxyServer.close();
-          server.close();
-          destiny.close();
-          if (count == 1) {
-            done();
-          }
-        });
-
-        server.listen(ports.source);
-        server.on("listening", startSocketIo);
-      },
-    );
+      server.listen(ports.source);
+      server.on("listening", startSocketIo);
+    });
 
     it.todo("should pass all set-cookie headers to client", async () => {
       const { resolve, promise } = Promise.withResolvers<void>();

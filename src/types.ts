@@ -16,11 +16,7 @@ export interface ProxyTargetDetailed {
   secureProtocol?: string;
 }
 
-export type ProxyTarget =
-  | string
-  | URL
-  | Partial<LegacyURL>
-  | ProxyTargetDetailed;
+export type ProxyTarget = string | URL | Partial<LegacyURL> | ProxyTargetDetailed;
 
 export interface ProxyServerOptions {
   /** URL string to be parsed. */

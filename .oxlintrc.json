@@ -1,0 +1,11 @@
+{
+  "$schema": "https://unpkg.com/oxlint/configuration_schema.json",
+  "plugins": [
+    "unicorn",
+    "typescript",
+    "oxc"
+  ],
+  "rules": {
+    "no-unused-vars": "off"
+  }
+}

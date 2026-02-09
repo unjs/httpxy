@@ -23,9 +23,9 @@ export type ProxyMiddleware<T extends ServerResponse | Socket> = (
   callback?: (err: any, req: IncomingMessage, socket: T, url?: any) => void,
 ) => void | true;
 
-export function defineProxyMiddleware<
-  T extends ServerResponse | Socket = ServerResponse,
->(m: ProxyMiddleware<T>) {
+export function defineProxyMiddleware<T extends ServerResponse | Socket = ServerResponse>(
+  m: ProxyMiddleware<T>,
+) {
   return m;
 }
 

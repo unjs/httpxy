@@ -17,10 +17,7 @@ describe("middleware:ws-incoming", () => {
             destroyCalled = true;
           },
         };
-      const returnValue = wsIncoming.checkMethodAndHeader(
-        stubRequest as any,
-        stubSocket as any,
-      );
+      const returnValue = wsIncoming.checkMethodAndHeader(stubRequest as any, stubSocket as any);
       expect(returnValue).toBe(true);
       expect(destroyCalled).toBe(true);
     });
@@ -37,10 +34,7 @@ describe("middleware:ws-incoming", () => {
           destroyCalled = true;
         },
       };
-      const returnValue = wsIncoming.checkMethodAndHeader(
-        stubRequest as any,
-        stubSocket as any,
-      );
+      const returnValue = wsIncoming.checkMethodAndHeader(stubRequest as any, stubSocket as any);
       expect(returnValue).toBe(true);
       expect(destroyCalled).toBe(true);
     });
@@ -59,10 +53,7 @@ describe("middleware:ws-incoming", () => {
             destroyCalled = true;
           },
         };
-      const returnValue = wsIncoming.checkMethodAndHeader(
-        stubRequest as any,
-        stubSocket as any,
-      );
+      const returnValue = wsIncoming.checkMethodAndHeader(stubRequest as any, stubSocket as any);
       expect(returnValue).toBe(true);
       expect(destroyCalled).toBe(true);
     });
@@ -81,10 +72,7 @@ describe("middleware:ws-incoming", () => {
           destroyCalled = true;
         },
       };
-      const returnValue = wsIncoming.checkMethodAndHeader(
-        stubRequest as any,
-        stubSocket as any,
-      );
+      const returnValue = wsIncoming.checkMethodAndHeader(stubRequest as any, stubSocket as any);
       expect(returnValue).toBe(undefined);
       expect(destroyCalled).toBe(false);
     });

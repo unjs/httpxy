@@ -1,6 +1,5 @@
 # Changelog
 
-
 ## v0.1.7
 
 [compare changes](https://github.com/unjs/httpxy/compare/v0.1.6...v0.1.7)
@@ -83,7 +82,7 @@
 ### ❤️ Contributors
 
 - Pooya Parsa ([@pi0](http://github.com/pi0))
-- Jonasolesen 
+- Jonasolesen
 - Gacek1123
 
 ## v0.1.3
@@ -122,10 +121,9 @@
 
 ## v0.1.1
 
-
 ### 🚀 Enhancements
 
-- Awaitable `.`web` and `.ws` ([e4dad27](https://github.com/unjs/httpxy/commit/e4dad27))
+- Awaitable `.`web`and`.ws` ([e4dad27](https://github.com/unjs/httpxy/commit/e4dad27))
 
 ### 🩹 Fixes
 
@@ -149,4 +147,3 @@
 
 - Pooya Parsa ([@pi0](http://github.com/pi0))
 - Sébastien Chopin <seb@nuxtlabs.com>
-
