@@ -5,12 +5,8 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 
 describe("httpxy types", () => {
   it("ProxyServer generic types", () => {
-    assertType<ProxyServer>(
-      new ProxyServer(),
-    );
-    assertType<ProxyServer<IncomingMessage, ServerResponse>>(
-      new ProxyServer(),
-    );
+    assertType<ProxyServer>(new ProxyServer());
+    assertType<ProxyServer<IncomingMessage, ServerResponse>>(new ProxyServer());
     assertType<ProxyServer<ExpressRequest, ExpressResponse>>(
       new ProxyServer<ExpressRequest, ExpressResponse>(),
     );
