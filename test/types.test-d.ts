@@ -10,5 +10,15 @@ describe("httpxy types", () => {
     assertType<ProxyServer<ExpressRequest, ExpressResponse>>(
       new ProxyServer<ExpressRequest, ExpressResponse>(),
     );
+
+    const expressProxyServer = new ProxyServer<ExpressRequest, ExpressResponse>();
+
+    expressProxyServer.on("start", (req, res) => {
+      assertType<ExpressRequest>(req);
+      assertType<IncomingMessage>(req);
+
+      assertType<ExpressResponse>(res);
+      assertType<ServerResponse>(res);
+    });
   });
 });
