@@ -116,13 +116,12 @@ export const writeHeaders = defineProxyOutgoingMiddleware((req, res, proxyRes, o
  */
 export const writeStatusCode = defineProxyOutgoingMiddleware((req, res, proxyRes) => {
   // From Node.js docs: response.writeHead(statusCode[, statusMessage][, headers])
+
+  // @ts-expect-error
+  res.statusCode = proxyRes.statusCode;
+
   if (proxyRes.statusMessage) {
-    // @ts-expect-error
-    res.statusCode = proxyRes.statusCode;
     res.statusMessage = proxyRes.statusMessage;
-  } else {
-    // @ts-expect-error
-    res.statusCode = proxyRes.statusCode;
   }
 });
 
