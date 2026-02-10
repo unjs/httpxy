@@ -1,4 +1,4 @@
-import { assertType, describe, it } from "vitest";
+import { assertType, describe, expectTypeOf, it } from "vitest";
 import { ProxyServer } from "../src/server";
 import type { Request as ExpressRequest, Response as ExpressResponse } from "express";
 import type { IncomingMessage, ServerResponse } from "node:http";
@@ -14,11 +14,11 @@ describe("httpxy types", () => {
     const expressProxyServer = new ProxyServer<ExpressRequest, ExpressResponse>();
 
     expressProxyServer.on("start", (req, res) => {
-      assertType<ExpressRequest>(req);
-      assertType<IncomingMessage>(req);
+      expectTypeOf(req).toEqualTypeOf<ExpressRequest>();
+      expectTypeOf(req).toExtend<IncomingMessage>();
 
-      assertType<ExpressResponse>(res);
-      assertType<ServerResponse>(res);
+      expectTypeOf(res).toEqualTypeOf<ExpressResponse>();
+      expectTypeOf(res).toExtend<ServerResponse>();
     });
   });
 });
