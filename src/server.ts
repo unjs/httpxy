@@ -23,8 +23,8 @@ export interface ProxyServerEventMap<
     options: ProxyServerOptions,
     head: any,
   ];
-  proxyRes: [proxyRes: Req, req: Req, res: Res];
-  end: [req: Req, res: Res, proxyRes: Req];
+  proxyRes: [proxyRes: http.IncomingMessage, req: Req, res: Res];
+  end: [req: Req, res: Res, proxyRes: http.IncomingMessage];
   open: [proxySocket: net.Socket];
   /** @deprecated */
   proxySocket: [proxySocket: net.Socket];
