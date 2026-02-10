@@ -1,5 +1,22 @@
 # Changelog
 
+## v0.2.1
+
+[compare changes](https://github.com/unjs/httpxy/compare/v0.2.0...v0.2.1)
+
+### 🌊 Types
+
+- Make httpxy's server event type map generic ([#97](https://github.com/unjs/httpxy/pull/97))
+
+### 🏡 Chore
+
+- Update deps ([aecbed3](https://github.com/unjs/httpxy/commit/aecbed3))
+
+### ❤️ Contributors
+
+- Pooya Parsa ([@pi0](https://github.com/pi0))
+- Sukka <isukkaw@gmail.com>
+
 ## v0.2.0
 
 [compare changes](https://github.com/unjs/httpxy/compare/v0.1.7...v0.2.0)
