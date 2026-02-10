@@ -12,6 +12,20 @@ const upgradeHeader = /(^|,)\s*upgrade\s*($|,)/i;
 export const isSSL = /^https|wss/;
 
 /**
+ * Node.js HTTP/2 accepts pseudo headers and it may conflict
+ * with request options.
+ *
+ * Let's just blacklist those potential conflicting pseudo
+ * headers.
+ */
+const HTTP2_HEADER_BLACKLIST = [
+  ':method',
+  ':path',
+  ':scheme',
+  ':authority',
+]
+
+/**
  * Copies the right headers from `options` and `req` to
  * `outgoing` which is then used to fire the proxied
  * request.
@@ -66,6 +80,13 @@ export function setupOutgoing(
 
   if (options.headers) {
     outgoing.headers = { ...outgoing.headers, ...options.headers };
+  }
+
+  if (req.httpVersionMajor > 1) {
+    // ignore potential conflicting HTTP/2 pseudo headers
+    for (const header of HTTP2_HEADER_BLACKLIST) {
+      delete outgoing.headers[header];
+    }
   }
 
   if (options.auth) {
