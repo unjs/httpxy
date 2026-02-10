@@ -15,12 +15,17 @@ export const removeChunked = defineProxyOutgoingMiddleware((req, res, proxyRes) 
 /**
  * If is a HTTP 1.0 request, set the correct connection header
  * or if connection header not present, then use `keep-alive`
+ *
+ * If is a HTTP/2 request, remove connection header no matter what,
+ * this avoids sending connection header to the underlying http2 client
  */
 export const setConnection = defineProxyOutgoingMiddleware((req, res, proxyRes) => {
   if (req.httpVersion === "1.0") {
     proxyRes.headers.connection = req.headers.connection || "close";
-  } else if (req.httpVersion !== "2.0" && !proxyRes.headers.connection) {
+  } else if (req.httpVersionMajor < 2 && !proxyRes.headers.connection) {
     proxyRes.headers.connection = req.headers.connection || "keep-alive";
+  } else if (req.httpVersionMajor >= 2) {
+    delete proxyRes.headers.connection;
   }
 });
 
