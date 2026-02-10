@@ -8,55 +8,34 @@ import { type ProxyServerOptions, type ProxyTarget } from "./types";
 import { ProxyMiddleware, type ResOfType } from "./middleware/_utils";
 import type net from "node:net";
 
-export interface ProxyServerEventMap {
-  error: [
-    err: Error,
-    req?: http.IncomingMessage,
-    res?: http.ServerResponse<http.IncomingMessage> | net.Socket,
-    target?: URL | ProxyTarget,
-  ];
-  start: [
-    req: http.IncomingMessage,
-    res: http.ServerResponse<http.IncomingMessage>,
-    target: URL | ProxyTarget,
-  ];
-  econnreset: [
-    err: Error,
-    req: http.IncomingMessage,
-    res: http.ServerResponse<http.IncomingMessage>,
-    target: URL | ProxyTarget,
-  ];
-  proxyReq: [
-    proxyReq: http.ClientRequest,
-    req: http.IncomingMessage,
-    res: http.ServerResponse<http.IncomingMessage>,
-    options: ProxyServerOptions,
-  ];
+export interface ProxyServerEventMap<
+  Req extends http.IncomingMessage = http.IncomingMessage,
+  Res extends http.ServerResponse = http.ServerResponse,
+> {
+  error: [err: Error, req?: Req, res?: Res | net.Socket, target?: URL | ProxyTarget];
+  start: [req: Req, res: Res, target: URL | ProxyTarget];
+  econnreset: [err: Error, req: Req, res: Res, target: URL | ProxyTarget];
+  proxyReq: [proxyReq: http.ClientRequest, req: Req, res: Res, options: ProxyServerOptions];
   proxyReqWs: [
     proxyReq: http.ClientRequest,
-    req: http.IncomingMessage,
+    req: Req,
     socket: net.Socket,
     options: ProxyServerOptions,
     head: any,
   ];
-  proxyRes: [
-    proxyRes: http.IncomingMessage,
-    req: http.IncomingMessage,
-    res: http.ServerResponse<http.IncomingMessage>,
-  ];
-  end: [
-    req: http.IncomingMessage,
-    res: http.ServerResponse<http.IncomingMessage>,
-    proxyRes: http.IncomingMessage,
-  ];
+  proxyRes: [proxyRes: Req, req: Req, res: Res];
+  end: [req: Req, res: Res, proxyRes: Req];
   open: [proxySocket: net.Socket];
   /** @deprecated */
   proxySocket: [proxySocket: net.Socket];
-  close: [proxyRes: http.IncomingMessage, proxySocket: net.Socket, proxyHead: any];
+  close: [proxyRes: Req, proxySocket: net.Socket, proxyHead: any];
 }
 
 // eslint-disable-next-line unicorn/prefer-event-target
-export class ProxyServer extends EventEmitter<ProxyServerEventMap> {
+export class ProxyServer<
+  Req extends http.IncomingMessage = http.IncomingMessage,
+  Res extends http.ServerResponse = http.ServerResponse,
+> extends EventEmitter<ProxyServerEventMap<Req, Res>> {
   private _server?: http.Server | https.Server;
 
   _webPasses: ProxyMiddleware<http.ServerResponse>[] = [...webIncomingMiddleware];
