@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.2.2
+
+[compare changes](https://github.com/unjs/httpxy/compare/v0.2.1...v0.2.2)
+
+### 🏡 Chore
+
+- Fix build script ([28dc9e6](https://github.com/unjs/httpxy/commit/28dc9e6))
+
+### ❤️ Contributors
+
+- Pooya Parsa ([@pi0](https://github.com/pi0))
+
 ## v0.2.1
 
 [compare changes](https://github.com/unjs/httpxy/compare/v0.2.0...v0.2.1)
