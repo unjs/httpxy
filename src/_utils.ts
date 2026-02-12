@@ -3,6 +3,7 @@ import httpsNative from "node:https";
 import net from "node:net";
 import type tls from "node:tls";
 import type { ProxyAddr, ProxyServerOptions, ProxyTarget, ProxyTargetDetailed } from "./types.ts";
+import type { Http2ServerRequest } from "node:http2";
 
 const upgradeHeader = /(^|,)\s*upgrade\s*($|,)/i;
 
@@ -18,12 +19,7 @@ export const isSSL = /^https|wss/;
  * Let's just blacklist those potential conflicting pseudo
  * headers.
  */
-const HTTP2_HEADER_BLACKLIST = [
-  ':method',
-  ':path',
-  ':scheme',
-  ':authority',
-]
+const HTTP2_HEADER_BLACKLIST = [":method", ":path", ":scheme", ":authority"];
 
 /**
  * Copies the right headers from `options` and `req` to
@@ -52,7 +48,7 @@ export function setupOutgoing(
     ca?: string;
     method?: string;
   },
-  req: httpNative.IncomingMessage,
+  req: httpNative.IncomingMessage | Http2ServerRequest,
   forward?: "forward" | "target",
 ): httpNative.RequestOptions | httpsNative.RequestOptions {
   outgoing.port =
@@ -202,7 +198,7 @@ export function setupSocket(socket: net.Socket): net.Socket {
  *
  * @api private
  */
-export function getPort(req: httpNative.IncomingMessage): string {
+export function getPort(req: httpNative.IncomingMessage | Http2ServerRequest): string {
   const res = req.headers.host ? req.headers.host.match(/:(\d+)/) : "";
   if (res) {
     return res[1]!;
@@ -219,7 +215,9 @@ export function getPort(req: httpNative.IncomingMessage): string {
  *
  * @api private
  */
-export function hasEncryptedConnection(req: httpNative.IncomingMessage): boolean {
+export function hasEncryptedConnection(
+  req: httpNative.IncomingMessage | Http2ServerRequest,
+): boolean {
   return Boolean(
     // req.connection.pair probably does not exist anymore
     (req.connection as tls.TLSSocket).encrypted || (req.connection as any).pair,

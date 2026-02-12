@@ -274,6 +274,42 @@ describe("middleware:web-outgoing", () => {
       expect(proxyRes.headers.connection).to.eql("hola");
     });
 
+    it("set the right connection (HTTP/1.1) - req.connection", () => {
+      const proxyRes = { headers: {} as any };
+      webOutgoing.setConnection(
+        {
+          httpVersion: "1.0",
+          httpVersionMajor: 1,
+          headers: {
+            connection: "hola",
+          },
+        } as any,
+        {} as any,
+        proxyRes as any,
+        {} as any,
+      );
+
+      expect(proxyRes.headers.connection).to.eql("hola");
+    });
+
+    it("set the right connection (HTTP/2) - req.connection", () => {
+      const proxyRes = { headers: {} as any };
+      webOutgoing.setConnection(
+        {
+          httpVersion: "2.0",
+          httpVersionMajor: 2,
+          headers: {
+            connection: "hola",
+          },
+        } as any,
+        {} as any,
+        proxyRes as any,
+        {} as any,
+      );
+
+      expect(proxyRes.headers.connection).to.eql(undefined);
+    });
+
     it("set the right connection - `keep-alive`", () => {
       const proxyRes = stubIncomingMessage({ headers: {} });
       webOutgoing.setConnection(

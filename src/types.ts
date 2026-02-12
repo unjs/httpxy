@@ -29,7 +29,11 @@ export interface ProxyServerOptions {
   forward?: ProxyTarget;
   /** Object to be passed to http(s).request. */
   agent?: any;
-  /** Object to be passed to https.createServer(). */
+  /** Enable HTTP/2 listener, default is `false` */
+  http2?: boolean;
+  /** Object to be passed to https.createServer()
+   * or http2.createSecureServer() if the `http2` option is enabled
+   */
   ssl?: any;
   /** If you want to proxy websockets. */
   ws?: boolean;
