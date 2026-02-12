@@ -274,12 +274,7 @@ describe("middleware:web-outgoing", () => {
 
     it("should write status code without statusMessage", () => {
       const res = {} as any;
-      webOutgoing.writeStatusCode(
-        {} as any,
-        res,
-        { statusCode: 200 } as any,
-        {} as any,
-      );
+      webOutgoing.writeStatusCode({} as any, res, { statusCode: 200 } as any, {} as any);
       expect(res.statusCode).to.eql(200);
       expect(res.statusMessage).to.eql(undefined);
     });

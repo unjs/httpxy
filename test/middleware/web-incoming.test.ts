@@ -94,26 +94,20 @@ describe("#stream middleware direct tests", () => {
     });
 
     // Call stream directly without callback (6th arg)
-    const stubReq = Object.assign(
-      new (await import("node:stream")).PassThrough(),
-      {
-        method: "GET",
-        url: "/",
-        headers: { host: "127.0.0.1" },
-        connection: { remoteAddress: "127.0.0.1" },
-        socket: { remoteAddress: "127.0.0.1", destroyed: false },
-      },
-    );
-    const stubRes = Object.assign(
-      new (await import("node:stream")).PassThrough(),
-      {
-        headersSent: false,
-        finished: false,
-        setHeader: () => {},
-        writeHead: () => {},
-        statusCode: 200,
-      },
-    );
+    const stubReq = Object.assign(new (await import("node:stream")).PassThrough(), {
+      method: "GET",
+      url: "/",
+      headers: { host: "127.0.0.1" },
+      connection: { remoteAddress: "127.0.0.1" },
+      socket: { remoteAddress: "127.0.0.1", destroyed: false },
+    });
+    const stubRes = Object.assign(new (await import("node:stream")).PassThrough(), {
+      headersSent: false,
+      finished: false,
+      setHeader: () => {},
+      writeHead: () => {},
+      statusCode: 200,
+    });
 
     webPasses.stream(
       stubReq as any,
@@ -325,9 +319,7 @@ describe("#createProxyServer.web() using own http server", () => {
 
     proxyServer.listen(0, "127.0.0.1", () => {
       const port = (proxyServer.address() as any).port;
-      http
-        .request({ hostname: "127.0.0.1", port, method: "GET" }, () => {})
-        .end();
+      http.request({ hostname: "127.0.0.1", port, method: "GET" }, () => {}).end();
     });
     await promise;
   });
@@ -354,9 +346,7 @@ describe("#createProxyServer.web() using own http server", () => {
 
     proxyServer.listen(0, "127.0.0.1", () => {
       const port = (proxyServer.address() as any).port;
-      http
-        .request({ hostname: "127.0.0.1", port, method: "GET" }, () => {})
-        .end();
+      http.request({ hostname: "127.0.0.1", port, method: "GET" }, () => {}).end();
     });
     await promise;
   });
@@ -397,9 +387,7 @@ describe("#createProxyServer.web() using own http server", () => {
 
     proxyServer.listen(0, "127.0.0.1", () => {
       const port = (proxyServer.address() as any).port;
-      http
-        .request({ hostname: "127.0.0.1", port, method: "GET" }, () => {})
-        .end();
+      http.request({ hostname: "127.0.0.1", port, method: "GET" }, () => {}).end();
     });
     await promise;
   });
