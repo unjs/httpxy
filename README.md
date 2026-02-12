@@ -28,7 +28,6 @@ const res3 = await proxyFetch({ host: "127.0.0.1", port: 3000 }, "http://example
 
 It accepts the same `input` and `init` arguments as the global `fetch`, including `Request` objects and streaming bodies, and returns a standard `Response`. Redirects are handled manually by default.
 
-
 ## Proxy Server
 
 > [!NOTE]
