@@ -253,21 +253,15 @@ describe("lib/http-proxy/common.js", () => {
 
     it("should preserve multiple consecutive slashes in path (#80)", () => {
       const outgoing = {} as any;
-      common.setupOutgoing(
-        outgoing,
-        { target: "http://localhost:3004" },
-        { url: "//test" } as any,
-      );
+      common.setupOutgoing(outgoing, { target: "http://localhost:3004" }, { url: "//test" } as any);
       expect(outgoing.path).to.eql("//test");
     });
 
     it("should preserve multiple consecutive slashes with query string (#80)", () => {
       const outgoing = {} as any;
-      common.setupOutgoing(
-        outgoing,
-        { target: "http://localhost:3004" },
-        { url: "//test?foo=bar" } as any,
-      );
+      common.setupOutgoing(outgoing, { target: "http://localhost:3004" }, {
+        url: "//test?foo=bar",
+      } as any);
       expect(outgoing.path).to.eql("//test?foo=bar");
     });
 
