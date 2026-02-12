@@ -66,6 +66,12 @@ proxyFetch(addr, request) → http.request to addr → Web Response
 - `proxyReq` event is intentionally skipped when request has `expect` header (`100-continue` advisory coverage).
 - `selfHandleResponse: true` skips outgoing passes and auto-pipe; callers must finish the response in `proxyRes`.
 - `proxyTimeout` aborts upstream request and surfaces timeout errors (tested as `ECONNRESET`).
+- `followRedirects: true | number` enables native redirect following (301/302/303/307/308). `true` = max 5 hops, number = custom max.
+- On 301/302/303 redirects, method changes to GET and request body is dropped.
+- On 307/308 redirects, original method and body are preserved (body is buffered on first request for replay).
+- `proxyRes` event fires only for the final (non-redirect) response; `proxyReq` fires for each request including redirects.
+- Sensitive headers (`authorization`, `cookie`) are stripped on cross-origin redirects.
+- When `followRedirects` is enabled, the request body is tee'd (written to proxy request and buffered simultaneously) rather than piped.
 
 ### WebSocket middleware semantics
 
@@ -126,7 +132,7 @@ pnpm test                         # Lint + typecheck + tests with coverage
 ### Test expectations and parity
 
 - The suite includes legacy parity tests ported from `http-party/node-http-proxy` plus project-specific tests (`test/server.test.ts`, `test/fetch.test.ts`, `test/types.test-d.ts`).
-- `followRedirects` parity is intentionally pending/todo and currently unsupported.
+- `followRedirects` is natively implemented (no external dependency). See behavioral notes below.
 - HTTPS tests rely on local fixtures in `test/fixtures/agent2-*.pem`.
 
 ## Tooling

@@ -1,4 +1,4 @@
-import type { ClientRequest, ServerResponse } from "node:http";
+import type { ClientRequest, IncomingMessage, ServerResponse } from "node:http";
 import type { ProxyTargetDetailed } from "../types.ts";
 import nodeHTTP from "node:http";
 import nodeHTTPS from "node:https";
@@ -7,6 +7,7 @@ import { webOutgoingMiddleware } from "./web-outgoing.ts";
 import { type ProxyMiddleware, defineProxyMiddleware } from "./_utils.ts";
 
 const nativeAgents = { http: nodeHTTP, https: nodeHTTPS };
+const redirectStatuses = new Set([301, 302, 303, 307, 308]);
 
 /**
  * Sets `content-length` to '0' if request is of DELETE type.
@@ -64,10 +65,15 @@ export const stream = defineProxyMiddleware((req, res, options, server, head, ca
   // And we begin!
   server.emit("start", req, res, options.target || options.forward);
 
-  // const agents = options.followRedirects ? followRedirects : nativeAgents;
-  const agents = nativeAgents;
-  const http = agents.http;
-  const https = agents.https;
+  const http = nativeAgents.http;
+  const https = nativeAgents.https;
+
+  const maxRedirects =
+    typeof options.followRedirects === "number"
+      ? options.followRedirects
+      : options.followRedirects
+        ? 5
+        : 0;
 
   if (options.forward) {
     // If forward enable, so just pipe the request
@@ -133,9 +139,110 @@ export const stream = defineProxyMiddleware((req, res, options, server, head, ca
     };
   }
 
-  (options.buffer || req).pipe(proxyReq);
+  // Buffer request body when following redirects (needed for 307/308 replay)
+  let bodyBuffer: Buffer | undefined;
+  if (maxRedirects > 0) {
+    const chunks: Buffer[] = [];
+    const source = options.buffer || req;
+    source.on("data", (chunk: Buffer) => {
+      chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk);
+      proxyReq.write(chunk);
+    });
+    source.on("end", () => {
+      bodyBuffer = Buffer.concat(chunks);
+      proxyReq.end();
+    });
+    source.on("error", (err: Error) => {
+      proxyReq.destroy(err);
+    });
+  } else {
+    (options.buffer || req).pipe(proxyReq);
+  }
 
-  proxyReq.on("response", function (proxyRes) {
+  function handleResponse(proxyRes: IncomingMessage, redirectCount: number, currentUrl: URL) {
+    const statusCode = proxyRes.statusCode!;
+
+    if (
+      maxRedirects > 0 &&
+      redirectStatuses.has(statusCode) &&
+      redirectCount < maxRedirects &&
+      proxyRes.headers.location
+    ) {
+      // Drain the redirect response body
+      proxyRes.resume();
+
+      const location = new URL(proxyRes.headers.location, currentUrl);
+
+      // 301/302/303 → GET without body; 307/308 → preserve method and body
+      const preserveMethod = statusCode === 307 || statusCode === 308;
+      const redirectMethod = preserveMethod ? req.method || "GET" : "GET";
+
+      const isHTTPS = location.protocol === "https:";
+      const agent = isHTTPS ? https : http;
+
+      // Build headers from original request
+      const redirectHeaders: Record<string, string | string[] | undefined> = { ...req.headers };
+      if (options.headers) {
+        Object.assign(redirectHeaders, options.headers);
+      }
+      redirectHeaders.host = location.host;
+
+      // Strip sensitive headers on cross-origin redirects
+      if (location.host !== currentUrl.host) {
+        delete redirectHeaders.authorization;
+        delete redirectHeaders.cookie;
+      }
+
+      // Drop body-related headers when method changes to GET
+      if (!preserveMethod) {
+        delete redirectHeaders["content-length"];
+        delete redirectHeaders["content-type"];
+        delete redirectHeaders["transfer-encoding"];
+      }
+
+      const redirectOpts: nodeHTTP.RequestOptions = {
+        hostname: location.hostname,
+        port: location.port || (isHTTPS ? 443 : 80),
+        path: location.pathname + location.search,
+        method: redirectMethod,
+        headers: redirectHeaders,
+        agent: options.agent || false,
+      };
+
+      if (isHTTPS) {
+        (redirectOpts as nodeHTTPS.RequestOptions).rejectUnauthorized =
+          options.secure === undefined ? true : options.secure;
+      }
+
+      const redirectReq = agent.request(redirectOpts);
+
+      if (server && !redirectReq.getHeader("expect")) {
+        server.emit("proxyReq", redirectReq, req, res, options);
+      }
+
+      if (options.proxyTimeout) {
+        redirectReq.setTimeout(options.proxyTimeout, () => {
+          redirectReq.abort();
+        });
+      }
+
+      const redirectError = createErrorHandler(redirectReq, location);
+      redirectReq.on("error", redirectError);
+
+      redirectReq.on("response", (nextRes: IncomingMessage) => {
+        handleResponse(nextRes, redirectCount + 1, location);
+      });
+
+      if (preserveMethod && bodyBuffer && bodyBuffer.length > 0) {
+        redirectReq.end(bodyBuffer);
+      } else {
+        redirectReq.end();
+      }
+
+      return;
+    }
+
+    // Non-redirect response (or max redirects exceeded)
     if (server) {
       server.emit("proxyRes", proxyRes, req, res);
     }
@@ -153,21 +260,22 @@ export const stream = defineProxyMiddleware((req, res, options, server, head, ca
         server.emit("end", req, res, proxyRes);
       }
     } else {
-      // EventSource close
       res.on("close", function () {
         proxyRes.destroy();
       });
-      // Allow us to listen when the proxy has completed
       proxyRes.on("end", function () {
         if (server) {
           server.emit("end", req, res, proxyRes);
         }
       });
-      // We pipe to the response unless its expected to be handled by the user
       if (!options.selfHandleResponse) {
         proxyRes.pipe(res);
       }
     }
+  }
+
+  proxyReq.on("response", function (proxyRes) {
+    handleResponse(proxyRes, 0, options.target as URL);
   });
 });
 

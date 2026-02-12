@@ -573,16 +573,16 @@ describe("#createProxyServer.web() using own http server", () => {
   });
 });
 
-describe.todo("#followRedirects", () => {
-  it("should proxy the request follow redirects", async () => {
+describe("#followRedirects", () => {
+  it("should follow 301 redirect", async () => {
     const { resolve, promise } = Promise.withResolvers<void>();
 
     const source = http.createServer(function (req: any, res: any) {
       if (url.parse(req.url).pathname === "/redirect") {
         res.writeHead(200, { "Content-Type": "text/plain" });
         res.end("ok");
+        return;
       }
-
       res.writeHead(301, { Location: "/redirect" });
       res.end();
     });
@@ -590,14 +590,10 @@ describe.todo("#followRedirects", () => {
 
     const proxy = httpProxy.createProxyServer({
       target: `http://127.0.0.1:${sourcePort}`,
-      // followRedirects: true,
+      followRedirects: true,
     });
 
-    function requestHandler(req: any, res: any) {
-      proxy.web(req, res);
-    }
-
-    const proxyServer = http.createServer(requestHandler);
+    const proxyServer = http.createServer((req, res) => proxy.web(req, res));
     const proxyPort = await listenOn(proxyServer);
 
     http
@@ -606,6 +602,196 @@ describe.todo("#followRedirects", () => {
         proxyServer.close();
         expect(res.statusCode).to.eql(200);
         resolve();
+      })
+      .end();
+    await promise;
+  });
+
+  it("should follow 302 and change method to GET", async () => {
+    const { resolve, promise } = Promise.withResolvers<void>();
+
+    const source = http.createServer(function (req: any, res: any) {
+      if (url.parse(req.url).pathname === "/dest") {
+        res.writeHead(200, { "Content-Type": "text/plain" });
+        res.end(req.method);
+        return;
+      }
+      res.writeHead(302, { Location: "/dest" });
+      res.end();
+    });
+    const sourcePort = await listenOn(source);
+
+    const proxy = httpProxy.createProxyServer({
+      target: `http://127.0.0.1:${sourcePort}`,
+      followRedirects: true,
+    });
+
+    const proxyServer = http.createServer((req, res) => proxy.web(req, res));
+    const proxyPort = await listenOn(proxyServer);
+
+    http
+      .request(`http://127.0.0.1:${proxyPort}`, { method: "POST" }, function (res) {
+        let body = "";
+        res.on("data", (chunk: Buffer) => (body += chunk));
+        res.on("end", () => {
+          source.close();
+          proxyServer.close();
+          expect(res.statusCode).to.eql(200);
+          expect(body).to.eql("GET");
+          resolve();
+        });
+      })
+      .end("post body");
+    await promise;
+  });
+
+  it("should follow 307 preserving method and body", async () => {
+    const { resolve, promise } = Promise.withResolvers<void>();
+    const postBody = "test-body-content";
+
+    const source = http.createServer(function (req: any, res: any) {
+      if (url.parse(req.url).pathname === "/dest") {
+        let body = "";
+        req.on("data", (chunk: Buffer) => (body += chunk));
+        req.on("end", () => {
+          res.writeHead(200, { "Content-Type": "text/plain" });
+          res.end(`${req.method}:${body}`);
+        });
+        return;
+      }
+      res.writeHead(307, { Location: "/dest" });
+      res.end();
+    });
+    const sourcePort = await listenOn(source);
+
+    const proxy = httpProxy.createProxyServer({
+      target: `http://127.0.0.1:${sourcePort}`,
+      followRedirects: true,
+    });
+
+    const proxyServer = http.createServer((req, res) => proxy.web(req, res));
+    const proxyPort = await listenOn(proxyServer);
+
+    const proxyReq = http.request(
+      `http://127.0.0.1:${proxyPort}`,
+      { method: "POST" },
+      function (res) {
+        let body = "";
+        res.on("data", (chunk: Buffer) => (body += chunk));
+        res.on("end", () => {
+          source.close();
+          proxyServer.close();
+          expect(res.statusCode).to.eql(200);
+          expect(body).to.eql(`POST:${postBody}`);
+          resolve();
+        });
+      },
+    );
+    proxyReq.end(postBody);
+    await promise;
+  });
+
+  it("should respect numeric max redirects limit", async () => {
+    const { resolve, promise } = Promise.withResolvers<void>();
+    let redirectCount = 0;
+
+    const source = http.createServer(function (_req: any, res: any) {
+      redirectCount++;
+      res.writeHead(301, { Location: `/hop-${redirectCount}` });
+      res.end();
+    });
+    const sourcePort = await listenOn(source);
+
+    const proxy = httpProxy.createProxyServer({
+      target: `http://127.0.0.1:${sourcePort}`,
+      followRedirects: 2,
+    });
+
+    const proxyServer = http.createServer((req, res) => proxy.web(req, res));
+    const proxyPort = await listenOn(proxyServer);
+
+    http
+      .request(`http://127.0.0.1:${proxyPort}`, function (res) {
+        source.close();
+        proxyServer.close();
+        // After 2 redirects followed, the 3rd 301 is returned to client
+        expect(res.statusCode).to.eql(301);
+        expect(redirectCount).to.eql(3);
+        resolve();
+      })
+      .end();
+    await promise;
+  });
+
+  it("should handle relative Location headers", async () => {
+    const { resolve, promise } = Promise.withResolvers<void>();
+
+    const source = http.createServer(function (req: any, res: any) {
+      if (url.parse(req.url).pathname === "/sub/dest") {
+        res.writeHead(200, { "Content-Type": "text/plain" });
+        res.end("ok");
+        return;
+      }
+      res.writeHead(302, { Location: "/sub/dest" });
+      res.end();
+    });
+    const sourcePort = await listenOn(source);
+
+    const proxy = httpProxy.createProxyServer({
+      target: `http://127.0.0.1:${sourcePort}`,
+      followRedirects: true,
+    });
+
+    const proxyServer = http.createServer((req, res) => proxy.web(req, res));
+    const proxyPort = await listenOn(proxyServer);
+
+    http
+      .request(`http://127.0.0.1:${proxyPort}/sub/start`, function (res) {
+        source.close();
+        proxyServer.close();
+        expect(res.statusCode).to.eql(200);
+        resolve();
+      })
+      .end();
+    await promise;
+  });
+
+  it("should emit proxyRes only for the final response", async () => {
+    const { resolve, promise } = Promise.withResolvers<void>();
+    let proxyResCount = 0;
+
+    const source = http.createServer(function (req: any, res: any) {
+      if (url.parse(req.url).pathname === "/final") {
+        res.writeHead(200, { "Content-Type": "text/plain" });
+        res.end("done");
+        return;
+      }
+      res.writeHead(302, { Location: "/final" });
+      res.end();
+    });
+    const sourcePort = await listenOn(source);
+
+    const proxy = httpProxy.createProxyServer({
+      target: `http://127.0.0.1:${sourcePort}`,
+      followRedirects: true,
+    });
+    proxy.on("proxyRes", () => proxyResCount++);
+
+    const proxyServer = http.createServer((req, res) => proxy.web(req, res));
+    const proxyPort = await listenOn(proxyServer);
+
+    http
+      .request(`http://127.0.0.1:${proxyPort}`, function (res) {
+        let body = "";
+        res.on("data", (chunk: Buffer) => (body += chunk));
+        res.on("end", () => {
+          source.close();
+          proxyServer.close();
+          expect(res.statusCode).to.eql(200);
+          expect(body).to.eql("done");
+          expect(proxyResCount).to.eql(1);
+          resolve();
+        });
       })
       .end();
     await promise;

@@ -65,6 +65,8 @@ export interface ProxyServerOptions {
   timeout?: number;
   /** If set to true, none of the webOutgoing passes are called and it's your responsibility to appropriately return the response by listening and acting on the proxyRes event */
   selfHandleResponse?: boolean;
+  /** Follow HTTP redirects from target. `true` = max 5 hops; number = custom max. */
+  followRedirects?: boolean | number;
   /** Buffer */
   buffer?: stream.Stream;
 }
