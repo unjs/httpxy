@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
 import * as httpProxy from "../src/index.ts";
-import semver from "semver";
 import http from "node:http";
 import https from "node:https";
 import path from "node:path";
@@ -180,7 +179,7 @@ describe("lib/http-proxy.js", () => {
     });
 
     describe("HTTPS not allow SSL self signed", () => {
-      it.todo("should fail with error", async () => {
+      it("should fail with error", async () => {
         const { resolve, promise } = Promise.withResolvers<void>();
         const ports = { source: getPort(), proxy: getPort() };
         const source = https
@@ -198,13 +197,11 @@ describe("lib/http-proxy.js", () => {
 
         proxy.listen(ports.proxy);
 
-        proxy.on("error", function (err, req, res) {
+        proxy.on("error", function (err) {
           expect(err).toBeInstanceOf(Error);
-          if (semver.gt(process.versions.node, "0.12.0")) {
-            expect(err.toString()).toBe("Error: unable to verify the first certificate");
-          } else {
-            expect(err.toString()).toBe("Error: DEPTH_ZERO_SELF_SIGNED_CERT");
-          }
+          expect(err.toString()).toMatch(/unable to verify the first certificate|DEPTH_ZERO_SELF_SIGNED_CERT/);
+          source.close();
+          proxy.close();
           resolve();
         });
 
