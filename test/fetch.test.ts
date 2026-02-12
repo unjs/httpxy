@@ -98,11 +98,10 @@ describe("proxyFetch", () => {
     });
 
     it("POST with body", async () => {
-      const res = await proxyFetch(
-        { host: "127.0.0.1", port: tcpPort },
-        `http://localhost/echo`,
-        { method: "POST", body: "hello" },
-      );
+      const res = await proxyFetch({ host: "127.0.0.1", port: tcpPort }, `http://localhost/echo`, {
+        method: "POST",
+        body: "hello",
+      });
       expect(res.status).toBe(200);
       expect(await res.text()).toBe("hello");
     });
@@ -188,11 +187,10 @@ describe("proxyFetch", () => {
           controller.close();
         },
       });
-      const res = await proxyFetch(
-        { host: "127.0.0.1", port: tcpPort },
-        `http://localhost/echo`,
-        { method: "POST", body: stream },
-      );
+      const res = await proxyFetch({ host: "127.0.0.1", port: tcpPort }, `http://localhost/echo`, {
+        method: "POST",
+        body: stream,
+      });
       expect(res.status).toBe(200);
       expect(await res.text()).toBe("streamed");
     });
@@ -306,11 +304,10 @@ describe("proxyFetch", () => {
         },
       });
       await expect(
-        proxyFetch(
-          { host: "127.0.0.1", port: tcpPort },
-          `http://localhost/echo`,
-          { method: "POST", body: stream },
-        ),
+        proxyFetch({ host: "127.0.0.1", port: tcpPort }, `http://localhost/echo`, {
+          method: "POST",
+          body: stream,
+        }),
       ).rejects.toThrow("stream-fail");
     });
   });
