@@ -199,7 +199,9 @@ describe("lib/http-proxy.js", () => {
 
         proxy.on("error", function (err) {
           expect(err).toBeInstanceOf(Error);
-          expect(err.toString()).toMatch(/unable to verify the first certificate|DEPTH_ZERO_SELF_SIGNED_CERT/);
+          expect(err.toString()).toMatch(
+            /unable to verify the first certificate|DEPTH_ZERO_SELF_SIGNED_CERT/,
+          );
           source.close();
           proxy.close();
           resolve();
