@@ -119,6 +119,13 @@ export const stream = defineProxyMiddleware((req, res, options, server, head, ca
     proxyReq.abort();
   });
 
+  // Abort proxy request when client disconnects
+  res.on("close", function () {
+    if (!res.writableFinished) {
+      proxyReq.destroy();
+    }
+  });
+
   // handle errors in proxy and incoming request, just like for forward proxy
   const proxyError = createErrorHandler(proxyReq, options.target);
   req.on("error", proxyError);

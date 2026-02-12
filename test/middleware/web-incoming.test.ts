@@ -573,6 +573,42 @@ describe("#createProxyServer.web() using own http server", () => {
   });
 });
 
+describe("#client abort propagation", () => {
+  it("should abort proxy request when client disconnects", async () => {
+    const { resolve, promise } = Promise.withResolvers<void>();
+
+    // Target server that waits long enough for client to abort
+    const source = http.createServer((req, _res) => {
+      req.on("close", () => {
+        source.close();
+        proxyServer.close();
+        resolve();
+      });
+    });
+    const sourcePort = await listenOn(source);
+
+    const proxy = httpProxy.createProxyServer({
+      target: `http://127.0.0.1:${sourcePort}`,
+    });
+
+    const proxyServer = http.createServer((req, res) => {
+      proxy.web(req, res);
+    });
+    const proxyPort = await listenOn(proxyServer);
+
+    // Make a request and abort it immediately
+    const req = http.request(`http://127.0.0.1:${proxyPort}`, () => {});
+    req.on("error", () => {}); // Ignore client-side errors from destroy
+    req.end();
+    req.on("socket", () => {
+      // Destroy after connection is established
+      setTimeout(() => req.destroy(), 50);
+    });
+
+    await promise;
+  });
+});
+
 describe("#followRedirects", () => {
   it("should follow 301 redirect", async () => {
     const { resolve, promise } = Promise.withResolvers<void>();
