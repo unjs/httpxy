@@ -125,7 +125,11 @@ export const writeStatusCode = defineProxyOutgoingMiddleware((req, res, proxyRes
   // @ts-expect-error
   res.statusCode = proxyRes.statusCode;
 
-  if (proxyRes.statusMessage) {
+  if (
+    proxyRes.statusMessage &&
+    // Only HTTP/1.0 and HTTP/1.1 support statusMessage
+    req.httpVersionMajor < 2
+  ) {
     res.statusMessage = proxyRes.statusMessage;
   }
 });
