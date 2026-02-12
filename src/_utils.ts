@@ -218,10 +218,26 @@ export function getPort(req: httpNative.IncomingMessage | Http2ServerRequest): s
 export function hasEncryptedConnection(
   req: httpNative.IncomingMessage | Http2ServerRequest,
 ): boolean {
-  return Boolean(
-    // req.connection.pair probably does not exist anymore
-    (req.connection as tls.TLSSocket).encrypted || (req.connection as any).pair,
-  );
+  // req.connection.pair probably does not exist anymore
+  if ("connection" in req) {
+    if ("encrypted" in req.connection) {
+      return req.connection.encrypted;
+    }
+    if ("pair" in req.connection) {
+      return !!req.connection.pair;
+    }
+  }
+  // Since Node.js v16 we now have req.socket
+  if ("socket" in req) {
+    if ("encrypted" in req.socket) {
+      return req.socket.encrypted;
+    }
+    if ("pair" in req.socket) {
+      return !!req.socket.pair;
+    }
+  }
+
+  return false;
 }
 
 /**
