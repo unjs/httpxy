@@ -6,11 +6,29 @@ import * as ws from "ws";
 import * as io from "socket.io";
 import SSE from "sse";
 import ioClient from "socket.io-client";
+import type { AddressInfo } from "node:net";
 
 // Source: https://github.com/http-party/node-http-proxy/blob/master/test/lib-http-proxy-test.js
 
-let initialPort = 1024;
-const getPort = () => initialPort++;
+function listenOn(server: http.Server | net.Server): Promise<number> {
+  return new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      resolve((server.address() as AddressInfo).port);
+    });
+  });
+}
+
+function proxyListen(proxy: ReturnType<typeof httpProxy.createProxyServer>): Promise<number> {
+  return new Promise((resolve, reject) => {
+    proxy.listen(0, "127.0.0.1");
+    const server = (proxy as any)._server as net.Server;
+    server.once("error", reject);
+    server.once("listening", () => {
+      resolve((server.address() as AddressInfo).port);
+    });
+  });
+}
 
 describe("http-proxy", () => {
   describe("#createProxyServer", () => {
@@ -38,23 +56,23 @@ describe("http-proxy", () => {
 
   describe("#createProxyServer with forward options and using web-incoming passes", () => {
     it("should pipe the request using web-incoming#stream method", async () => {
-      const ports = { source: getPort(), proxy: getPort() };
-      const proxy = httpProxy
-        .createProxyServer({
-          forward: "http://localhost:" + ports.source,
-        })
-        .listen(ports.proxy, "localhost");
+      const source = http.createServer();
+      const sourcePort = await listenOn(source);
+
+      const proxy = httpProxy.createProxyServer({
+        forward: "http://127.0.0.1:" + sourcePort,
+      });
+      const proxyPort = await proxyListen(proxy);
 
       const { promise, resolve } = Promise.withResolvers<void>();
-      const source = http.createServer((req, res) => {
+      source.on("request", (req, res) => {
         expect(req.method).to.eql("GET");
-        expect(Number.parseInt(req.headers.host!.split(":")[1]!)).toBe(ports.proxy);
+        expect(Number.parseInt(req.headers.host!.split(":")[1]!)).toBe(proxyPort);
         source.close();
         proxy.close(resolve);
       });
 
-      source.listen(ports.source);
-      http.request("http://localhost:" + ports.proxy, () => {}).end();
+      http.request("http://127.0.0.1:" + proxyPort, () => {}).end();
 
       await promise;
     });
@@ -62,23 +80,23 @@ describe("http-proxy", () => {
 
   describe("#createProxyServer using the web-incoming passes", () => {
     it("should proxy sse", async () => {
-      const ports = { source: getPort(), proxy: getPort() };
-      const proxy = httpProxy.createProxyServer({
-        target: "http://localhost:" + ports.source,
-      });
-      const _proxyServer = proxy.listen(ports.proxy, "localhost");
       const source = http.createServer();
+      const sourcePort = await listenOn(source);
+
+      const proxy = httpProxy.createProxyServer({
+        target: "http://127.0.0.1:" + sourcePort,
+      });
+      const proxyPort = await proxyListen(proxy);
+
       const sse = new SSE(source, { path: "/" });
       sse.on("connection", (client) => {
         client.send("Hello over SSE");
         client.close();
       });
 
-      source.listen(ports.source);
-
       const options = {
-        hostname: "localhost",
-        port: ports.proxy,
+        hostname: "127.0.0.1",
+        port: proxyPort,
       };
 
       const { promise, resolve } = Promise.withResolvers<void>();
@@ -100,33 +118,32 @@ describe("http-proxy", () => {
     });
 
     it("should make the request on pipe and finish it", async () => {
-      const ports = { source: getPort(), proxy: getPort() };
-      const proxy = httpProxy
-        .createProxyServer({
-          target: "http://localhost:" + ports.source,
-        })
-        .listen(ports.proxy, "localhost");
+      const source = http.createServer();
+      const sourcePort = await listenOn(source);
+
+      const proxy = httpProxy.createProxyServer({
+        target: "http://127.0.0.1:" + sourcePort,
+      });
+      const proxyPort = await proxyListen(proxy);
 
       const { promise, resolve } = Promise.withResolvers<void>();
-      const source = http.createServer((req, res) => {
+      source.on("request", (req, res) => {
         expect(req.method).to.eql("POST");
-        expect(req.headers["x-forwarded-for"]).to.eql("localhost");
-        expect(Number.parseInt(req.headers.host!.split(":")[1]!)).to.eql(ports.proxy);
+        expect(req.headers["x-forwarded-for"]).to.eql("127.0.0.1");
+        expect(Number.parseInt(req.headers.host!.split(":")[1]!)).to.eql(proxyPort);
         source.close();
         proxy.close(() => {});
         resolve();
       });
 
-      source.listen(ports.source);
-
       http
         .request(
           {
-            hostname: "localhost",
-            port: ports.proxy + "",
+            hostname: "127.0.0.1",
+            port: proxyPort,
             method: "POST",
             headers: {
-              "x-forwarded-for": "localhost",
+              "x-forwarded-for": "127.0.0.1",
             },
           },
           () => {},
@@ -139,29 +156,26 @@ describe("http-proxy", () => {
 
   describe("#createProxyServer using the web-incoming passes", () => {
     it("should make the request, handle response and finish it", async () => {
-      const ports = { source: getPort(), proxy: getPort() };
-      const proxy = httpProxy
-        .createProxyServer({
-          target: "http://localhost:" + ports.source,
-          preserveHeaderKeyCase: true,
-        })
-        .listen(ports.proxy, "localhost");
-
       const source = http.createServer((req, res) => {
         expect(req.method).to.eql("GET");
-        expect(Number.parseInt(req.headers.host!.split(":")[1]!)).to.eql(ports.proxy);
+        expect(Number.parseInt(req.headers.host!.split(":")[1]!)).to.eql(proxyPort);
         res.writeHead(200, { "Content-Type": "text/plain" });
         res.end("Hello from " + (source.address()! as any).port);
       });
+      const sourcePort = await listenOn(source);
 
-      source.listen(ports.source);
+      const proxy = httpProxy.createProxyServer({
+        target: "http://127.0.0.1:" + sourcePort,
+        preserveHeaderKeyCase: true,
+      });
+      const proxyPort = await proxyListen(proxy);
 
       const { promise, resolve } = Promise.withResolvers<void>();
       http
         .request(
           {
-            hostname: "localhost",
-            port: ports.proxy,
+            hostname: "127.0.0.1",
+            port: proxyPort,
             method: "GET",
           },
           (res) => {
@@ -173,7 +187,7 @@ describe("http-proxy", () => {
             }
 
             res.on("data", (data) => {
-              expect(data.toString()).to.eql("Hello from " + ports.source);
+              expect(data.toString()).to.eql("Hello from " + sourcePort);
             });
 
             res.on("end", () => {
@@ -189,9 +203,8 @@ describe("http-proxy", () => {
 
   describe("#createProxyServer() method with error response", () => {
     it("should make the request and emit the error event", async () => {
-      const ports = { source: getPort(), proxy: getPort() };
       const proxy = httpProxy.createProxyServer({
-        target: "http://localhost:" + ports.source,
+        target: "http://127.0.0.1:1",
       });
 
       const { promise, resolve } = Promise.withResolvers<void>();
@@ -202,13 +215,13 @@ describe("http-proxy", () => {
         resolve();
       });
 
-      proxy.listen(ports.proxy, "localhost");
+      const proxyPort = await proxyListen(proxy);
 
       http
         .request(
           {
-            hostname: "localhost",
-            port: ports.proxy,
+            hostname: "127.0.0.1",
+            port: proxyPort,
             method: "GET",
           },
           () => {},
@@ -222,31 +235,29 @@ describe("http-proxy", () => {
   describe("#createProxyServer setting the correct timeout value", () => {
     it("should hang up the socket at the timeout", async () => {
       const { promise, resolve } = Promise.withResolvers<void>();
-      const ports = { source: getPort(), proxy: getPort() };
-      const proxy = httpProxy
-        .createProxyServer({
-          target: "http://localhost:" + ports.source,
-          timeout: 3,
-        })
-        .listen(ports.proxy);
-
-      proxy.on("error", (err) => {
-        expect(err).toBeInstanceOf(Error);
-        expect((err as any).code).toBe("ECONNRESET");
-      });
 
       const source = http.createServer(function (_req, res) {
         setTimeout(() => {
           res.end("At this point the socket should be closed");
         }, 5);
       });
+      const sourcePort = await listenOn(source);
 
-      source.listen(ports.source);
+      const proxy = httpProxy.createProxyServer({
+        target: "http://127.0.0.1:" + sourcePort,
+        timeout: 3,
+      });
+      const proxyPort = await proxyListen(proxy);
+
+      proxy.on("error", (err) => {
+        expect(err).toBeInstanceOf(Error);
+        expect((err as any).code).toBe("ECONNRESET");
+      });
 
       const testReq = http.request(
         {
-          hostname: "localhost",
-          port: ports.proxy,
+          hostname: "127.0.0.1",
+          port: proxyPort,
           method: "GET",
         },
         () => {},
@@ -267,16 +278,17 @@ describe("http-proxy", () => {
 
   describe("#createProxyServer with xfwd option", () => {
     it("should not throw on empty http host header", async () => {
-      const ports = { source: getPort(), proxy: getPort() };
-      const proxy = httpProxy
-        .createProxyServer({
-          forward: "http://localhost:" + ports.source,
-          xfwd: true,
-        })
-        .listen(ports.proxy, "localhost");
+      const source = http.createServer();
+      const sourcePort = await listenOn(source);
+
+      const proxy = httpProxy.createProxyServer({
+        forward: "http://127.0.0.1:" + sourcePort,
+        xfwd: true,
+      });
+      const proxyPort = await proxyListen(proxy);
 
       const { promise, resolve } = Promise.withResolvers<void>();
-      const source = http.createServer(function (req, _res) {
+      source.on("request", function (req, _res) {
         expect(req.method).to.eql("GET");
         // Host header is forwarded from the original request (not changed to source)
         expect(req.headers["x-forwarded-for"]).toBeDefined();
@@ -284,97 +296,47 @@ describe("http-proxy", () => {
         proxy.close(resolve);
       });
 
-      source.listen(ports.source);
-
-      const socket = net.connect({ port: ports.proxy }, () => {
+      const socket = net.connect({ port: proxyPort }, () => {
         socket.write("GET / HTTP/1.0\r\n\r\n");
       });
 
-      // handle errors
-      socket.on("error", () => {
-        expect.fail("Unexpected socket error");
-      });
-
-      socket.on("data", (data) => {
+      socket.on("data", () => {
         socket.end();
       });
 
-      // socket.on("end", () => {
-      //   expect("Socket to finish").to.eql("Socket to finish");
-      // });
-      http.request("http://localhost:" + ports.proxy, () => {}).end();
+      // Ignore socket errors during teardown (server may close before socket drains)
+      socket.on("error", () => {});
+
+      http.request("http://127.0.0.1:" + proxyPort, () => {}).end();
       await promise;
     });
   });
 
-  // describe('#createProxyServer using the web-incoming passes', () =>  {
-  //   it('should emit events correctly', function(done) {
-  //     var proxy = httpProxy.createProxyServer({
-  //       target: 'http://localhost:8080'
-  //     }),
-
-  //     proxyServer = proxy.listen('8081'),
-
-  //     source = http.createServer(function(req, res) {
-  //       expect(req.method).to.eql('GET');
-  //       expect(req.headers.host.split(':')[1]).to.eql('8081');
-  //       res.writeHead(200, {'Content-Type': 'text/plain'})
-  //       res.end('Hello from ' + source.address().port);
-  //     }),
-
-  //     events = [];
-
-  //     source.listen('8080');
-
-  //     proxy.ee.on('http-proxy:**', function (uno, dos, tres) {
-  //       events.push(this.event);
-  //     })
-
-  //     http.request({
-  //       hostname: 'localhost',
-  //       port: '8081',
-  //       method: 'GET',
-  //     }, function(res) {
-  //       expect(res.statusCode).to.eql(200);
-
-  //       res.on('data', (data) => {
-  //         expect(data.toString()).to.eql('Hello from 8080');
-  //       });
-
-  //       res.on('end', () =>  {
-  //         expect(events).to.contain('http-proxy:outgoing:web:begin');
-  //         expect(events).to.contain('http-proxy:outgoing:web:end');
-  //         source.close();
-  //         proxyServer.close();
-  //         done();
-  //       });
-  //     }).end();
-  //   });
-  // });
-
   describe("#createProxyServer using the ws-incoming passes", () => {
     it("should proxy the websockets stream", async () => {
-      const ports = { source: getPort(), proxy: getPort() };
+      const destiny = new ws.WebSocketServer({ port: 0 });
+      await new Promise<void>((r) => destiny.on("listening", r));
+      const sourcePort = (destiny.address() as AddressInfo).port;
+
       const proxy = httpProxy.createProxyServer({
-        target: "ws://localhost:" + ports.source,
+        target: "ws://127.0.0.1:" + sourcePort,
         ws: true,
       });
-      const proxyServer = proxy.listen(ports.proxy, "localhost");
+      const proxyPort = await proxyListen(proxy);
+      const proxyServer = proxy;
 
       const { promise, resolve } = Promise.withResolvers<void>();
-      const destiny = new ws.WebSocketServer({ port: ports.source }, () => {
-        const client = new ws.WebSocket("ws://localhost:" + ports.proxy);
+      const client = new ws.WebSocket("ws://127.0.0.1:" + proxyPort);
 
-        client.on("open", () => {
-          client.send("hello there");
-        });
+      client.on("open", () => {
+        client.send("hello there");
+      });
 
-        client.on("message", (msg) => {
-          expect(msg.toString("utf8")).toBe("Hello over websockets");
-          client.close();
-          destiny.close();
-          proxyServer.close(resolve);
-        });
+      client.on("message", (msg) => {
+        expect(msg.toString("utf8")).toBe("Hello over websockets");
+        client.close();
+        destiny.close();
+        proxyServer.close(resolve);
       });
 
       destiny.on("connection", (socket) => {
@@ -388,15 +350,16 @@ describe("http-proxy", () => {
     });
 
     it("should emit error on proxy error", async () => {
-      const ports = { source: getPort(), proxy: getPort() };
       const { promise, resolve } = Promise.withResolvers<void>();
+
       const proxy = httpProxy.createProxyServer({
-          // Note: we don't ever listen on this port
-          target: "ws://localhost:" + ports.source,
-          ws: true,
-        }),
-        proxyServer = proxy.listen(ports.proxy),
-        client = new ws.WebSocket("ws://localhost:" + ports.proxy);
+        // Note: we don't ever listen on this port
+        target: "ws://127.0.0.1:1",
+        ws: true,
+      });
+      const proxyPort = await proxyListen(proxy);
+      const proxyServer = proxy;
+      const client = new ws.WebSocket("ws://127.0.0.1:" + proxyPort);
 
       client.on("open", () => {
         client.send("hello there");
@@ -425,22 +388,23 @@ describe("http-proxy", () => {
 
     it("should close client socket if upstream is closed before upgrade", async () => {
       const { resolve, promise } = Promise.withResolvers<void>();
-      const ports = { source: getPort(), proxy: getPort() };
+
       const server = http.createServer();
       server.on("upgrade", function (req, socket, head) {
         const response = ["HTTP/1.1 404 Not Found", "Content-type: text/html", "", ""];
         socket.write(response.join("\r\n"));
         socket.end();
       });
-      server.listen(ports.source);
+      const sourcePort = await listenOn(server);
 
       const proxy = httpProxy.createProxyServer({
-          // note: we don't ever listen on this port
-          target: "ws://localhost:" + ports.source,
-          ws: true,
-        }),
-        proxyServer = proxy.listen(ports.proxy),
-        client = new ws.WebSocket("ws://localhost:" + ports.proxy);
+        // note: we don't ever listen on this port
+        target: "ws://127.0.0.1:" + sourcePort,
+        ws: true,
+      });
+      const proxyPort = await proxyListen(proxy);
+      const proxyServer = proxy;
+      const client = new ws.WebSocket("ws://127.0.0.1:" + proxyPort);
 
       client.on("open", () => {
         client.send("hello there");
@@ -456,17 +420,20 @@ describe("http-proxy", () => {
 
     it("should proxy a socket.io stream", async () => {
       const { resolve, promise } = Promise.withResolvers<void>();
-      const ports = { source: getPort(), proxy: getPort() },
-        proxy = httpProxy.createProxyServer({
-          target: "ws://localhost:" + ports.source,
-          ws: true,
-        }),
-        proxyServer = proxy.listen(ports.proxy),
-        server = http.createServer(),
-        destiny = new io.Server(server);
+
+      const server = http.createServer();
+      const sourcePort = await listenOn(server);
+
+      const proxy = httpProxy.createProxyServer({
+        target: "ws://127.0.0.1:" + sourcePort,
+        ws: true,
+      });
+      const proxyPort = await proxyListen(proxy);
+      const proxyServer = proxy;
+      const destiny = new io.Server(server);
 
       function startSocketIo() {
-        const client = ioClient("ws://localhost:" + ports.proxy);
+        const client = ioClient("ws://127.0.0.1:" + proxyPort);
         client.on("connect", () => {
           client.emit("incoming", "hello there");
         });
@@ -479,8 +446,7 @@ describe("http-proxy", () => {
           proxyServer.close(resolve);
         });
       }
-      server.listen(ports.source);
-      server.on("listening", startSocketIo);
+      startSocketIo();
 
       destiny.on("connection", (socket) => {
         socket.on("incoming", (msg) => {
@@ -494,17 +460,20 @@ describe("http-proxy", () => {
 
     it("should emit open and close events when socket.io client connects and disconnects", async () => {
       const { resolve, promise } = Promise.withResolvers<void>();
-      const ports = { source: getPort(), proxy: getPort() };
+
+      const server = http.createServer();
+      const sourcePort = await listenOn(server);
+
       const proxy = httpProxy.createProxyServer({
-        target: "ws://localhost:" + ports.source,
+        target: "ws://127.0.0.1:" + sourcePort,
         ws: true,
       });
-      const proxyServer = proxy.listen(ports.proxy);
-      const server = http.createServer();
+      const proxyPort = await proxyListen(proxy);
+      const proxyServer = proxy;
       const destiny = new io.Server(server);
 
       function startSocketIo() {
-        const client = ioClient("ws://localhost:" + ports.proxy);
+        const client = ioClient("ws://127.0.0.1:" + proxyPort);
         client.on("connect", () => {
           client.disconnect();
         });
@@ -523,31 +492,34 @@ describe("http-proxy", () => {
         resolve();
       });
 
-      server.listen(ports.source);
-      server.on("listening", startSocketIo);
+      startSocketIo();
       await promise;
     });
 
     it("should pass all set-cookie headers to client", async () => {
       const { resolve, promise } = Promise.withResolvers<void>();
-      const ports = { source: getPort(), proxy: getPort() };
+
+      const destiny = new ws.WebSocketServer({ port: 0 });
+      await new Promise<void>((r) => destiny.on("listening", r));
+      const sourcePort = (destiny.address() as AddressInfo).port;
+
       const proxy = httpProxy.createProxyServer({
-        target: "ws://localhost:" + ports.source,
+        target: "ws://127.0.0.1:" + sourcePort,
         ws: true,
       });
-      const proxyServer = proxy.listen(ports.proxy);
-      const destiny = new ws.WebSocketServer({ port: ports.source }, () => {
-        const client = new ws.WebSocket("ws://localhost:" + ports.proxy);
+      const proxyPort = await proxyListen(proxy);
+      const proxyServer = proxy;
 
-        client.on("upgrade", (res) => {
-          expect(res.headers["set-cookie"]).toHaveLength(2);
-        });
+      const client = new ws.WebSocket("ws://127.0.0.1:" + proxyPort);
 
-        client.on("open", () => {
-          client.close();
-          destiny.close();
-          proxyServer.close(resolve);
-        });
+      client.on("upgrade", (res) => {
+        expect(res.headers["set-cookie"]).toHaveLength(2);
+      });
+
+      client.on("open", () => {
+        client.close();
+        destiny.close();
+        proxyServer.close(resolve);
       });
 
       destiny.on("headers", (headers) => {
@@ -559,10 +531,13 @@ describe("http-proxy", () => {
 
     it("should detect a proxyReq event and modify headers", async () => {
       const { promise, resolve } = Promise.withResolvers<void>();
-      const ports = { source: getPort(), proxy: getPort() };
+
+      const destiny = new ws.WebSocketServer({ port: 0 });
+      await new Promise<void>((r) => destiny.on("listening", r));
+      const sourcePort = (destiny.address() as AddressInfo).port;
 
       const proxy = httpProxy.createProxyServer({
-        target: "ws://localhost:" + ports.source,
+        target: "ws://127.0.0.1:" + sourcePort,
         ws: true,
       });
 
@@ -570,21 +545,20 @@ describe("http-proxy", () => {
         proxyReq.setHeader("X-Special-Proxy-Header", "foobar");
       });
 
-      const proxyServer = proxy.listen(ports.proxy);
+      const proxyPort = await proxyListen(proxy);
+      const proxyServer = proxy;
 
-      const destiny = new ws.WebSocketServer({ port: ports.source }, () => {
-        const client = new ws.WebSocket("ws://localhost:" + ports.proxy);
+      const client = new ws.WebSocket("ws://127.0.0.1:" + proxyPort);
 
-        client.on("open", () => {
-          client.send("hello there");
-        });
+      client.on("open", () => {
+        client.send("hello there");
+      });
 
-        client.on("message", (msg: any) => {
-          expect(msg.toString("utf8")).toBe("Hello over websockets");
-          client.close();
-          destiny.close();
-          proxyServer.close(resolve);
-        });
+      client.on("message", (msg: any) => {
+        expect(msg.toString("utf8")).toBe("Hello over websockets");
+        client.close();
+        destiny.close();
+        proxyServer.close(resolve);
       });
 
       destiny.on("connection", function (socket, upgradeReq) {
@@ -602,25 +576,29 @@ describe("http-proxy", () => {
     it("should forward frames with single frame payload (including on node 4.x)", async () => {
       const { resolve, promise } = await Promise.withResolvers<void>();
       const payload = Array.from({ length: 65_529 }).join("0");
-      const ports = { source: getPort(), proxy: getPort() };
+
+      const destiny = new ws.WebSocketServer({ port: 0 });
+      await new Promise<void>((r) => destiny.on("listening", r));
+      const sourcePort = (destiny.address() as AddressInfo).port;
+
       const proxy = httpProxy.createProxyServer({
-        target: "ws://localhost:" + ports.source,
+        target: "ws://127.0.0.1:" + sourcePort,
         ws: true,
       });
-      const proxyServer = proxy.listen(ports.proxy);
-      const destiny = new ws.WebSocketServer({ port: ports.source }, () => {
-        const client = new ws.WebSocket("ws://localhost:" + ports.proxy);
+      const proxyPort = await proxyListen(proxy);
+      const proxyServer = proxy;
 
-        client.on("open", () => {
-          client.send(payload);
-        });
+      const client = new ws.WebSocket("ws://127.0.0.1:" + proxyPort);
 
-        client.on("message", (msg) => {
-          expect(msg.toString("utf8")).toBe("Hello over websockets");
-          client.close();
-          destiny.close();
-          proxyServer.close(resolve);
-        });
+      client.on("open", () => {
+        client.send(payload);
+      });
+
+      client.on("message", (msg) => {
+        expect(msg.toString("utf8")).toBe("Hello over websockets");
+        client.close();
+        destiny.close();
+        proxyServer.close(resolve);
       });
 
       destiny.on("connection", (socket) => {
@@ -636,25 +614,29 @@ describe("http-proxy", () => {
     it("should forward continuation frames with big payload (including on node 4.x)", async () => {
       const { promise, resolve } = Promise.withResolvers<void>();
       const payload = Array.from({ length: 65_530 }).join("0");
-      const ports = { source: getPort(), proxy: getPort() };
+
+      const destiny = new ws.WebSocketServer({ port: 0 });
+      await new Promise<void>((r) => destiny.on("listening", r));
+      const sourcePort = (destiny.address() as AddressInfo).port;
+
       const proxy = httpProxy.createProxyServer({
-        target: "ws://localhost:" + ports.source,
+        target: "ws://127.0.0.1:" + sourcePort,
         ws: true,
       });
-      const proxyServer = proxy.listen(ports.proxy);
-      const destiny = new ws.WebSocketServer({ port: ports.source }, () => {
-        const client = new ws.WebSocket("ws://localhost:" + ports.proxy);
+      const proxyPort = await proxyListen(proxy);
+      const proxyServer = proxy;
 
-        client.on("open", () => {
-          client.send(payload);
-        });
+      const client = new ws.WebSocket("ws://127.0.0.1:" + proxyPort);
 
-        client.on("message", (msg) => {
-          expect(msg.toString("utf8")).toBe("Hello over websockets");
-          client.close();
-          destiny.close();
-          proxyServer.close(resolve);
-        });
+      client.on("open", () => {
+        client.send(payload);
+      });
+
+      client.on("message", (msg) => {
+        expect(msg.toString("utf8")).toBe("Hello over websockets");
+        client.close();
+        destiny.close();
+        proxyServer.close(resolve);
       });
 
       destiny.on("connection", (socket) => {
