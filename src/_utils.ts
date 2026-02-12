@@ -74,6 +74,11 @@ export function setupOutgoing(
   outgoing.method = options.method || req.method;
   outgoing.headers = { ...req.headers };
 
+  // before clean up HTTP/2 blacklist header, we might wanna override host first
+  if (req.headers?.[":authority"]) {
+    outgoing.headers.host = req.headers[":authority"] as string;
+  }
+
   if (options.headers) {
     outgoing.headers = { ...outgoing.headers, ...options.headers };
   }
@@ -199,7 +204,8 @@ export function setupSocket(socket: net.Socket): net.Socket {
  * @api private
  */
 export function getPort(req: httpNative.IncomingMessage | Http2ServerRequest): string {
-  const res = req.headers.host ? req.headers.host.match(/:(\d+)/) : "";
+  const hostHeader = (req.headers[":authority"] as string | undefined) || req.headers.host;
+  const res = hostHeader ? hostHeader.match(/:(\d+)/) : "";
   if (res) {
     return res[1]!;
   }

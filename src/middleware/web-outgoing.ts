@@ -7,7 +7,8 @@ const redirectRegex = /^201|30([1278])$/;
  * If is a HTTP 1.0 request, remove chunk headers
  */
 export const removeChunked = defineProxyOutgoingMiddleware((req, res, proxyRes) => {
-  if (req.httpVersion === "1.0") {
+  // HTTP/1.0 and HTTP/2 do not have transfer-encoding: chunked
+  if (req.httpVersion !== "1.1") {
     delete proxyRes.headers["transfer-encoding"];
   }
 });
@@ -47,8 +48,12 @@ export const setRedirectHostRewrite = defineProxyOutgoingMiddleware(
 
       if (options.hostRewrite) {
         u.host = options.hostRewrite;
-      } else if (options.autoRewrite && req.headers.host) {
-        u.host = req.headers.host;
+      } else if (options.autoRewrite) {
+        if (req.headers[":authority"]) {
+          u.host = req.headers[":authority"] as string;
+        } else if (req.headers.host) {
+          u.host = req.headers.host;
+        }
       }
       if (options.protocolRewrite) {
         u.protocol = options.protocolRewrite;
