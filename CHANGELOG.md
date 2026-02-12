@@ -20,7 +20,7 @@
 
 ### 💅 Refactors
 
-- ⚠️  Remove legacy node `Url` support ([b2e6c92](https://github.com/unjs/httpxy/commit/b2e6c92))
+- ⚠️ Remove legacy node `Url` support ([b2e6c92](https://github.com/unjs/httpxy/commit/b2e6c92))
 
 ### 🏡 Chore
 
@@ -47,7 +47,7 @@
 
 #### ⚠️ Breaking Changes
 
-- ⚠️  Remove legacy node `Url` support ([b2e6c92](https://github.com/unjs/httpxy/commit/b2e6c92))
+- ⚠️ Remove legacy node `Url` support ([b2e6c92](https://github.com/unjs/httpxy/commit/b2e6c92))
 
 ### ❤️ Contributors
 
