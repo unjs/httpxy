@@ -37,7 +37,7 @@
     "@types/semver": "^7.7.1",
     "@types/sse": "^0.0.0",
     "@types/ws": "^8.18.1",
-    "@typescript/native-preview": "^7.0.0-dev.20260210.1",
+    "@typescript/native-preview": "^7.0.0-dev.20260212.1",
     "@vitest/coverage-v8": "^4.0.18",
     "async": "^3.2.6",
     "changelogen": "^0.6.2",
@@ -45,8 +45,8 @@
     "eslint-config-unjs": "^0.6.2",
     "expect.js": "^0.3.1",
     "ofetch": "^1.5.1",
-    "oxfmt": "^0.31.0",
-    "oxlint": "^1.46.0",
+    "oxfmt": "^0.32.0",
+    "oxlint": "^1.47.0",
     "semver": "^7.7.4",
     "socket.io": "^4.8.3",
     "socket.io-client": "^4.8.3",
@@ -56,5 +56,5 @@
     "vitest": "^4.0.18",
     "ws": "^8.19.0"
   },
-  "packageManager": "pnpm@10.29.2"
+  "packageManager": "pnpm@10.29.3"
 }
