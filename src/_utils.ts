@@ -106,8 +106,12 @@ export function setupOutgoing(
       ? (target as URL).pathname || (target as LegacyURL).path || ""
       : "";
 
-  const parsed = new URL(req.url!, "http://localhost");
-  let outgoingPath = options.toProxy ? "/" + req.url : parsed.pathname + parsed.search || "";
+  const reqUrl = req.url || "";
+  const qIdx = reqUrl.indexOf("?");
+  const reqPath = qIdx === -1 ? reqUrl : reqUrl.slice(0, qIdx);
+  const reqSearch = qIdx === -1 ? "" : reqUrl.slice(qIdx);
+  const normalizedPath = reqPath ? (reqPath[0] === "/" ? reqPath : "/" + reqPath) : "/";
+  let outgoingPath = options.toProxy ? "/" + reqUrl : normalizedPath + reqSearch;
 
   //
   // Remark: ignorePath will just straight up ignore whatever the request's
