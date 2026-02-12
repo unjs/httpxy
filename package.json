@@ -22,8 +22,8 @@
   "scripts": {
     "build": "unbuild",
     "dev": "vitest",
-    "lint": "oxlint . && oxfmt --check src test",
-    "lint:fix": "oxlint . --fix && oxfmt src test",
+    "lint": "oxlint . && oxfmt --check",
+    "fmt": "oxlint . --fix && oxfmt",
     "prepack": "pnpm run build",
     "release": "pnpm test && pnpm build && changelogen --release && npm publish && git push --follow-tags",
     "test": "pnpm lint && pnpm typecheck && vitest run --coverage",
