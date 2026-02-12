@@ -35,7 +35,7 @@
 
 ### 💅 Refactors
 
-- ⚠️  Code improvements ([#78](https://github.com/unjs/httpxy/pull/78))
+- ⚠️ Code improvements ([#78](https://github.com/unjs/httpxy/pull/78))
 
 ### 🌊 Types
 
@@ -52,7 +52,7 @@
 
 #### ⚠️ Breaking Changes
 
-- ⚠️  Code improvements ([#78](https://github.com/unjs/httpxy/pull/78))
+- ⚠️ Code improvements ([#78](https://github.com/unjs/httpxy/pull/78))
 
 ### ❤️ Contributors
 

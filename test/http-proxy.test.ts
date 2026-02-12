@@ -48,7 +48,7 @@ describe("http-proxy", () => {
       const { promise, resolve } = Promise.withResolvers<void>();
       const source = http.createServer((req, res) => {
         expect(req.method).to.eql("GET");
-        expect(Number.parseInt(req.headers.host!.split(":")[1])).toBe(ports.proxy);
+        expect(Number.parseInt(req.headers.host!.split(":")[1]!)).toBe(ports.proxy);
         source.close();
         proxy.close(resolve);
       });
@@ -111,7 +111,7 @@ describe("http-proxy", () => {
       const source = http.createServer((req, res) => {
         expect(req.method).to.eql("POST");
         expect(req.headers["x-forwarded-for"]).to.eql("localhost");
-        expect(Number.parseInt(req.headers.host!.split(":")[1])).to.eql(ports.proxy);
+        expect(Number.parseInt(req.headers.host!.split(":")[1]!)).to.eql(ports.proxy);
         source.close();
         proxy.close(() => {});
         resolve();
@@ -149,7 +149,7 @@ describe("http-proxy", () => {
 
       const source = http.createServer((req, res) => {
         expect(req.method).to.eql("GET");
-        expect(Number.parseInt(req.headers.host!.split(":")[1])).to.eql(ports.proxy);
+        expect(Number.parseInt(req.headers.host!.split(":")[1]!)).to.eql(ports.proxy);
         res.writeHead(200, { "Content-Type": "text/plain" });
         res.end("Hello from " + (source.address()! as any).port);
       });
@@ -197,7 +197,7 @@ describe("http-proxy", () => {
       const { promise, resolve } = Promise.withResolvers<void>();
       proxy.on("error", (err) => {
         expect(err).toBeInstanceOf(Error);
-        expect(err.code).toBe("ECONNREFUSED");
+        expect((err as any).code).toBe("ECONNREFUSED");
         proxy.close(() => {});
         resolve();
       });
@@ -221,7 +221,7 @@ describe("http-proxy", () => {
 
   describe.todo("#createProxyServer setting the correct timeout value", () => {
     it("should hang up the socket at the timeout", async () => {
-      this.timeout(30);
+      // this.timeout(30);
       const ports = { source: getPort(), proxy: getPort() };
       const proxy = httpProxy
         .createProxyServer({
@@ -230,9 +230,9 @@ describe("http-proxy", () => {
         })
         .listen(ports.proxy);
 
-      proxy.on("error", (e) => {
-        expect(e).toBe.an(Error);
-        expect(e.code).toBe.eql("ECONNRESET");
+      proxy.on("error", (err) => {
+        expect(err).toBeInstanceOf(Error);
+        expect((err as any).code).toBe("ECONNRESET");
       });
 
       const source = http.createServer(function (req, res) {
@@ -252,12 +252,11 @@ describe("http-proxy", () => {
         () => {},
       );
 
-      testReq.on("error", (e) => {
-        expect(e).toBe.an(Error);
-        expect(e.code).toBe.eql("ECONNRESET");
-        proxy.close();
+      testReq.on("error", (err) => {
+        expect(err).toBeInstanceOf(Error);
+        expect((err as any).code).toBe("ECONNRESET");
+        proxy.close(() => {});
         source.close();
-        done();
       });
 
       testReq.end();
@@ -277,7 +276,7 @@ describe("http-proxy", () => {
       const { promise, resolve } = Promise.withResolvers<void>();
       const source = http.createServer(function (req, res) {
         expect(req.method).to.eql("GET");
-        expect(Number.parseInt(req.headers.host!.split(":")[1])).to.eql(ports.source);
+        expect(Number.parseInt(req.headers.host!.split(":")[1]!)).to.eql(ports.source);
         source.close();
         proxy.close(resolve);
       });
@@ -496,6 +495,7 @@ describe("http-proxy", () => {
       });
       const proxyServer = proxy.listen(ports.proxy);
       const server = http.createServer();
+      // @ts-expect-error TODO
       const destiny = io.Server.listen(server);
 
       function startSocketIo() {
@@ -513,11 +513,11 @@ describe("http-proxy", () => {
       });
 
       proxyServer.on("close", () => {
-        proxyServer.close();
+        proxyServer.close(() => {});
         server.close();
         destiny.close();
         if (count == 1) {
-          done();
+          // done();
         }
       });
 

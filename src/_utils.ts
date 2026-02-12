@@ -1,9 +1,10 @@
 import httpNative from "node:http";
 import httpsNative from "node:https";
+import net from "node:net";
 import type tls from "node:tls";
 import type { Url as LegacyURL } from "node:url";
-import net from "node:net";
-import type { ProxyServerOptions, ProxyTarget, ProxyTargetDetailed } from "./types";
+
+import type { ProxyServerOptions, ProxyTarget, ProxyTargetDetailed } from "./types.ts";
 
 const upgradeHeader = /(^|,)\s*upgrade\s*($|,)/i;
 
@@ -36,6 +37,8 @@ export function setupOutgoing(
   options: ProxyServerOptions & {
     target: ProxyTarget;
     forward?: ProxyTarget;
+    ca?: string;
+    method?: string;
   },
   req: httpNative.IncomingMessage,
   forward?: "forward" | "target",
@@ -57,11 +60,9 @@ export function setupOutgoing(
     "secureProtocol",
   ] as const) {
     const value = (options[forward || "target"] as ProxyTargetDetailed)[e];
-    // @ts-expect-error -- this mapping is valid
-    outgoing[e] = value;
+    outgoing[e] = value as any;
   }
 
-  // @ts-expect-error - options.method is undocumented
   outgoing.method = options.method || req.method;
   outgoing.headers = { ...req.headers };
 
@@ -73,9 +74,7 @@ export function setupOutgoing(
     outgoing.auth = options.auth;
   }
 
-  // @ts-expect-error - options.ca is undocumented
   if (options.ca) {
-    // @ts-expect-error - options.ca is undocumented
     outgoing.ca = options.ca;
   }
 
@@ -186,7 +185,7 @@ export function setupSocket(socket: net.Socket): net.Socket {
 export function getPort(req: httpNative.IncomingMessage): string {
   const res = req.headers.host ? req.headers.host.match(/:(\d+)/) : "";
   if (res) {
-    return res[1];
+    return res[1]!;
   }
   return hasEncryptedConnection(req) ? "443" : "80";
 }

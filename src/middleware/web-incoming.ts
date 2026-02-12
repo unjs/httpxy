@@ -1,10 +1,10 @@
 import type { ClientRequest, ServerResponse } from "node:http";
-import type { ProxyTargetDetailed } from "../types";
+import type { ProxyTargetDetailed } from "../types.ts";
 import nodeHTTP from "node:http";
 import nodeHTTPS from "node:https";
-import { getPort, hasEncryptedConnection, setupOutgoing } from "../_utils";
-import { webOutgoingMiddleware } from "./web-outgoing";
-import { ProxyMiddleware, defineProxyMiddleware } from "./_utils";
+import { getPort, hasEncryptedConnection, setupOutgoing } from "../_utils.ts";
+import { webOutgoingMiddleware } from "./web-outgoing.ts";
+import { type ProxyMiddleware, defineProxyMiddleware } from "./_utils.ts";
 
 const nativeAgents = { http: nodeHTTP, https: nodeHTTPS };
 

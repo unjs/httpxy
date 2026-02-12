@@ -1,5 +1,5 @@
 import { assertType, describe, expectTypeOf, it } from "vitest";
-import { ProxyServer } from "../src/server";
+import { ProxyServer } from "../src/server.ts";
 import type { Request as ExpressRequest, Response as ExpressResponse } from "express";
 import type { IncomingMessage, ServerResponse } from "node:http";
 

@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 
-import * as webPasses from "../../src/middleware/web-incoming";
-import * as httpProxy from "../../src";
+import * as webPasses from "../../src/middleware/web-incoming.ts";
+import * as httpProxy from "../../src/index.ts";
 import concat from "concat-stream";
 import async from "async";
 import url from "node:url";
@@ -16,7 +16,7 @@ describe("middleware:web-incoming", () => {
         method: "DELETE",
         headers: {} as any,
       };
-      webPasses.deleteLength(stubRequest as any, {} as any, {} as any);
+      webPasses.deleteLength(stubRequest as any, {} as any, {} as any, {} as any);
       expect(stubRequest.headers["content-length"]).to.eql("0");
     });
 
@@ -25,7 +25,7 @@ describe("middleware:web-incoming", () => {
         method: "OPTIONS",
         headers: {} as any,
       };
-      webPasses.deleteLength(stubRequest as any, {} as any, {} as any);
+      webPasses.deleteLength(stubRequest as any, {} as any, {} as any, {} as any);
       expect(stubRequest.headers["content-length"]).to.eql("0");
     });
 
@@ -36,7 +36,7 @@ describe("middleware:web-incoming", () => {
           "transfer-encoding": "chunked",
         } as any,
       };
-      webPasses.deleteLength(stubRequest as any, {} as any, {} as any);
+      webPasses.deleteLength(stubRequest as any, {} as any, {} as any, {} as any);
       expect(stubRequest.headers["content-length"]).to.eql("0");
       expect(stubRequest.headers).to.not.have.key("transfer-encoding");
     });
@@ -53,7 +53,7 @@ describe("middleware:web-incoming", () => {
         },
       };
 
-      webPasses.timeout(stubRequest as any, {} as any, { timeout: 5000 } as any);
+      webPasses.timeout(stubRequest as any, {} as any, { timeout: 5000 } as any, {} as any);
       expect(done).to.eql(5000);
     });
   });
@@ -70,7 +70,7 @@ describe("middleware:web-incoming", () => {
     };
 
     it("set the correct x-forwarded-* headers", () => {
-      webPasses.XHeaders(stubRequest as any, {} as any, { xfwd: true } as any);
+      webPasses.XHeaders(stubRequest as any, {} as any, { xfwd: true } as any, {} as any);
       expect(stubRequest.headers["x-forwarded-for"]).toBe("192.168.1.2");
       expect(stubRequest.headers["x-forwarded-port"]).toBe("8080");
       expect(stubRequest.headers["x-forwarded-proto"]).toBe("http");
@@ -229,7 +229,7 @@ describe("#createProxyServer.web() using own http server", () => {
         expect(err).toBeInstanceOf(Error);
         expect(errReq).toBe(req);
         expect(errRes).toBe(res);
-        expect(err.code).toBe("ECONNREFUSED");
+        expect((err as any).code).toBe("ECONNREFUSED");
         resolve();
       });
 
@@ -265,7 +265,7 @@ describe("#createProxyServer.web() using own http server", () => {
         expect(err).toBeInstanceOf(Error);
         expect(errReq).toBe(req);
         expect(errRes).toBe(res);
-        expect(err.code).toBe("ECONNREFUSED");
+        expect((err as any).code).toBe("ECONNREFUSED");
         resolve();
       });
 
@@ -306,7 +306,7 @@ describe("#createProxyServer.web() using own http server", () => {
         expect(errReq).toBe(req);
         expect(errRes).toBe(res);
         expect(Date.now() - started).toBeGreaterThan(99);
-        expect(err.code).toBe("ECONNRESET");
+        expect((err as any).code).toBe("ECONNRESET");
         resolve();
       });
 

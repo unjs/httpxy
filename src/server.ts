@@ -1,11 +1,10 @@
 import http from "node:http";
 import https from "node:https";
 import { EventEmitter } from "node:events";
-// import type { Duplex } from "node:stream";
-import { webIncomingMiddleware } from "./middleware/web-incoming";
-import { websocketIncomingMiddleware } from "./middleware/ws-incoming";
-import { type ProxyServerOptions, type ProxyTarget } from "./types";
-import { ProxyMiddleware, type ResOfType } from "./middleware/_utils";
+import { webIncomingMiddleware } from "./middleware/web-incoming.ts";
+import { websocketIncomingMiddleware } from "./middleware/ws-incoming.ts";
+import type { ProxyServerOptions, ProxyTarget } from "./types.ts";
+import type { ProxyMiddleware, ResOfType } from "./middleware/_utils.ts";
 import type net from "node:net";
 
 export interface ProxyServerEventMap<
@@ -76,7 +75,7 @@ export class ProxyServer<
    * @param port - Port to listen on
    * @param hostname - The hostname to listen on
    */
-  listen(port: number, hostname: string) {
+  listen(port: number, hostname?: string) {
     const closure = (req: http.IncomingMessage, res: http.ServerResponse) => {
       this.web(req, res);
     };
@@ -100,7 +99,7 @@ export class ProxyServer<
   /**
    * A function that closes the inner webserver and stops listening on given port
    */
-  close(callback: () => void) {
+  close(callback?: () => void) {
     if (this._server) {
       // Wrap callback to nullify server after all open connections are closed.
       this._server.close((...args) => {

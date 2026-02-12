@@ -1,7 +1,7 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Socket } from "node:net";
-import type { ProxyServer } from "../server";
-import type { ProxyServerOptions, ProxyTargetDetailed } from "../types";
+import type { ProxyServer } from "../server.ts";
+import type { ProxyServerOptions, ProxyTargetDetailed } from "../types.ts";
 
 export type ResOfType<T extends "web" | "ws"> = T extends "ws"
   ? T extends "web"

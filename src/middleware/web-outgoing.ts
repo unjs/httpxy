@@ -1,5 +1,5 @@
-import { rewriteCookieProperty } from "../_utils";
-import { ProxyOutgoingMiddleware, defineProxyOutgoingMiddleware } from "./_utils";
+import { rewriteCookieProperty } from "../_utils.ts";
+import { type ProxyOutgoingMiddleware, defineProxyOutgoingMiddleware } from "./_utils.ts";
 
 const redirectRegex = /^201|30([1278])$/;
 
@@ -97,7 +97,7 @@ export const writeHeaders = defineProxyOutgoingMiddleware((req, res, proxyRes, o
   if (preserveHeaderKeyCase && proxyRes.rawHeaders !== undefined) {
     rawHeaderKeyMap = {};
     for (let i = 0; i < proxyRes.rawHeaders.length; i += 2) {
-      const key = proxyRes.rawHeaders[i];
+      const key = proxyRes.rawHeaders[i]!;
       rawHeaderKeyMap[key.toLowerCase()] = key;
     }
   }

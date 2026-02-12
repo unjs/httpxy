@@ -1,3 +1,3 @@
-export * from "./types";
-export * from "./server";
-export * from "./fetch";
+export type { ProxyServerOptions, ProxyTarget, ProxyTargetDetailed } from "./types.ts";
+export { ProxyServer, createProxyServer, type ProxyServerEventMap } from "./server.ts";
+export { proxyFetch } from "./fetch.ts";
