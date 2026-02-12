@@ -24,6 +24,21 @@ console.log(await res2.text());
 
 // Or use an object for more control
 const res3 = await proxyFetch({ host: "127.0.0.1", port: 3000 }, "http://example.com/api/data");
+
+// Using a Request object
+const req = new Request("http://example.com/api/data", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ key: "value" }),
+});
+const res4 = await proxyFetch("http://127.0.0.1:3000", req);
+
+// Using a URL string with RequestInit
+const res5 = await proxyFetch("http://127.0.0.1:3000", "http://example.com/api/data", {
+  method: "PUT",
+  headers: { Authorization: "Bearer token" },
+  body: JSON.stringify({ updated: true }),
+});
 ```
 
 It accepts the same `input` and `init` arguments as the global `fetch`, including `Request` objects and streaming bodies, and returns a standard `Response`. Redirects are handled manually by default.
