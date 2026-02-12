@@ -23,7 +23,9 @@ export const deleteLength = defineProxyMiddleware((req) => {
  */
 export const timeout = defineProxyMiddleware((req, res, options) => {
   if (options.timeout) {
-    req.socket.setTimeout(options.timeout);
+    req.socket.setTimeout(options.timeout, () => {
+      req.socket.destroy();
+    });
   }
 });
 
