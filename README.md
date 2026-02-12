@@ -5,15 +5,33 @@
 [![bundle][bundle-src]][bundle-href]
 [![Codecov][codecov-src]][codecov-href]
 
-A Full-Featured HTTP and WebSocket Proxy for Node.js forked from [http-party/node-http-proxy](https://github.com/http-party/node-http-proxy) with modern Typescript rewrite.
+A Full-Featured HTTP and WebSocket Proxy for Node.js
 
-## Usage
+## Proxy Fetch
 
-Install package:
+`proxyFetch` is a proxy utility with web standard (`Request`/`Response`) interfaces. It forwards requests to a specific server address (TCP host/port or Unix socket), bypassing the URL's hostname.
 
-```sh
-npx nypm i -D httpxy
+```ts
+import { proxyFetch } from "httpxy";
+
+// TCP — using a URL string
+const res = await proxyFetch("http://127.0.0.1:3000", "http://example.com/api/data");
+console.log(await res.json());
+
+// Unix socket — using a URL string
+const res2 = await proxyFetch("unix:/tmp/app.sock", "http://localhost/health");
+console.log(await res2.text());
+
+// Or use an object for more control
+const res3 = await proxyFetch({ host: "127.0.0.1", port: 3000 }, "http://example.com/api/data");
 ```
+
+It accepts the same `input` and `init` arguments as the global `fetch`, including `Request` objects and streaming bodies, and returns a standard `Response`. Redirects are handled manually by default.
+
+## Proxy Server
+
+> [!NOTE]
+> Proxy server was originally forked from [http-party/node-http-proxy](https://github.com/http-party/node-http-proxy).
 
 Create proxy:
 
