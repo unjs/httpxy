@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 
-import * as webOutgoing from "../../src/middleware/web-outgoing";
+import * as webOutgoing from "../../src/middleware/web-outgoing.ts";
 
 // Source: https://github.com/http-party/node-http-proxy/blob/master/test/lib-http-proxy-passes-web-outgoing-test.js
 
@@ -159,6 +159,7 @@ describe("middleware:web-outgoing", () => {
         } as any,
         {} as any,
         proxyRes as any,
+        {} as any,
       );
 
       expect(proxyRes.headers.connection).to.eql("close");
@@ -175,6 +176,7 @@ describe("middleware:web-outgoing", () => {
         } as any,
         {} as any,
         proxyRes as any,
+        {} as any,
       );
 
       expect(proxyRes.headers.connection).to.eql("hey");
@@ -191,6 +193,7 @@ describe("middleware:web-outgoing", () => {
         } as any,
         {} as any,
         proxyRes as any,
+        {} as any,
       );
 
       expect(proxyRes.headers.connection).to.eql("hola");
@@ -207,6 +210,7 @@ describe("middleware:web-outgoing", () => {
         } as any,
         {} as any,
         proxyRes as any,
+        {} as any,
       );
 
       expect(proxyRes.headers.connection).to.eql("keep-alive");
@@ -223,6 +227,7 @@ describe("middleware:web-outgoing", () => {
         } as any,
         {} as any,
         proxyRes as any,
+        {} as any,
       );
 
       expect(proxyRes.headers.connection).to.eql(undefined);
@@ -252,7 +257,7 @@ describe("middleware:web-outgoing", () => {
         },
       };
 
-      webOutgoing.writeStatusCode({} as any, res as any, { statusCode: 200 } as any);
+      webOutgoing.writeStatusCode({} as any, res as any, { statusCode: 200 } as any, {} as any);
     });
   });
 
@@ -434,7 +439,7 @@ describe("middleware:web-outgoing", () => {
         "transfer-encoding": "hello",
       },
     };
-    webOutgoing.removeChunked({ httpVersion: "1.0" } as any, {} as any, proxyRes as any);
+    webOutgoing.removeChunked({ httpVersion: "1.0" } as any, {} as any, proxyRes as any, {} as any);
     expect(proxyRes.headers["transfer-encoding"]).to.eql(undefined);
   });
 });

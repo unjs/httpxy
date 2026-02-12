@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import * as common from "../src/_utils";
+import * as common from "../src/_utils.ts";
 
 // Source: https://github.com/http-party/node-http-proxy/blob/master/test/lib-http-proxy-common-test.js
 
@@ -427,7 +427,6 @@ describe("lib/http-proxy/common.js", () => {
         outgoing,
         {
           target: "https://whooooo.com",
-          // @ts-expect-error
           method: "POST",
         },
         { method: "GET", url: "" } as any,

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import * as wsIncoming from "../../src/middleware/ws-incoming";
+import * as wsIncoming from "../../src/middleware/ws-incoming.ts";
 
 // Source: https://github.com/http-party/node-http-proxy/blob/master/test/lib-http-proxy-passes-ws-incoming-test.js
 
@@ -17,7 +17,12 @@ describe("middleware:ws-incoming", () => {
             destroyCalled = true;
           },
         };
-      const returnValue = wsIncoming.checkMethodAndHeader(stubRequest as any, stubSocket as any);
+      const returnValue = wsIncoming.checkMethodAndHeader(
+        stubRequest as any,
+        stubSocket as any,
+        {} as any,
+        {} as any,
+      );
       expect(returnValue).toBe(true);
       expect(destroyCalled).toBe(true);
     });
@@ -34,7 +39,12 @@ describe("middleware:ws-incoming", () => {
           destroyCalled = true;
         },
       };
-      const returnValue = wsIncoming.checkMethodAndHeader(stubRequest as any, stubSocket as any);
+      const returnValue = wsIncoming.checkMethodAndHeader(
+        stubRequest as any,
+        stubSocket as any,
+        {} as any,
+        {} as any,
+      );
       expect(returnValue).toBe(true);
       expect(destroyCalled).toBe(true);
     });
@@ -53,7 +63,12 @@ describe("middleware:ws-incoming", () => {
             destroyCalled = true;
           },
         };
-      const returnValue = wsIncoming.checkMethodAndHeader(stubRequest as any, stubSocket as any);
+      const returnValue = wsIncoming.checkMethodAndHeader(
+        stubRequest as any,
+        stubSocket as any,
+        {} as any,
+        {} as any,
+      );
       expect(returnValue).toBe(true);
       expect(destroyCalled).toBe(true);
     });
@@ -72,7 +87,12 @@ describe("middleware:ws-incoming", () => {
           destroyCalled = true;
         },
       };
-      const returnValue = wsIncoming.checkMethodAndHeader(stubRequest as any, stubSocket as any);
+      const returnValue = wsIncoming.checkMethodAndHeader(
+        stubRequest as any,
+        stubSocket as any,
+        {} as any,
+        {} as any,
+      );
       expect(returnValue).toBe(undefined);
       expect(destroyCalled).toBe(false);
     });
@@ -80,7 +100,7 @@ describe("middleware:ws-incoming", () => {
 
   describe("#XHeaders", () => {
     it("return if no forward request", () => {
-      const returnValue = wsIncoming.XHeaders({} as any, {} as any, {} as any);
+      const returnValue = wsIncoming.XHeaders({} as any, {} as any, {} as any, {} as any);
       expect(returnValue).toBe(undefined);
     });
 
@@ -94,7 +114,7 @@ describe("middleware:ws-incoming", () => {
           host: "192.168.1.2:8080",
         } as any,
       };
-      wsIncoming.XHeaders(stubRequest as any, {} as any, { xfwd: true } as any);
+      wsIncoming.XHeaders(stubRequest as any, {} as any, { xfwd: true } as any, {} as any);
       expect(stubRequest.headers["x-forwarded-for"]).toBe("192.168.1.2");
       expect(stubRequest.headers["x-forwarded-port"]).toBe("8080");
       expect(stubRequest.headers["x-forwarded-proto"]).toBe("ws");
@@ -113,7 +133,7 @@ describe("middleware:ws-incoming", () => {
           host: "192.168.1.3:8181",
         } as any,
       };
-      wsIncoming.XHeaders(stubRequest as any, {} as any, { xfwd: true } as any);
+      wsIncoming.XHeaders(stubRequest as any, {} as any, { xfwd: true } as any, {} as any);
       expect(stubRequest.headers["x-forwarded-for"]).toBe("192.168.1.3");
       expect(stubRequest.headers["x-forwarded-port"]).toBe("8181");
       expect(stubRequest.headers["x-forwarded-proto"]).toBe("wss");

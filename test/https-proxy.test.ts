@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import * as httpProxy from "../src";
+import * as httpProxy from "../src/index.ts";
 import semver from "semver";
 import http from "node:http";
 import https from "node:https";
@@ -20,7 +20,7 @@ describe("lib/http-proxy.js", () => {
         const ports = { source: getPort(), proxy: getPort() };
         const source = http.createServer(function (req, res) {
           expect(req.method).to.eql("GET");
-          expect(Number.parseInt(req.headers.host!.split(":")[1])).to.eql(ports.proxy);
+          expect(Number.parseInt(req.headers.host!.split(":")[1]!)).to.eql(ports.proxy);
           res.writeHead(200, { "Content-Type": "text/plain" });
           res.end("Hello from " + ports.source);
         });
@@ -78,7 +78,7 @@ describe("lib/http-proxy.js", () => {
           },
           function (req, res) {
             expect(req.method).to.eql("GET");
-            expect(Number.parseInt(req.headers.host!.split(":")[1])).to.eql(ports.proxy);
+            expect(Number.parseInt(req.headers.host!.split(":")[1]!)).to.eql(ports.proxy);
             res.writeHead(200, { "Content-Type": "text/plain" });
             res.end("Hello from " + ports.source);
           },
@@ -132,7 +132,7 @@ describe("lib/http-proxy.js", () => {
           },
           function (req, res) {
             expect(req.method).to.eql("GET");
-            expect(Number.parseInt(req.headers.host!.split(":")[1])).to.eql(ports.proxy);
+            expect(Number.parseInt(req.headers.host!.split(":")[1]!)).to.eql(ports.proxy);
             res.writeHead(200, { "Content-Type": "text/plain" });
             res.end("Hello from " + ports.source);
           },
@@ -227,7 +227,7 @@ describe("lib/http-proxy.js", () => {
         const ports = { source: getPort(), proxy: getPort() };
         const source = http.createServer(function (req, res) {
           expect(req.method).to.eql("GET");
-          expect(Number.parseInt(req.headers.host!.split(":")[1])).to.eql(ports.proxy);
+          expect(Number.parseInt(req.headers.host!.split(":")[1]!)).to.eql(ports.proxy);
           res.writeHead(200, { "Content-Type": "text/plain" });
           res.end("Hello from " + ports.source);
         });

@@ -1,8 +1,8 @@
 import nodeHTTP from "node:http";
 import nodeHTTPS from "node:https";
-import { getPort, hasEncryptedConnection, isSSL, setupOutgoing, setupSocket } from "../_utils";
-import { ProxyMiddleware, defineProxyMiddleware } from "./_utils";
 import type { Socket } from "node:net";
+import { type ProxyMiddleware, defineProxyMiddleware } from "./_utils.ts";
+import { getPort, hasEncryptedConnection, isSSL, setupOutgoing, setupSocket } from "../_utils.ts";
 
 /**
  * WebSocket requests must have the `GET` method and
