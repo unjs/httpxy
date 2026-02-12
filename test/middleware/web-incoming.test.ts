@@ -5,6 +5,12 @@ import * as httpProxy from "../../src/index.ts";
 import concat from "concat-stream";
 import http from "node:http";
 import type { AddressInfo } from "node:net";
+import {
+  stubIncomingMessage,
+  stubServerResponse,
+  stubMiddlewareOptions,
+  stubProxyServer,
+} from "../_stubs.ts";
 
 // Source: https://github.com/http-party/node-http-proxy/blob/master/test/lib-http-proxy-passes-web-incoming-test.js
 
@@ -20,31 +26,46 @@ function listenOn(server: http.Server): Promise<number> {
 describe("middleware:web-incoming", () => {
   describe("#deleteLength", () => {
     it("should change `content-length` for DELETE requests", () => {
-      const stubRequest = {
+      const stubRequest = stubIncomingMessage({
         method: "DELETE",
-        headers: {} as any,
-      };
-      webPasses.deleteLength(stubRequest as any, {} as any, {} as any, {} as any);
+        headers: {},
+      });
+      webPasses.deleteLength(
+        stubRequest,
+        stubServerResponse(),
+        stubMiddlewareOptions(),
+        stubProxyServer(),
+      );
       expect(stubRequest.headers["content-length"]).to.eql("0");
     });
 
     it("should change `content-length` for OPTIONS requests", () => {
-      const stubRequest = {
+      const stubRequest = stubIncomingMessage({
         method: "OPTIONS",
-        headers: {} as any,
-      };
-      webPasses.deleteLength(stubRequest as any, {} as any, {} as any, {} as any);
+        headers: {},
+      });
+      webPasses.deleteLength(
+        stubRequest,
+        stubServerResponse(),
+        stubMiddlewareOptions(),
+        stubProxyServer(),
+      );
       expect(stubRequest.headers["content-length"]).to.eql("0");
     });
 
     it("should remove `transfer-encoding` from empty DELETE requests", () => {
-      const stubRequest = {
+      const stubRequest = stubIncomingMessage({
         method: "DELETE",
         headers: {
           "transfer-encoding": "chunked",
-        } as any,
-      };
-      webPasses.deleteLength(stubRequest as any, {} as any, {} as any, {} as any);
+        },
+      });
+      webPasses.deleteLength(
+        stubRequest,
+        stubServerResponse(),
+        stubMiddlewareOptions(),
+        stubProxyServer(),
+      );
       expect(stubRequest.headers["content-length"]).to.eql("0");
       expect(stubRequest.headers).to.not.have.key("transfer-encoding");
     });
@@ -53,35 +74,45 @@ describe("middleware:web-incoming", () => {
   describe("#timeout", () => {
     it("should set timeout on the socket", () => {
       let done = false;
-      const stubRequest = {
+      const stubRequest = stubIncomingMessage({
         socket: {
           setTimeout: function (value: any) {
             done = value;
           },
         },
-      };
+      });
 
-      webPasses.timeout(stubRequest as any, {} as any, { timeout: 5000 } as any, {} as any);
+      webPasses.timeout(
+        stubRequest,
+        stubServerResponse(),
+        stubMiddlewareOptions({ timeout: 5000 }),
+        stubProxyServer(),
+      );
       expect(done).to.eql(5000);
     });
   });
 
   describe("#XHeaders", () => {
-    const stubRequest = {
+    const req = stubIncomingMessage({
       connection: {
         remoteAddress: "192.168.1.2",
         remotePort: "8080",
       },
       headers: {
         host: "192.168.1.2:8080",
-      } as any,
-    };
+      },
+    });
 
     it("set the correct x-forwarded-* headers", () => {
-      webPasses.XHeaders(stubRequest as any, {} as any, { xfwd: true } as any, {} as any);
-      expect(stubRequest.headers["x-forwarded-for"]).toBe("192.168.1.2");
-      expect(stubRequest.headers["x-forwarded-port"]).toBe("8080");
-      expect(stubRequest.headers["x-forwarded-proto"]).toBe("http");
+      webPasses.XHeaders(
+        req,
+        stubServerResponse(),
+        stubMiddlewareOptions({ xfwd: true }),
+        stubProxyServer(),
+      );
+      expect(req.headers["x-forwarded-for"]).toBe("192.168.1.2");
+      expect(req.headers["x-forwarded-port"]).toBe("8080");
+      expect(req.headers["x-forwarded-proto"]).toBe("http");
     });
   });
 });

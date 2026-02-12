@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 
 import * as webOutgoing from "../../src/middleware/web-outgoing.ts";
+import { stubIncomingMessage, stubServerResponse, stubMiddlewareOptions } from "../_stubs.ts";
 
 // Source: https://github.com/http-party/node-http-proxy/blob/master/test/lib-http-proxy-passes-web-outgoing-test.js
 
@@ -32,40 +33,70 @@ describe("middleware:web-outgoing", () => {
       for (const code of [201, 301, 302, 307, 308]) {
         it("on " + code, () => {
           ctx.proxyRes.statusCode = code;
-          webOutgoing.setRedirectHostRewrite(ctx.req, {} as any, ctx.proxyRes, ctx.options);
+          webOutgoing.setRedirectHostRewrite(
+            ctx.req,
+            stubServerResponse(),
+            ctx.proxyRes,
+            ctx.options,
+          );
           expect(ctx.proxyRes.headers.location).to.eql("http://ext-manual.com/");
         });
       }
 
       it("not on 200", () => {
         ctx.proxyRes.statusCode = 200;
-        webOutgoing.setRedirectHostRewrite(ctx.req, {} as any, ctx.proxyRes, ctx.options);
+        webOutgoing.setRedirectHostRewrite(
+          ctx.req,
+          stubServerResponse(),
+          ctx.proxyRes,
+          ctx.options,
+        );
         expect(ctx.proxyRes.headers.location).to.eql("http://backend.com/");
       });
 
       it("not when hostRewrite is unset", () => {
         delete ctx.options.hostRewrite;
-        webOutgoing.setRedirectHostRewrite(ctx.req, {} as any, ctx.proxyRes, ctx.options);
+        webOutgoing.setRedirectHostRewrite(
+          ctx.req,
+          stubServerResponse(),
+          ctx.proxyRes,
+          ctx.options,
+        );
         expect(ctx.proxyRes.headers.location).to.eql("http://backend.com/");
       });
 
       it("takes precedence over autoRewrite", () => {
         ctx.options.autoRewrite = true;
-        webOutgoing.setRedirectHostRewrite(ctx.req, {} as any, ctx.proxyRes, ctx.options);
+        webOutgoing.setRedirectHostRewrite(
+          ctx.req,
+          stubServerResponse(),
+          ctx.proxyRes,
+          ctx.options,
+        );
         expect(ctx.proxyRes.headers.location).to.eql("http://ext-manual.com/");
       });
 
       it("not when the redirected location does not match target host", () => {
         ctx.proxyRes.statusCode = 302;
         ctx.proxyRes.headers.location = "http://some-other/";
-        webOutgoing.setRedirectHostRewrite(ctx.req, {} as any, ctx.proxyRes, ctx.options);
+        webOutgoing.setRedirectHostRewrite(
+          ctx.req,
+          stubServerResponse(),
+          ctx.proxyRes,
+          ctx.options,
+        );
         expect(ctx.proxyRes.headers.location).to.eql("http://some-other/");
       });
 
       it("not when the redirected location does not match target port", () => {
         ctx.proxyRes.statusCode = 302;
         ctx.proxyRes.headers.location = "http://backend.com:8080/";
-        webOutgoing.setRedirectHostRewrite(ctx.req, {} as any, ctx.proxyRes, ctx.options);
+        webOutgoing.setRedirectHostRewrite(
+          ctx.req,
+          stubServerResponse(),
+          ctx.proxyRes,
+          ctx.options,
+        );
         expect(ctx.proxyRes.headers.location).to.eql("http://backend.com:8080/");
       });
     });
@@ -77,34 +108,59 @@ describe("middleware:web-outgoing", () => {
       for (const code of [201, 301, 302, 307, 308]) {
         it("on " + code, () => {
           ctx.proxyRes.statusCode = code;
-          webOutgoing.setRedirectHostRewrite(ctx.req, {} as any, ctx.proxyRes, ctx.options);
+          webOutgoing.setRedirectHostRewrite(
+            ctx.req,
+            stubServerResponse(),
+            ctx.proxyRes,
+            ctx.options,
+          );
           expect(ctx.proxyRes.headers.location).to.eql("http://ext-auto.com/");
         });
       }
 
       it("not on 200", () => {
         ctx.proxyRes.statusCode = 200;
-        webOutgoing.setRedirectHostRewrite(ctx.req, {} as any, ctx.proxyRes, ctx.options);
+        webOutgoing.setRedirectHostRewrite(
+          ctx.req,
+          stubServerResponse(),
+          ctx.proxyRes,
+          ctx.options,
+        );
         expect(ctx.proxyRes.headers.location).to.eql("http://backend.com/");
       });
 
       it("not when autoRewrite is unset", () => {
         delete ctx.options.autoRewrite;
-        webOutgoing.setRedirectHostRewrite(ctx.req, {} as any, ctx.proxyRes, ctx.options);
+        webOutgoing.setRedirectHostRewrite(
+          ctx.req,
+          stubServerResponse(),
+          ctx.proxyRes,
+          ctx.options,
+        );
         expect(ctx.proxyRes.headers.location).to.eql("http://backend.com/");
       });
 
       it("not when the redirected location does not match target host", () => {
         ctx.proxyRes.statusCode = 302;
         ctx.proxyRes.headers.location = "http://some-other/";
-        webOutgoing.setRedirectHostRewrite(ctx.req, {} as any, ctx.proxyRes, ctx.options);
+        webOutgoing.setRedirectHostRewrite(
+          ctx.req,
+          stubServerResponse(),
+          ctx.proxyRes,
+          ctx.options,
+        );
         expect(ctx.proxyRes.headers.location).to.eql("http://some-other/");
       });
 
       it("not when the redirected location does not match target port", () => {
         ctx.proxyRes.statusCode = 302;
         ctx.proxyRes.headers.location = "http://backend.com:8080/";
-        webOutgoing.setRedirectHostRewrite(ctx.req, {} as any, ctx.proxyRes, ctx.options);
+        webOutgoing.setRedirectHostRewrite(
+          ctx.req,
+          stubServerResponse(),
+          ctx.proxyRes,
+          ctx.options,
+        );
         expect(ctx.proxyRes.headers.location).to.eql("http://backend.com:8080/");
       });
     });
@@ -116,32 +172,57 @@ describe("middleware:web-outgoing", () => {
       for (const code of [201, 301, 302, 307, 308]) {
         it("on " + code, () => {
           ctx.proxyRes.statusCode = code;
-          webOutgoing.setRedirectHostRewrite(ctx.req, {} as any, ctx.proxyRes, ctx.options);
+          webOutgoing.setRedirectHostRewrite(
+            ctx.req,
+            stubServerResponse(),
+            ctx.proxyRes,
+            ctx.options,
+          );
           expect(ctx.proxyRes.headers.location).to.eql("https://backend.com/");
         });
       }
 
       it("not on 200", () => {
         ctx.proxyRes.statusCode = 200;
-        webOutgoing.setRedirectHostRewrite(ctx.req, {} as any, ctx.proxyRes, ctx.options);
+        webOutgoing.setRedirectHostRewrite(
+          ctx.req,
+          stubServerResponse(),
+          ctx.proxyRes,
+          ctx.options,
+        );
         expect(ctx.proxyRes.headers.location).to.eql("http://backend.com/");
       });
 
       it("not when protocolRewrite is unset", () => {
         delete ctx.options.protocolRewrite;
-        webOutgoing.setRedirectHostRewrite(ctx.req, {} as any, ctx.proxyRes, ctx.options);
+        webOutgoing.setRedirectHostRewrite(
+          ctx.req,
+          stubServerResponse(),
+          ctx.proxyRes,
+          ctx.options,
+        );
         expect(ctx.proxyRes.headers.location).to.eql("http://backend.com/");
       });
 
       it("works together with hostRewrite", () => {
         ctx.options.hostRewrite = "ext-manual.com";
-        webOutgoing.setRedirectHostRewrite(ctx.req, {} as any, ctx.proxyRes, ctx.options);
+        webOutgoing.setRedirectHostRewrite(
+          ctx.req,
+          stubServerResponse(),
+          ctx.proxyRes,
+          ctx.options,
+        );
         expect(ctx.proxyRes.headers.location).to.eql("https://ext-manual.com/");
       });
 
       it("works together with autoRewrite", () => {
         ctx.options.autoRewrite = true;
-        webOutgoing.setRedirectHostRewrite(ctx.req, {} as any, ctx.proxyRes, ctx.options);
+        webOutgoing.setRedirectHostRewrite(
+          ctx.req,
+          stubServerResponse(),
+          ctx.proxyRes,
+          ctx.options,
+        );
         expect(ctx.proxyRes.headers.location).to.eql("https://ext-auto.com/");
       });
     });
@@ -149,100 +230,90 @@ describe("middleware:web-outgoing", () => {
 
   describe("#setConnection", () => {
     it("set the right connection with 1.0 - `close`", () => {
-      const proxyRes = { headers: {} as any };
+      const proxyRes = stubIncomingMessage({ headers: {} });
       webOutgoing.setConnection(
-        {
+        stubIncomingMessage({
           httpVersion: "1.0",
-          headers: {
-            connection: undefined,
-          },
-        } as any,
-        {} as any,
-        proxyRes as any,
-        {} as any,
+          headers: { connection: undefined },
+        }),
+        stubServerResponse(),
+        proxyRes,
+        stubMiddlewareOptions(),
       );
 
       expect(proxyRes.headers.connection).to.eql("close");
     });
 
     it("set the right connection with 1.0 - req.connection", () => {
-      const proxyRes = { headers: {} as any };
+      const proxyRes = stubIncomingMessage({ headers: {} });
       webOutgoing.setConnection(
-        {
+        stubIncomingMessage({
           httpVersion: "1.0",
-          headers: {
-            connection: "hey",
-          },
-        } as any,
-        {} as any,
-        proxyRes as any,
-        {} as any,
+          headers: { connection: "hey" },
+        }),
+        stubServerResponse(),
+        proxyRes,
+        stubMiddlewareOptions(),
       );
 
       expect(proxyRes.headers.connection).to.eql("hey");
     });
 
     it("set the right connection - req.connection", () => {
-      const proxyRes = { headers: {} as any };
+      const proxyRes = stubIncomingMessage({ headers: {} });
       webOutgoing.setConnection(
-        {
+        stubIncomingMessage({
           httpVersion: undefined,
-          headers: {
-            connection: "hola",
-          },
-        } as any,
-        {} as any,
-        proxyRes as any,
-        {} as any,
+          headers: { connection: "hola" },
+        }),
+        stubServerResponse(),
+        proxyRes,
+        stubMiddlewareOptions(),
       );
 
       expect(proxyRes.headers.connection).to.eql("hola");
     });
 
     it("set the right connection - `keep-alive`", () => {
-      const proxyRes = { headers: {} as any };
+      const proxyRes = stubIncomingMessage({ headers: {} });
       webOutgoing.setConnection(
-        {
+        stubIncomingMessage({
           httpVersion: undefined,
-          headers: {
-            connection: undefined,
-          },
-        } as any,
-        {} as any,
-        proxyRes as any,
-        {} as any,
+          headers: { connection: undefined },
+        }),
+        stubServerResponse(),
+        proxyRes,
+        stubMiddlewareOptions(),
       );
 
       expect(proxyRes.headers.connection).to.eql("keep-alive");
     });
 
     it("don`t set connection with 2.0 if exist", () => {
-      const proxyRes = { headers: {} as any };
+      const proxyRes = stubIncomingMessage({ headers: {} });
       webOutgoing.setConnection(
-        {
+        stubIncomingMessage({
           httpVersion: "2.0",
-          headers: {
-            connection: "namstey",
-          },
-        } as any,
-        {} as any,
-        proxyRes as any,
-        {} as any,
+          headers: { connection: "namstey" },
+        }),
+        stubServerResponse(),
+        proxyRes,
+        stubMiddlewareOptions(),
       );
 
       expect(proxyRes.headers.connection).to.eql(undefined);
     });
 
     it("don`t set connection with 2.0 if doesn`t exist", () => {
-      const proxyRes = { headers: {} as any };
+      const proxyRes = stubIncomingMessage({ headers: {} });
       webOutgoing.setConnection(
-        {
+        stubIncomingMessage({
           httpVersion: "2.0",
-          headers: {} as any,
-        } as any,
-        {} as any,
-        proxyRes as any,
-        {} as any,
+          headers: {},
+        }),
+        stubServerResponse(),
+        proxyRes,
+        stubMiddlewareOptions(),
       );
 
       expect(proxyRes.headers.connection as any).to.eql(undefined);
@@ -251,30 +322,40 @@ describe("middleware:web-outgoing", () => {
 
   describe("#writeStatusCode", () => {
     it("should write status code", () => {
-      const res = {
+      const res = stubServerResponse({
         writeHead: function (n: number) {
           expect(n).to.eql(200);
         },
-      };
+      });
 
-      webOutgoing.writeStatusCode({} as any, res as any, { statusCode: 200 } as any, {} as any);
+      webOutgoing.writeStatusCode(
+        stubIncomingMessage(),
+        res,
+        stubIncomingMessage({ statusCode: 200 }),
+        stubMiddlewareOptions(),
+      );
     });
 
     it("should write status code with statusMessage", () => {
-      const res = {} as any;
+      const res = stubServerResponse();
       webOutgoing.writeStatusCode(
-        {} as any,
+        stubIncomingMessage(),
         res,
-        { statusCode: 404, statusMessage: "Not Found" } as any,
-        {} as any,
+        stubIncomingMessage({ statusCode: 404, statusMessage: "Not Found" }),
+        stubMiddlewareOptions(),
       );
       expect(res.statusCode).to.eql(404);
       expect(res.statusMessage).to.eql("Not Found");
     });
 
     it("should write status code without statusMessage", () => {
-      const res = {} as any;
-      webOutgoing.writeStatusCode({} as any, res, { statusCode: 200 } as any, {} as any);
+      const res = stubServerResponse();
+      webOutgoing.writeStatusCode(
+        stubIncomingMessage(),
+        res,
+        stubIncomingMessage({ statusCode: 200 }),
+        stubMiddlewareOptions(),
+      );
       expect(res.statusCode).to.eql(200);
       expect(res.statusMessage).to.eql(undefined);
     });
@@ -312,13 +393,13 @@ describe("middleware:web-outgoing", () => {
           // Header names are lower-cased
           ctx.res.headers[k.toLowerCase()] = v;
         },
-        headers: {} as any,
+        headers: {} as Record<string, any>,
       };
     });
 
     it("writes headers", () => {
       const options = {};
-      webOutgoing.writeHeaders({} as any, ctx.res, ctx.proxyRes, options as any);
+      webOutgoing.writeHeaders(stubIncomingMessage(), ctx.res, ctx.proxyRes, options as any);
 
       expect(ctx.res.headers.hey).to.eql("hello");
       expect(ctx.res.headers.how).to.eql("are you?");
@@ -329,7 +410,7 @@ describe("middleware:web-outgoing", () => {
 
     it("writes raw headers", () => {
       const options = {};
-      webOutgoing.writeHeaders({} as any, ctx.res, ctx.rawProxyRes, options as any);
+      webOutgoing.writeHeaders(stubIncomingMessage(), ctx.res, ctx.rawProxyRes, options as any);
 
       expect(ctx.res.headers.hey).to.eql("hello");
       expect(ctx.res.headers.how).to.eql("are you?");
@@ -343,7 +424,7 @@ describe("middleware:web-outgoing", () => {
         cookiePathRewrite: "/dummyPath",
       };
 
-      webOutgoing.writeHeaders({} as any, ctx.res, ctx.proxyRes, options as any);
+      webOutgoing.writeHeaders(stubIncomingMessage(), ctx.res, ctx.proxyRes, options as any);
 
       expect(ctx.res.headers["set-cookie"]).to.contain("hello; domain=my.domain; path=/dummyPath");
     });
@@ -351,7 +432,7 @@ describe("middleware:web-outgoing", () => {
     it("does not rewrite path", () => {
       const options = {};
 
-      webOutgoing.writeHeaders({} as any, ctx.res, ctx.proxyRes, options as any);
+      webOutgoing.writeHeaders(stubIncomingMessage(), ctx.res, ctx.proxyRes, options as any);
 
       expect(ctx.res.headers["set-cookie"]).to.contain("hello; domain=my.domain; path=/");
     });
@@ -361,7 +442,7 @@ describe("middleware:web-outgoing", () => {
         cookiePathRewrite: "",
       };
 
-      webOutgoing.writeHeaders({} as any, ctx.res, ctx.proxyRes, options as any);
+      webOutgoing.writeHeaders(stubIncomingMessage(), ctx.res, ctx.proxyRes, options as any);
 
       expect(ctx.res.headers["set-cookie"]).to.contain("hello; domain=my.domain");
     });
@@ -369,7 +450,7 @@ describe("middleware:web-outgoing", () => {
     it("does not rewrite domain", () => {
       const options = {};
 
-      webOutgoing.writeHeaders({} as any, ctx.res, ctx.proxyRes, options as any);
+      webOutgoing.writeHeaders(stubIncomingMessage(), ctx.res, ctx.proxyRes, options as any);
 
       expect(ctx.res.headers["set-cookie"]).to.contain("hello; domain=my.domain; path=/");
     });
@@ -379,7 +460,7 @@ describe("middleware:web-outgoing", () => {
         cookieDomainRewrite: "my.new.domain",
       };
 
-      webOutgoing.writeHeaders({} as any, ctx.res, ctx.proxyRes, options as any);
+      webOutgoing.writeHeaders(stubIncomingMessage(), ctx.res, ctx.proxyRes, options as any);
 
       expect(ctx.res.headers["set-cookie"]).to.contain("hello; domain=my.new.domain; path=/");
     });
@@ -389,7 +470,7 @@ describe("middleware:web-outgoing", () => {
         cookieDomainRewrite: "",
       };
 
-      webOutgoing.writeHeaders({} as any, ctx.res, ctx.proxyRes, options as any);
+      webOutgoing.writeHeaders(stubIncomingMessage(), ctx.res, ctx.proxyRes, options as any);
 
       expect(ctx.res.headers["set-cookie"]).to.contain("hello; path=/");
     });
@@ -407,7 +488,7 @@ describe("middleware:web-outgoing", () => {
         "hello-on-my.old.domain; domain=my.old.domain; path=/",
         "hello-on-my.special.domain; domain=my.special.domain; path=/",
       ];
-      webOutgoing.writeHeaders({} as any, ctx.res, ctx.proxyRes, options as any);
+      webOutgoing.writeHeaders(stubIncomingMessage(), ctx.res, ctx.proxyRes, options as any);
 
       expect(ctx.res.headers["set-cookie"]).to.contain("hello-on-my.domain; path=/");
       expect(ctx.res.headers["set-cookie"]).to.contain(
@@ -440,7 +521,7 @@ describe("middleware:web-outgoing", () => {
         "Set-Cookie",
         "hello-on-my.special.domain; domain=my.special.domain; path=/",
       ];
-      webOutgoing.writeHeaders({} as any, ctx.res, ctx.rawProxyRes, options as any);
+      webOutgoing.writeHeaders(stubIncomingMessage(), ctx.res, ctx.rawProxyRes, options as any);
 
       expect(ctx.res.headers["set-cookie"]).to.include("hello-on-my.domain; path=/");
       expect(ctx.res.headers["set-cookie"]).to.contain(
@@ -464,7 +545,12 @@ describe("middleware:web-outgoing", () => {
           headers[k.toLowerCase()] = v;
         },
       };
-      webOutgoing.writeHeaders({} as any, res as any, proxyRes as any, {} as any);
+      webOutgoing.writeHeaders(
+        stubIncomingMessage(),
+        res as any,
+        proxyRes as any,
+        stubMiddlewareOptions(),
+      );
       expect(headers.hey).to.eql("hello");
       expect(headers).to.not.have.key("undef");
     });
@@ -476,7 +562,12 @@ describe("middleware:web-outgoing", () => {
         "transfer-encoding": "hello",
       },
     };
-    webOutgoing.removeChunked({ httpVersion: "1.0" } as any, {} as any, proxyRes as any, {} as any);
+    webOutgoing.removeChunked(
+      stubIncomingMessage({ httpVersion: "1.0" }),
+      stubServerResponse(),
+      proxyRes as any,
+      stubMiddlewareOptions(),
+    );
     expect(proxyRes.headers["transfer-encoding"]).to.eql(undefined);
   });
 });

@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import * as common from "../src/_utils.ts";
+import { createOutgoing, stubIncomingMessage, stubSocket } from "./_stubs.ts";
 
 // Source: https://github.com/http-party/node-http-proxy/blob/master/test/lib-http-proxy-common-test.js
 
@@ -8,7 +9,7 @@ import * as common from "../src/_utils.ts";
 describe("lib/http-proxy/common.js", () => {
   describe("#setupOutgoing", () => {
     it("should setup the correct headers", () => {
-      const outgoing = {} as any;
+      const outgoing = createOutgoing();
       common.setupOutgoing(
         outgoing,
         {
@@ -24,11 +25,11 @@ describe("lib/http-proxy/common.js", () => {
           localAddress: "local.address",
           auth: "username:pass",
         },
-        {
+        stubIncomingMessage({
           method: "i",
           url: "am",
-          headers: { pro: "xy", overwritten: false },
-        },
+          headers: { pro: "xy", overwritten: "false" },
+        }),
       );
 
       expect(outgoing.host).to.eql("hey");
@@ -40,15 +41,15 @@ describe("lib/http-proxy/common.js", () => {
       expect(outgoing.method).to.eql("i");
       expect(outgoing.path).to.eql("/am"); // leading slash is new in httpxy
 
-      expect(outgoing.headers.pro).to.eql("xy");
-      expect(outgoing.headers.fizz).to.eql("bang");
-      expect(outgoing.headers.overwritten).to.eql(true);
+      expect(outgoing.headers!.pro).to.eql("xy");
+      expect(outgoing.headers!.fizz).to.eql("bang");
+      expect(outgoing.headers!.overwritten).to.eql(true);
       expect(outgoing.localAddress).to.eql("local.address");
       expect(outgoing.auth).to.eql("username:pass");
     });
 
     it("should not override agentless upgrade header", () => {
-      const outgoing = {} as any;
+      const outgoing = createOutgoing();
       common.setupOutgoing(
         outgoing,
         {
@@ -61,17 +62,17 @@ describe("lib/http-proxy/common.js", () => {
           },
           headers: { connection: "upgrade" },
         },
-        {
+        stubIncomingMessage({
           method: "i",
           url: "am",
-          headers: { pro: "xy", overwritten: false },
-        } as any,
+          headers: { pro: "xy", overwritten: "false" },
+        }),
       );
-      expect(outgoing.headers.connection).to.eql("upgrade");
+      expect(outgoing.headers!.connection).to.eql("upgrade");
     });
 
     it("should not override agentless connection: contains upgrade", () => {
-      const outgoing = {} as any;
+      const outgoing = createOutgoing();
       common.setupOutgoing(
         outgoing,
         {
@@ -81,21 +82,21 @@ describe("lib/http-proxy/common.js", () => {
             hostname: "how",
             socketPath: "are",
             port: "you",
-          } as any,
+          },
           headers: { connection: "keep-alive, upgrade" }, // this is what Firefox sets
         },
-        {
+        stubIncomingMessage({
           method: "i",
           url: "am",
-          headers: { pro: "xy", overwritten: false },
-        } as any,
+          headers: { pro: "xy", overwritten: "false" },
+        }),
       );
-      expect(outgoing.headers.connection).to.eql("keep-alive, upgrade");
+      expect(outgoing.headers!.connection).to.eql("keep-alive, upgrade");
     });
 
     it("should override agentless connection: contains improper upgrade", () => {
       // sanity check on upgrade regex
-      const outgoing = {} as any;
+      const outgoing = createOutgoing();
       common.setupOutgoing(
         outgoing,
         {
@@ -108,17 +109,17 @@ describe("lib/http-proxy/common.js", () => {
           },
           headers: { connection: "keep-alive, not upgrade" },
         },
-        {
+        stubIncomingMessage({
           method: "i",
           url: "am",
-          headers: { pro: "xy", overwritten: false },
-        } as any,
+          headers: { pro: "xy", overwritten: "false" },
+        }),
       );
-      expect(outgoing.headers.connection).to.eql("close");
+      expect(outgoing.headers!.connection).to.eql("close");
     });
 
     it("should override agentless non-upgrade header to close", () => {
-      const outgoing = {} as any;
+      const outgoing = createOutgoing();
       common.setupOutgoing(
         outgoing,
         {
@@ -131,25 +132,29 @@ describe("lib/http-proxy/common.js", () => {
           },
           headers: { connection: "xyz" },
         },
-        {
+        stubIncomingMessage({
           method: "i",
           url: "am",
-          headers: { pro: "xy", overwritten: false },
-        } as any,
+          headers: { pro: "xy", overwritten: "false" },
+        }),
       );
-      expect(outgoing.headers.connection).to.eql("close");
+      expect(outgoing.headers!.connection).to.eql("close");
     });
 
     it("should set the agent to false if none is given", () => {
-      const outgoing = {} as any;
-      common.setupOutgoing(outgoing, { target: "http://localhost" }, {
-        url: "/",
-      } as any);
+      const outgoing = createOutgoing();
+      common.setupOutgoing(
+        outgoing,
+        { target: "http://localhost" },
+        stubIncomingMessage({
+          url: "/",
+        }),
+      );
       expect(outgoing.agent).to.eql(false);
     });
 
     it("set the port according to the protocol", () => {
-      const outgoing = {} as any;
+      const outgoing = createOutgoing();
       common.setupOutgoing(
         outgoing,
         {
@@ -161,11 +166,11 @@ describe("lib/http-proxy/common.js", () => {
             protocol: "https:",
           },
         },
-        {
+        stubIncomingMessage({
           method: "i",
           url: "am",
           headers: { pro: "xy" },
-        } as any,
+        }),
       );
 
       expect(outgoing.host).to.eql("how");
@@ -175,31 +180,35 @@ describe("lib/http-proxy/common.js", () => {
 
       expect(outgoing.method).to.eql("i");
       expect(outgoing.path).to.eql("/am");
-      expect(outgoing.headers.pro).to.eql("xy");
+      expect(outgoing.headers!.pro).to.eql("xy");
 
       expect(outgoing.port).to.eql(443);
     });
 
     it("should keep the original target path in the outgoing path", () => {
-      const outgoing = {} as any;
-      common.setupOutgoing(outgoing, { target: URL.parse("http://localhost/some-path")! }, {
-        url: "am",
-      } as any);
+      const outgoing = createOutgoing();
+      common.setupOutgoing(
+        outgoing,
+        { target: URL.parse("http://localhost/some-path")! },
+        stubIncomingMessage({
+          url: "am",
+        }),
+      );
 
       expect(outgoing.path).to.eql("/some-path/am");
     });
 
     it("should keep the original forward path in the outgoing path", () => {
-      const outgoing = {} as any;
+      const outgoing = createOutgoing();
       common.setupOutgoing(
         outgoing,
         {
           target: "http://localhost",
           forward: URL.parse("http://localhost/some-path")!,
         },
-        {
+        stubIncomingMessage({
           url: "am",
-        } as any,
+        }),
         "forward",
       );
 
@@ -207,7 +216,7 @@ describe("lib/http-proxy/common.js", () => {
     });
 
     it("should properly detect https/wss protocol without the colon", () => {
-      const outgoing = {} as any;
+      const outgoing = createOutgoing();
       common.setupOutgoing(
         outgoing,
         {
@@ -216,63 +225,71 @@ describe("lib/http-proxy/common.js", () => {
             host: "whatever.com",
           },
         },
-        { url: "/" } as any,
+        stubIncomingMessage({ url: "/" }),
       );
 
       expect(outgoing.port).to.eql(443);
     });
 
     it("should not prepend the target path to the outgoing path with prependPath = false", () => {
-      const outgoing = {} as any;
+      const outgoing = createOutgoing();
       common.setupOutgoing(
         outgoing,
         {
           target: URL.parse("http://localhost/hellothere")!,
           prependPath: false,
         },
-        { url: "hi" } as any,
+        stubIncomingMessage({ url: "hi" }),
       );
 
       expect(outgoing.path).to.eql("/hi");
     });
 
     it("should properly join paths", () => {
-      const outgoing = {} as any;
+      const outgoing = createOutgoing();
       common.setupOutgoing(
         outgoing,
         {
           target: URL.parse("http://localhost/forward")!,
         },
-        { url: "/static/path" } as any,
+        stubIncomingMessage({ url: "/static/path" }),
       );
 
       expect(outgoing.path).to.eql("/forward/static/path");
     });
 
     it("should preserve multiple consecutive slashes in path (#80)", () => {
-      const outgoing = {} as any;
-      common.setupOutgoing(outgoing, { target: "http://localhost:3004" }, { url: "//test" } as any);
+      const outgoing = createOutgoing();
+      common.setupOutgoing(
+        outgoing,
+        { target: "http://localhost:3004" },
+        stubIncomingMessage({ url: "//test" }),
+      );
       expect(outgoing.path).to.eql("//test");
     });
 
     it("should preserve multiple consecutive slashes with query string (#80)", () => {
-      const outgoing = {} as any;
-      common.setupOutgoing(outgoing, { target: "http://localhost:3004" }, {
-        url: "//test?foo=bar",
-      } as any);
+      const outgoing = createOutgoing();
+      common.setupOutgoing(
+        outgoing,
+        { target: "http://localhost:3004" },
+        stubIncomingMessage({
+          url: "//test?foo=bar",
+        }),
+      );
       expect(outgoing.path).to.eql("//test?foo=bar");
     });
 
     it("should not modify the query string", () => {
-      const outgoing = {} as any;
+      const outgoing = createOutgoing();
       common.setupOutgoing(
         outgoing,
         {
           target: URL.parse("http://localhost/forward")!,
         },
-        {
+        stubIncomingMessage({
           url: "/?foo=bar//&target=http://foobar.com/?a=1%26b=2&other=2",
-        } as any,
+        }),
       );
 
       expect(outgoing.path).to.eql(
@@ -284,7 +301,7 @@ describe("lib/http-proxy/common.js", () => {
     // This is the proper failing test case for the common.join problem
     //
     it("should correctly format the toProxy URL", () => {
-      const outgoing = {} as any;
+      const outgoing = createOutgoing();
       const google = "https://google.com";
       common.setupOutgoing(
         outgoing,
@@ -292,14 +309,14 @@ describe("lib/http-proxy/common.js", () => {
           target: URL.parse("http://sometarget.com:80")!,
           toProxy: true,
         },
-        { url: google } as any,
+        stubIncomingMessage({ url: google }),
       );
 
       expect(outgoing.path).to.eql("/" + google);
     });
 
     it("should not replace :\\ to :\\\\ when no https word before", () => {
-      const outgoing = {} as any;
+      const outgoing = createOutgoing();
       const google = "https://google.com:/join/join.js";
       common.setupOutgoing(
         outgoing,
@@ -307,14 +324,14 @@ describe("lib/http-proxy/common.js", () => {
           target: URL.parse("http://sometarget.com:80")!,
           toProxy: true,
         },
-        { url: google } as any,
+        stubIncomingMessage({ url: google }),
       );
 
       expect(outgoing.path).to.eql("/" + google);
     });
 
     it("should not replace :\\ to \\\\ when no http word before", () => {
-      const outgoing = {} as any;
+      const outgoing = createOutgoing();
       const google = "http://google.com:/join/join.js";
       common.setupOutgoing(
         outgoing,
@@ -322,7 +339,7 @@ describe("lib/http-proxy/common.js", () => {
           target: URL.parse("http://sometarget.com:80")!,
           toProxy: true,
         },
-        { url: google } as any,
+        stubIncomingMessage({ url: google }),
       );
 
       expect(outgoing.path).to.eql("/" + google);
@@ -330,7 +347,7 @@ describe("lib/http-proxy/common.js", () => {
 
     describe("when using ignorePath", () => {
       it("should ignore the path of the `req.url` passed in but use the target path", () => {
-        const outgoing = {} as any;
+        const outgoing = createOutgoing();
         const myEndpoint = "https://whatever.com/some/crazy/path/whoooo";
         common.setupOutgoing(
           outgoing,
@@ -338,14 +355,14 @@ describe("lib/http-proxy/common.js", () => {
             target: URL.parse(myEndpoint)!,
             ignorePath: true,
           },
-          { url: "/more/crazy/pathness" } as any,
+          stubIncomingMessage({ url: "/more/crazy/pathness" }),
         );
 
         expect(outgoing.path).to.eql("/some/crazy/path/whoooo");
       });
 
       it("and prependPath: false, it should ignore path of target and incoming request", () => {
-        const outgoing = {} as any;
+        const outgoing = createOutgoing();
         const myEndpoint = "https://whatever.com/some/crazy/path/whoooo";
         common.setupOutgoing(
           outgoing,
@@ -354,7 +371,7 @@ describe("lib/http-proxy/common.js", () => {
             ignorePath: true,
             prependPath: false,
           },
-          { url: "/more/crazy/pathness" } as any,
+          stubIncomingMessage({ url: "/more/crazy/pathness" }),
         );
 
         expect(outgoing.path).to.eql("/");
@@ -363,7 +380,7 @@ describe("lib/http-proxy/common.js", () => {
 
     describe("when using changeOrigin", () => {
       it("should correctly set the port to the host when it is a non-standard port using URL.parse", () => {
-        const outgoing = {} as any;
+        const outgoing = createOutgoing();
         const myEndpoint = "https://myCouch.com:6984";
         common.setupOutgoing(
           outgoing,
@@ -371,14 +388,14 @@ describe("lib/http-proxy/common.js", () => {
             target: URL.parse(myEndpoint)!,
             changeOrigin: true,
           },
-          { url: "/" } as any,
+          stubIncomingMessage({ url: "/" }),
         );
 
-        expect(outgoing.headers.host).to.eql("mycouch.com:6984");
+        expect(outgoing.headers!.host).to.eql("mycouch.com:6984");
       });
 
       it("should correctly set the port to the host when it is a non-standard port when setting host and port manually (which ignores port)", () => {
-        const outgoing = {} as any;
+        const outgoing = createOutgoing();
         common.setupOutgoing(
           outgoing,
           {
@@ -389,14 +406,14 @@ describe("lib/http-proxy/common.js", () => {
             },
             changeOrigin: true,
           },
-          { url: "/" } as any,
+          stubIncomingMessage({ url: "/" }),
         );
-        expect(outgoing.headers.host).to.eql("mycouch.com:6984");
+        expect(outgoing.headers!.host).to.eql("mycouch.com:6984");
       });
     });
 
     it("should pass through https client parameters", () => {
-      const outgoing = {} as any;
+      const outgoing = createOutgoing();
       common.setupOutgoing(
         outgoing,
         {
@@ -415,10 +432,10 @@ describe("lib/http-proxy/common.js", () => {
             secureProtocol: "my-secure-protocol",
           },
         },
-        {
+        stubIncomingMessage({
           method: "i",
           url: "am",
-        } as any,
+        }),
       );
 
       expect(outgoing.pfx).eql("my-pfx");
@@ -431,37 +448,41 @@ describe("lib/http-proxy/common.js", () => {
     });
 
     it("should set ca from top-level options", () => {
-      const outgoing = {} as any;
+      const outgoing = createOutgoing();
       common.setupOutgoing(
         outgoing,
         {
           target: { host: "localhost", protocol: "https:" },
           ca: "my-top-level-ca",
         } as any,
-        { url: "/", headers: {} } as any,
+        stubIncomingMessage({ url: "/" }),
       );
       expect(outgoing.ca).eql("my-top-level-ca");
     });
 
     it("should handle overriding the `method` of the http request", () => {
-      const outgoing = {} as any;
+      const outgoing = createOutgoing();
       common.setupOutgoing(
         outgoing,
         {
           target: "https://whooooo.com",
           method: "POST",
         },
-        { method: "GET", url: "" } as any,
+        stubIncomingMessage({ method: "GET", url: "" }),
       );
 
       expect(outgoing.method).eql("POST");
     });
 
     it("should handle empty pathname target", () => {
-      const outgoing = {} as any;
-      common.setupOutgoing(outgoing, { target: URL.parse("http://localhost")! }, {
-        url: "",
-      } as any);
+      const outgoing = createOutgoing();
+      common.setupOutgoing(
+        outgoing,
+        { target: URL.parse("http://localhost")! },
+        stubIncomingMessage({
+          url: "",
+        }),
+      );
 
       expect(outgoing.path).toBe("/");
     });
@@ -548,7 +569,7 @@ describe("lib/http-proxy/common.js", () => {
           nodelay: false,
           keepalive: false,
         },
-        stubSocket = {
+        sock = stubSocket({
           setTimeout: function (num: number) {
             socketConfig.timeout = num;
           },
@@ -558,8 +579,8 @@ describe("lib/http-proxy/common.js", () => {
           setKeepAlive: function (bol: boolean) {
             socketConfig.keepalive = bol;
           },
-        };
-      const returnValue = common.setupSocket(stubSocket as any);
+        });
+      const returnValue = common.setupSocket(sock);
 
       expect(socketConfig.timeout).to.eql(0);
       expect(socketConfig.nodelay).to.eql(true);
