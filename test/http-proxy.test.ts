@@ -648,5 +648,58 @@ describe("http-proxy", () => {
 
       await promise;
     });
+
+    it("should not crash when client socket errors before upstream upgrade (issue #79)", async () => {
+      const { promise, resolve } = Promise.withResolvers<void>();
+
+      // Backend that delays responding to the upgrade request
+      const server = http.createServer();
+      server.on("upgrade", (_req, socket) => {
+        // Never respond — simulate a slow/hanging backend
+        socket.on("error", () => {});
+        setTimeout(() => socket.destroy(), 500);
+      });
+      const sourcePort = await listenOn(server);
+
+      const proxy = httpProxy.createProxyServer({
+        target: "ws://127.0.0.1:" + sourcePort,
+        ws: true,
+      });
+
+      // Intercept the ws stream pass to inject an error on the client socket
+      // before the upstream upgrade response arrives
+      proxy.before("ws", "", ((_req: any, socket: any) => {
+        // After the proxy sets up the upstream request but before the
+        // upgrade callback fires, simulate a client disconnect (ECONNRESET)
+        setTimeout(() => {
+          socket.destroy(new Error("read ECONNRESET"));
+        }, 50);
+      }) as any);
+
+      const proxyPort = await proxyListen(proxy);
+
+      proxy.on("error", () => {
+        // The error should be caught here, not crash the process
+        proxy.close(() => {});
+        server.close();
+        resolve();
+      });
+
+      // Use a raw TCP socket to send a WebSocket upgrade request
+      const client = net.connect(proxyPort, "127.0.0.1", () => {
+        client.write(
+          "GET / HTTP/1.1\r\n" +
+            "Host: 127.0.0.1\r\n" +
+            "Upgrade: websocket\r\n" +
+            "Connection: Upgrade\r\n" +
+            "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n" +
+            "Sec-WebSocket-Version: 13\r\n" +
+            "\r\n",
+        );
+      });
+      client.on("error", () => {});
+
+      await promise;
+    });
   });
 });

@@ -78,6 +78,11 @@ export const stream = defineProxyMiddleware<Socket>(
       socket.unshift(head);
     }
 
+    // Attach error handler early so client socket errors (e.g. ECONNRESET
+    // from an intermediary proxy timeout) are caught before the upstream
+    // upgrade response arrives. (#79)
+    socket.on("error", onSocketError);
+
     const proxyReq = (isSSL.test(options.target.protocol || "http") ? nodeHTTPS : nodeHTTP).request(
       setupOutgoing(options.ssl || {}, options, req),
     );
@@ -137,6 +142,15 @@ export const stream = defineProxyMiddleware<Socket>(
 
     proxyReq.end(); // XXX: CHECK IF THIS IS THIS CORRECT
     // return;
+
+    function onSocketError(err: Error) {
+      if (callback) {
+        callback(err, req, socket);
+      } else {
+        server.emit("error", err, req, socket);
+      }
+      proxyReq.destroy();
+    }
 
     function onOutgoingError(err: Error) {
       if (callback) {

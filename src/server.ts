@@ -87,7 +87,7 @@ export class ProxyServer<
     if (this.options.ws) {
       this._server.on("upgrade", (req, socket, head) => {
         // @ts-expect-error
-        this.ws(req, socket, head);
+        this.ws(req, socket, head).catch(() => {});
       });
     }
 
