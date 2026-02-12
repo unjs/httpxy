@@ -1,6 +1,6 @@
 {
   "name": "httpxy",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "description": "A full-featured HTTP proxy for Node.js.",
   "license": "MIT",
   "repository": "unjs/httpxy",
