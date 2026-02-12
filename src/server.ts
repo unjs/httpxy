@@ -225,7 +225,12 @@ function _createProxyFn<Type extends "web" | "ws">(type: Type, server: ProxyServ
         server,
         head,
         (error) => {
-          _reject(error);
+          if (server.listenerCount("error") > 0) {
+            server.emit("error", error, req, res);
+            _resolve();
+          } else {
+            _reject(error);
+          }
         },
       );
       // Passes can return a truthy value to halt the loop
