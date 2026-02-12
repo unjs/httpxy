@@ -2,8 +2,6 @@ import httpNative from "node:http";
 import httpsNative from "node:https";
 import net from "node:net";
 import type tls from "node:tls";
-import type { Url as LegacyURL } from "node:url";
-
 import type { ProxyServerOptions, ProxyTarget, ProxyTargetDetailed } from "./types.ts";
 
 const upgradeHeader = /(^|,)\s*upgrade\s*($|,)/i;
@@ -101,10 +99,7 @@ export function setupOutgoing(
 
   // the final path is target path + relative path requested by user:
   const target = options[forward || "target"];
-  const targetPath =
-    target && options.prependPath !== false
-      ? (target as URL).pathname || (target as LegacyURL).path || ""
-      : "";
+  const targetPath = target && options.prependPath !== false ? (target as URL).pathname || "" : "";
 
   const reqUrl = req.url || "";
   const qIdx = reqUrl.indexOf("?");

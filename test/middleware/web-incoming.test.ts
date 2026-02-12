@@ -3,7 +3,6 @@ import { describe, it, expect } from "vitest";
 import * as webPasses from "../../src/middleware/web-incoming.ts";
 import * as httpProxy from "../../src/index.ts";
 import concat from "concat-stream";
-import url from "node:url";
 import http from "node:http";
 import type { AddressInfo } from "node:net";
 
@@ -614,7 +613,7 @@ describe("#followRedirects", () => {
     const { resolve, promise } = Promise.withResolvers<void>();
 
     const source = http.createServer(function (req: any, res: any) {
-      if (url.parse(req.url).pathname === "/redirect") {
+      if (new URL(req.url, "http://localhost").pathname === "/redirect") {
         res.writeHead(200, { "Content-Type": "text/plain" });
         res.end("ok");
         return;
@@ -647,7 +646,7 @@ describe("#followRedirects", () => {
     const { resolve, promise } = Promise.withResolvers<void>();
 
     const source = http.createServer(function (req: any, res: any) {
-      if (url.parse(req.url).pathname === "/dest") {
+      if (new URL(req.url, "http://localhost").pathname === "/dest") {
         res.writeHead(200, { "Content-Type": "text/plain" });
         res.end(req.method);
         return;
@@ -686,7 +685,7 @@ describe("#followRedirects", () => {
     const postBody = "test-body-content";
 
     const source = http.createServer(function (req: any, res: any) {
-      if (url.parse(req.url).pathname === "/dest") {
+      if (new URL(req.url, "http://localhost").pathname === "/dest") {
         let body = "";
         req.on("data", (chunk: Buffer) => (body += chunk));
         req.on("end", () => {
@@ -763,7 +762,7 @@ describe("#followRedirects", () => {
     const { resolve, promise } = Promise.withResolvers<void>();
 
     const source = http.createServer(function (req: any, res: any) {
-      if (url.parse(req.url).pathname === "/sub/dest") {
+      if (new URL(req.url, "http://localhost").pathname === "/sub/dest") {
         res.writeHead(200, { "Content-Type": "text/plain" });
         res.end("ok");
         return;
@@ -797,7 +796,7 @@ describe("#followRedirects", () => {
     let proxyResCount = 0;
 
     const source = http.createServer(function (req: any, res: any) {
-      if (url.parse(req.url).pathname === "/final") {
+      if (new URL(req.url, "http://localhost").pathname === "/final") {
         res.writeHead(200, { "Content-Type": "text/plain" });
         res.end("done");
         return;

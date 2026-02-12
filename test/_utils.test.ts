@@ -182,11 +182,11 @@ describe("lib/http-proxy/common.js", () => {
 
     it("should keep the original target path in the outgoing path", () => {
       const outgoing = {} as any;
-      common.setupOutgoing(outgoing, { target: { path: "some-path" } }, {
+      common.setupOutgoing(outgoing, { target: URL.parse("http://localhost/some-path")! }, {
         url: "am",
       } as any);
 
-      expect(outgoing.path).to.eql("some-path/am");
+      expect(outgoing.path).to.eql("/some-path/am");
     });
 
     it("should keep the original forward path in the outgoing path", () => {
@@ -194,10 +194,8 @@ describe("lib/http-proxy/common.js", () => {
       common.setupOutgoing(
         outgoing,
         {
-          target: {},
-          forward: {
-            path: "some-path",
-          },
+          target: "http://localhost",
+          forward: URL.parse("http://localhost/some-path")!,
         },
         {
           url: "am",
@@ -205,7 +203,7 @@ describe("lib/http-proxy/common.js", () => {
         "forward",
       );
 
-      expect(outgoing.path).to.eql("some-path/am");
+      expect(outgoing.path).to.eql("/some-path/am");
     });
 
     it("should properly detect https/wss protocol without the colon", () => {
@@ -229,7 +227,7 @@ describe("lib/http-proxy/common.js", () => {
       common.setupOutgoing(
         outgoing,
         {
-          target: { path: "hellothere" },
+          target: URL.parse("http://localhost/hellothere")!,
           prependPath: false,
         },
         { url: "hi" } as any,
@@ -243,7 +241,7 @@ describe("lib/http-proxy/common.js", () => {
       common.setupOutgoing(
         outgoing,
         {
-          target: { path: "/forward" },
+          target: URL.parse("http://localhost/forward")!,
         },
         { url: "/static/path" } as any,
       );
@@ -270,7 +268,7 @@ describe("lib/http-proxy/common.js", () => {
       common.setupOutgoing(
         outgoing,
         {
-          target: { path: "/forward" },
+          target: URL.parse("http://localhost/forward")!,
         },
         {
           url: "/?foo=bar//&target=http://foobar.com/?a=1%26b=2&other=2",
@@ -364,7 +362,7 @@ describe("lib/http-proxy/common.js", () => {
     });
 
     describe("when using changeOrigin", () => {
-      it("should correctly set the port to the host when it is a non-standard port using url.parse", () => {
+      it("should correctly set the port to the host when it is a non-standard port using URL.parse", () => {
         const outgoing = {} as any;
         const myEndpoint = "https://myCouch.com:6984";
         common.setupOutgoing(
@@ -459,14 +457,13 @@ describe("lib/http-proxy/common.js", () => {
       expect(outgoing.method).eql("POST");
     });
 
-    // url.parse('').path => null
-    it("should not pass null as last arg to #urlJoin", () => {
+    it("should handle empty pathname target", () => {
       const outgoing = {} as any;
-      common.setupOutgoing(outgoing, { target: { path: "" } }, {
+      common.setupOutgoing(outgoing, { target: URL.parse("http://localhost")! }, {
         url: "",
       } as any);
 
-      expect(outgoing.path).toBe("/"); // leading slash is new in httpxy
+      expect(outgoing.path).toBe("/");
     });
   });
 

@@ -149,11 +149,11 @@ pnpm test                         # Lint + typecheck + tests with coverage
 ## Key Types
 
 ```ts
-type ProxyTarget = string | URL | Partial<LegacyURL> | ProxyTargetDetailed;
+type ProxyTarget = string | URL | ProxyTargetDetailed;
 
 interface ProxyTargetDetailed {
-  host: string;
-  port: number;
+  host?: string;
+  port?: number | string;
   protocol?: string;
   hostname?: string;
   socketPath?: string;
@@ -162,7 +162,7 @@ interface ProxyTargetDetailed {
 
 interface ProxyServerOptions {
   target?: ProxyTarget; // Proxy destination
-  forward?: ProxyTarget; // Forward destination (fires & forget)
+  forward?: ProxyTarget; // Forward destination
   ws?: boolean; // Enable WebSocket proxying
   xfwd?: boolean; // Add x-forwarded-* headers
   changeOrigin?: boolean; // Rewrite Host header to target

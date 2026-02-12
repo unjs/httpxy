@@ -1,9 +1,8 @@
 import type * as stream from "node:stream";
-import type { Url as LegacyURL } from "node:url";
 
 export interface ProxyTargetDetailed {
-  host: string;
-  port: number;
+  host?: string;
+  port?: number | string;
   protocol?: string;
   hostname?: string;
   socketPath?: string;
@@ -16,13 +15,13 @@ export interface ProxyTargetDetailed {
   secureProtocol?: string;
 }
 
-export type ProxyTarget = string | URL | Partial<LegacyURL> | ProxyTargetDetailed;
+export type ProxyTarget = string | URL | ProxyTargetDetailed;
 
 export interface ProxyServerOptions {
   /** URL string to be parsed. */
   target?: ProxyTarget;
   /** URL string to be parsed. */
-  forward?: Exclude<ProxyTarget, ProxyTargetDetailed>;
+  forward?: ProxyTarget;
   /** Object to be passed to http(s).request. */
   agent?: any;
   /** Object to be passed to https.createServer(). */
