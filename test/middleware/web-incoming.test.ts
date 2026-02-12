@@ -453,7 +453,7 @@ describe("#createProxyServer.web() using own http server", () => {
     }
 
     const proxyServer = http.createServer(requestHandler);
-    const [proxyPort] = await Promise.all([listenOn(proxyServer)]);
+    const proxyPort = await listenOn(proxyServer);
 
     http
       .get(`http://127.0.0.1:${proxyPort}`, function (res) {
