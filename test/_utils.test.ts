@@ -4,7 +4,6 @@ import * as common from "../src/_utils.ts";
 // Source: https://github.com/http-party/node-http-proxy/blob/master/test/lib-http-proxy-common-test.js
 
 // Difference from http-proxy is that we always ensure leading slash on path
-// TODO: Couple of tests (wrongly?) failing and marked as todo
 
 describe("lib/http-proxy/common.js", () => {
   describe("#setupOutgoing", () => {
@@ -272,7 +271,7 @@ describe("lib/http-proxy/common.js", () => {
     //
     // This is the proper failing test case for the common.join problem
     //
-    it.todo("should correctly format the toProxy URL", () => {
+    it("should correctly format the toProxy URL", () => {
       const outgoing = {} as any;
       const google = "https://google.com";
       common.setupOutgoing(
@@ -287,8 +286,7 @@ describe("lib/http-proxy/common.js", () => {
       expect(outgoing.path).to.eql("/" + google);
     });
 
-    // eslint-disable-next-line no-useless-escape
-    it.todo("should not replace :\ to :\\ when no https word before", () => {
+    it("should not replace :\\ to :\\\\ when no https word before", () => {
       const outgoing = {} as any;
       const google = "https://google.com:/join/join.js";
       common.setupOutgoing(
@@ -303,8 +301,7 @@ describe("lib/http-proxy/common.js", () => {
       expect(outgoing.path).to.eql("/" + google);
     });
 
-    // eslint-disable-next-line no-useless-escape
-    it.todo("should not replace :\ to :\\ when no http word before", () => {
+    it("should not replace :\\ to \\\\ when no http word before", () => {
       const outgoing = {} as any;
       const google = "http://google.com:/join/join.js";
       common.setupOutgoing(
