@@ -418,6 +418,19 @@ describe("lib/http-proxy/common.js", () => {
       expect(outgoing.secureProtocol).eql("my-secure-protocol");
     });
 
+    it("should set ca from top-level options", () => {
+      const outgoing = {} as any;
+      common.setupOutgoing(
+        outgoing,
+        {
+          target: { host: "localhost", protocol: "https:" },
+          ca: "my-top-level-ca",
+        } as any,
+        { url: "/", headers: {} } as any,
+      );
+      expect(outgoing.ca).eql("my-top-level-ca");
+    });
+
     it("should handle overriding the `method` of the http request", () => {
       const outgoing = {} as any;
       common.setupOutgoing(
@@ -440,6 +453,80 @@ describe("lib/http-proxy/common.js", () => {
       } as any);
 
       expect(outgoing.path).toBe("/"); // leading slash is new in httpxy
+    });
+  });
+
+  describe("#joinURL", () => {
+    it("should insert slash when base has no trailing slash and path has no leading slash", () => {
+      expect(common.joinURL("foo", "bar")).to.eql("foo/bar");
+    });
+
+    it("should return path when base is undefined", () => {
+      expect(common.joinURL(undefined, "/path")).to.eql("/path");
+    });
+
+    it("should return base when path is undefined", () => {
+      expect(common.joinURL("/base", undefined)).to.eql("/base");
+    });
+
+    it("should return / when both are undefined", () => {
+      expect(common.joinURL(undefined, undefined)).to.eql("/");
+    });
+
+    it("should strip duplicate slash when both have slash", () => {
+      expect(common.joinURL("/base/", "/path")).to.eql("/base/path");
+    });
+
+    it("should concat when base has trailing slash and path has no leading slash", () => {
+      expect(common.joinURL("/base/", "path")).to.eql("/base/path");
+    });
+  });
+
+  describe("#rewriteCookieProperty", () => {
+    it("should return original cookie when domain is not in config and no wildcard", () => {
+      const cookie = "hello; domain=other.com; path=/";
+      const result = common.rewriteCookieProperty(cookie, { "specific.com": "new.com" }, "domain");
+      expect(result).to.eql("hello; domain=other.com; path=/");
+    });
+  });
+
+  describe("#requiresPort", () => {
+    it("should return false for ftp on port 21", () => {
+      expect(common.requiresPort(21, "ftp")).to.eql(false);
+    });
+
+    it("should return true for ftp on non-standard port", () => {
+      expect(common.requiresPort(8021, "ftp")).to.eql(true);
+    });
+
+    it("should return false for gopher on port 70", () => {
+      expect(common.requiresPort(70, "gopher")).to.eql(false);
+    });
+
+    it("should return true for gopher on non-standard port", () => {
+      expect(common.requiresPort(8070, "gopher")).to.eql(true);
+    });
+
+    it("should return false for file protocol", () => {
+      expect(common.requiresPort(0, "file")).to.eql(false);
+      expect(common.requiresPort(8080, "file")).to.eql(false);
+    });
+
+    it("should return false for unknown protocol on port 0", () => {
+      expect(common.requiresPort(0, "unknown")).to.eql(false);
+    });
+
+    it("should return true for unknown protocol on non-zero port", () => {
+      expect(common.requiresPort(8080, "unknown")).to.eql(true);
+    });
+
+    it("should return false when port is falsy", () => {
+      expect(common.requiresPort(0, "http")).to.eql(false);
+    });
+
+    it("should handle protocol with colon", () => {
+      expect(common.requiresPort(80, "http:")).to.eql(false);
+      expect(common.requiresPort(8080, "http:")).to.eql(true);
     });
   });
 

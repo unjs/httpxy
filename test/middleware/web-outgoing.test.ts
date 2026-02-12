@@ -259,6 +259,30 @@ describe("middleware:web-outgoing", () => {
 
       webOutgoing.writeStatusCode({} as any, res as any, { statusCode: 200 } as any, {} as any);
     });
+
+    it("should write status code with statusMessage", () => {
+      const res = {} as any;
+      webOutgoing.writeStatusCode(
+        {} as any,
+        res,
+        { statusCode: 404, statusMessage: "Not Found" } as any,
+        {} as any,
+      );
+      expect(res.statusCode).to.eql(404);
+      expect(res.statusMessage).to.eql("Not Found");
+    });
+
+    it("should write status code without statusMessage", () => {
+      const res = {} as any;
+      webOutgoing.writeStatusCode(
+        {} as any,
+        res,
+        { statusCode: 200 } as any,
+        {} as any,
+      );
+      expect(res.statusCode).to.eql(200);
+      expect(res.statusMessage).to.eql(undefined);
+    });
   });
 
   describe("#writeHeaders", () => {
@@ -430,6 +454,24 @@ describe("middleware:web-outgoing", () => {
       expect(ctx.res.headers["set-cookie"]).to.contain(
         "hello-on-my.special.domain; domain=my.special.domain; path=/",
       );
+    });
+
+    it("skips undefined header values", () => {
+      const proxyRes = {
+        headers: {
+          hey: "hello",
+          undef: undefined,
+        },
+      };
+      const headers: any = {};
+      const res = {
+        setHeader: function (k: string, v: string) {
+          headers[k.toLowerCase()] = v;
+        },
+      };
+      webOutgoing.writeHeaders({} as any, res as any, proxyRes as any, {} as any);
+      expect(headers.hey).to.eql("hello");
+      expect(headers).to.not.have.key("undef");
     });
   });
 
