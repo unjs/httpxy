@@ -37,7 +37,7 @@
     "@types/semver": "^7.7.1",
     "@types/sse": "^0.0.0",
     "@types/ws": "^8.18.1",
-    "@typescript/native-preview": "^7.0.0-dev.20260212.1",
+    "@typescript/native-preview": "^7.0.0-dev.20260215.1",
     "@vitest/coverage-v8": "^4.0.18",
     "async": "^3.2.6",
     "changelogen": "^0.6.2",
