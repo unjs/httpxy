@@ -598,7 +598,7 @@ describe("lib/http-proxy/common.js", () => {
     });
 
     it("should throw for ProxyAddr missing port and socketPath", () => {
-      expect(() => common.parseAddr({} as any)).to.toThrowError(
+      expect(() => common.parseAddr({} as any)).toThrowError(
         /ProxyAddr must have either `port` or `socketPath`/,
       );
     });
