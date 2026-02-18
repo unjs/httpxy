@@ -1,5 +1,6 @@
-import { createServer, type Server } from "node:http";
-import { connect, type AddressInfo, type Socket } from "node:net";
+import { createServer, type Server, type IncomingMessage } from "node:http";
+import { Duplex } from "node:stream";
+import { connect, type AddressInfo } from "node:net";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import * as ws from "ws";
 
@@ -55,58 +56,53 @@ async function listenServer(server: Server): Promise<number> {
   return (server.address() as AddressInfo).port;
 }
 
+function makeDummySocket() {
+  return new Duplex({ read() {}, write(_c, _e, cb) { cb(); } });
+}
+
+function wsUpgradeRequest(port: number): string {
+  return (
+    "GET / HTTP/1.1\r\n" +
+    `Host: 127.0.0.1:${port}\r\n` +
+    "Upgrade: websocket\r\n" +
+    "Connection: Upgrade\r\n" +
+    "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n" +
+    "Sec-WebSocket-Version: 13\r\n" +
+    "\r\n"
+  );
+}
+
+async function createTargetServer(
+  onUpgrade?: (req: IncomingMessage, socket: Duplex, head: Buffer) => void,
+): Promise<{ server: Server; port: number }> {
+  const server = createServer();
+  if (onUpgrade) server.on("upgrade", onUpgrade);
+  const port = await listenServer(server);
+  return { server, port };
+}
+
 // --- Tests ---
 
 describe("proxyUpgrade", () => {
   describe("validate ws upgrade request", () => {
     it("rejects non-GET method", async () => {
-      const { Duplex } = await import("node:stream");
-      const socket = new Duplex({ read() {}, write(_c, _e, cb) { cb(); } });
-
-      const req = {
-        method: "POST",
-        headers: { upgrade: "websocket" },
-        socket: { remoteAddress: "127.0.0.1" },
-      } as any;
-
-      await expect(
-        proxyUpgrade({ host: "127.0.0.1", port: 1 }, req, socket),
-      ).rejects.toThrow("Not a valid WebSocket upgrade request");
-
+      const socket = makeDummySocket();
+      const req = { method: "POST", headers: { upgrade: "websocket" }, socket: { remoteAddress: "127.0.0.1" } } as any;
+      await expect(proxyUpgrade({ host: "127.0.0.1", port: 1 }, req, socket)).rejects.toThrow("Not a valid WebSocket upgrade request");
       expect(socket.destroyed).toBe(true);
     });
 
     it("rejects missing upgrade header", async () => {
-      const { Duplex } = await import("node:stream");
-      const socket = new Duplex({ read() {}, write(_c, _e, cb) { cb(); } });
-
-      const req = {
-        method: "GET",
-        headers: {},
-        socket: { remoteAddress: "127.0.0.1" },
-      } as any;
-
-      await expect(
-        proxyUpgrade({ host: "127.0.0.1", port: 1 }, req, socket),
-      ).rejects.toThrow("Not a valid WebSocket upgrade request");
-
+      const socket = makeDummySocket();
+      const req = { method: "GET", headers: {}, socket: { remoteAddress: "127.0.0.1" } } as any;
+      await expect(proxyUpgrade({ host: "127.0.0.1", port: 1 }, req, socket)).rejects.toThrow("Not a valid WebSocket upgrade request");
       expect(socket.destroyed).toBe(true);
     });
 
     it("rejects non-websocket upgrade header", async () => {
-      const { Duplex } = await import("node:stream");
-      const socket = new Duplex({ read() {}, write(_c, _e, cb) { cb(); } });
-
-      const req = {
-        method: "GET",
-        headers: { upgrade: "h2c" },
-        socket: { remoteAddress: "127.0.0.1" },
-      } as any;
-
-      await expect(
-        proxyUpgrade({ host: "127.0.0.1", port: 1 }, req, socket),
-      ).rejects.toThrow("Not a valid WebSocket upgrade request");
-
+      const socket = makeDummySocket();
+      const req = { method: "GET", headers: { upgrade: "h2c" }, socket: { remoteAddress: "127.0.0.1" } } as any;
+      await expect(proxyUpgrade({ host: "127.0.0.1", port: 1 }, req, socket)).rejects.toThrow("Not a valid WebSocket upgrade request");
       expect(socket.destroyed).toBe(true);
     });
   });
@@ -174,8 +170,7 @@ describe("proxyUpgrade", () => {
   });
 
   it("should add x-forwarded headers when xfwd is set", async () => {
-    // Create a target that echoes upgrade request headers
-    const targetServer = createServer();
+    const { server: targetServer, port: targetPort } = await createTargetServer();
     const targetWs = new ws.WebSocketServer({ server: targetServer });
 
     targetWs.on("connection", (socket, req) => {
@@ -187,9 +182,6 @@ describe("proxyUpgrade", () => {
         }),
       );
     });
-
-    await new Promise<void>((r) => targetServer.listen(0, "127.0.0.1", r));
-    const targetPort = (targetServer.address() as AddressInfo).port;
 
     const proxy = createProxyServer({ host: "127.0.0.1", port: targetPort }, { xfwd: true });
     const proxyPort = await listenServer(proxy);
@@ -213,13 +205,8 @@ describe("proxyUpgrade", () => {
 
   it("should reject when upstream responds without upgrading", async () => {
     // Target is a plain HTTP server that never upgrades — just returns 404
-    const targetServer = createServer((_req, res) => {
-      res.writeHead(404);
-      res.end("Not Found");
-    });
-
-    await new Promise<void>((r) => targetServer.listen(0, "127.0.0.1", r));
-    const targetPort = (targetServer.address() as AddressInfo).port;
+    const targetServer = createServer((_req, res) => { res.writeHead(404); res.end("Not Found"); });
+    const targetPort = await listenServer(targetServer);
 
     const server = createServer();
     const { promise, resolve } = Promise.withResolvers<void>();
@@ -247,12 +234,7 @@ describe("proxyUpgrade", () => {
   }, 5000);
 
   it("should not emit undefined header values", async () => {
-    // Create a target server that responds to upgrade with headers containing undefined
-    const targetServer = createServer();
-
-    targetServer.on("upgrade", (req, socket) => {
-      // Manually craft a 101 response with a header that has no value
-      // to simulate an upstream that sends sec-websocket-protocol without a value
+    const { server: targetServer, port: targetPort } = await createTargetServer((req, socket) => {
       socket.write(
         "HTTP/1.1 101 Switching Protocols\r\n" +
           "Upgrade: websocket\r\n" +
@@ -260,32 +242,16 @@ describe("proxyUpgrade", () => {
           "Sec-WebSocket-Accept: s3pPLMBiTxaQ9kYGzzhZRbK+xOo=\r\n" +
           "\r\n",
       );
-      // Keep socket open for piping
       req.socket.pipe(socket).pipe(req.socket);
     });
-
-    await new Promise<void>((r) => targetServer.listen(0, "127.0.0.1", r));
-    const targetPort = (targetServer.address() as AddressInfo).port;
 
     const proxy = createProxyServer({ host: "127.0.0.1", port: targetPort });
     const proxyPort = await listenServer(proxy);
 
     const { promise, resolve } = Promise.withResolvers<void>();
 
-    // Use raw net connection to inspect the raw upgrade response bytes
-    const net = await import("node:net");
-    const sock = net.connect(proxyPort, "127.0.0.1", () => {
-      sock.write(
-        "GET / HTTP/1.1\r\n" +
-          "Host: 127.0.0.1:" +
-          proxyPort +
-          "\r\n" +
-          "Upgrade: websocket\r\n" +
-          "Connection: Upgrade\r\n" +
-          "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n" +
-          "Sec-WebSocket-Version: 13\r\n" +
-          "\r\n",
-      );
+    const sock = connect(proxyPort, "127.0.0.1", () => {
+      sock.write(wsUpgradeRequest(proxyPort));
     });
 
     sock.on("data", (data) => {
@@ -301,9 +267,7 @@ describe("proxyUpgrade", () => {
   });
 
   it("should preserve multiple set-cookie headers in upgrade response", async () => {
-    const targetServer = createServer();
-
-    targetServer.on("upgrade", (req, socket) => {
+    const { server: targetServer, port: targetPort } = await createTargetServer((req, socket) => {
       socket.write(
         "HTTP/1.1 101 Switching Protocols\r\n" +
           "Upgrade: websocket\r\n" +
@@ -317,24 +281,13 @@ describe("proxyUpgrade", () => {
       req.socket.pipe(socket).pipe(req.socket);
     });
 
-    await new Promise<void>((r) => targetServer.listen(0, "127.0.0.1", r));
-    const targetPort = (targetServer.address() as AddressInfo).port;
-
     const proxy = createProxyServer({ host: "127.0.0.1", port: targetPort });
     const proxyPort = await listenServer(proxy);
 
     const { promise, resolve } = Promise.withResolvers<void>();
 
     const sock = connect(proxyPort, "127.0.0.1", () => {
-      sock.write(
-        "GET / HTTP/1.1\r\n" +
-          `Host: 127.0.0.1:${proxyPort}\r\n` +
-          "Upgrade: websocket\r\n" +
-          "Connection: Upgrade\r\n" +
-          "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n" +
-          "Sec-WebSocket-Version: 13\r\n" +
-          "\r\n",
-      );
+      sock.write(wsUpgradeRequest(proxyPort));
     });
 
     sock.on("data", (data) => {
@@ -381,12 +334,10 @@ describe("proxyUpgrade", () => {
   });
 
   it("should forward non-empty head buffer to upstream", async () => {
-    // Raw target that captures all data received after the upgrade handshake
-    const targetServer = createServer();
     const received: Buffer[] = [];
     const { promise, resolve } = Promise.withResolvers<void>();
 
-    targetServer.on("upgrade", (_req, socket) => {
+    const { server: targetServer, port: targetPort } = await createTargetServer((_req, socket) => {
       socket.write(
         "HTTP/1.1 101 Switching Protocols\r\n" +
           "Upgrade: websocket\r\n" +
@@ -395,7 +346,6 @@ describe("proxyUpgrade", () => {
       );
       socket.on("data", (chunk: Buffer) => {
         received.push(Buffer.from(chunk));
-        // Give a small delay for all data to arrive, then close
         setTimeout(() => socket.destroy(), 20);
       });
       socket.on("close", () => {
@@ -404,9 +354,6 @@ describe("proxyUpgrade", () => {
         resolve();
       });
     });
-
-    await new Promise<void>((r) => targetServer.listen(0, "127.0.0.1", r));
-    const targetPort = (targetServer.address() as AddressInfo).port;
 
     // Proxy server that injects a non-empty head buffer
     const server = createServer();
@@ -420,17 +367,8 @@ describe("proxyUpgrade", () => {
 
     const port = await listenServer(server);
 
-    // Raw client — send upgrade request, then immediately close writable side
     const sock = connect(port, "127.0.0.1", () => {
-      sock.end(
-        "GET / HTTP/1.1\r\n" +
-          `Host: 127.0.0.1:${port}\r\n` +
-          "Upgrade: websocket\r\n" +
-          "Connection: Upgrade\r\n" +
-          "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n" +
-          "Sec-WebSocket-Version: 13\r\n" +
-          "\r\n",
-      );
+      sock.end(wsUpgradeRequest(port));
     });
 
     sock.on("error", () => {});
@@ -442,14 +380,9 @@ describe("proxyUpgrade", () => {
 
   describe("disconnect scenarios", () => {
     it("client socket error before upgrade rejects and destroys proxy request", async () => {
-      // Slow target: never completes the upgrade
-      const targetServer = createServer();
-      targetServer.on("upgrade", () => {
+      const { server: targetServer, port: targetPort } = await createTargetServer(() => {
         // Intentionally hang — never respond
       });
-
-      await new Promise<void>((r) => targetServer.listen(0, "127.0.0.1", r));
-      const targetPort = (targetServer.address() as AddressInfo).port;
 
       const { promise, resolve } = Promise.withResolvers<void>();
       const server = createServer();
@@ -490,21 +423,15 @@ describe("proxyUpgrade", () => {
     });
 
     it("client disconnect before upgrade rejects the promise", async () => {
-      // Slow target: waits before completing the WS handshake
-      const targetServer = createServer();
       const targetWs = new ws.WebSocketServer({ noServer: true });
 
-      targetServer.on("upgrade", (req, socket, head) => {
-        // Delay the upgrade to give the client time to disconnect
+      const { server: targetServer, port: targetPort } = await createTargetServer((req, socket, head) => {
         setTimeout(() => {
-          targetWs.handleUpgrade(req, socket, head, (client) => {
+          targetWs.handleUpgrade(req, socket as any, head, (client) => {
             targetWs.emit("connection", client, req);
           });
         }, 200);
       });
-
-      await new Promise<void>((r) => targetServer.listen(0, "127.0.0.1", r));
-      const targetPort = (targetServer.address() as AddressInfo).port;
 
       const { promise, resolve } = Promise.withResolvers<void>();
       const server = createServer();
@@ -522,18 +449,8 @@ describe("proxyUpgrade", () => {
 
       const port = await listenServer(server);
 
-      // Use a raw socket so we can destroy it mid-handshake
       const sock = connect(port, "127.0.0.1", () => {
-        sock.write(
-          "GET / HTTP/1.1\r\n" +
-            `Host: 127.0.0.1:${port}\r\n` +
-            "Upgrade: websocket\r\n" +
-            "Connection: Upgrade\r\n" +
-            "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n" +
-            "Sec-WebSocket-Version: 13\r\n" +
-            "\r\n",
-        );
-        // Destroy before the upstream can complete the upgrade
+        sock.write(wsUpgradeRequest(port));
         setTimeout(() => sock.destroy(), 50);
       });
 
@@ -544,20 +461,14 @@ describe("proxyUpgrade", () => {
     });
 
     it("client disconnect after upgrade ends the upstream socket", async () => {
-      const targetServer = createServer();
+      const { server: targetServer, port: targetPort } = await createTargetServer();
       const targetWs = new ws.WebSocketServer({ server: targetServer });
 
       const { promise, resolve } = Promise.withResolvers<void>();
 
       targetWs.on("connection", (socket) => {
-        socket.on("close", () => {
-          // Upstream sees the close after client disconnects
-          resolve();
-        });
+        socket.on("close", () => resolve());
       });
-
-      await new Promise<void>((r) => targetServer.listen(0, "127.0.0.1", r));
-      const targetPort = (targetServer.address() as AddressInfo).port;
 
       const proxy = createProxyServer({ host: "127.0.0.1", port: targetPort });
       const proxyPort = await listenServer(proxy);
@@ -576,13 +487,10 @@ describe("proxyUpgrade", () => {
     });
 
     it("client socket error after upgrade ends the upstream proxy socket", async () => {
-      const targetServer = createServer();
+      const { server: targetServer, port: targetPort } = await createTargetServer();
       const targetWs = new ws.WebSocketServer({ server: targetServer });
 
       const { promise, resolve } = Promise.withResolvers<void>();
-
-      await new Promise<void>((r) => targetServer.listen(0, "127.0.0.1", r));
-      const targetPort = (targetServer.address() as AddressInfo).port;
 
       const server = createServer();
 
@@ -614,14 +522,9 @@ describe("proxyUpgrade", () => {
     });
 
     it("server disconnect during upgrade rejects the promise", async () => {
-      // Target server that immediately destroys the socket on upgrade
-      const targetServer = createServer();
-      targetServer.on("upgrade", (_req, socket) => {
+      const { server: targetServer, port: targetPort } = await createTargetServer((_req, socket) => {
         socket.destroy();
       });
-
-      await new Promise<void>((r) => targetServer.listen(0, "127.0.0.1", r));
-      const targetPort = (targetServer.address() as AddressInfo).port;
 
       const { promise, resolve } = Promise.withResolvers<void>();
       const server = createServer();
@@ -649,16 +552,12 @@ describe("proxyUpgrade", () => {
     });
 
     it("server disconnect after upgrade ends the client socket", async () => {
-      const targetServer = createServer();
+      const { server: targetServer, port: targetPort } = await createTargetServer();
       const targetWs = new ws.WebSocketServer({ server: targetServer });
 
       targetWs.on("connection", (socket) => {
-        // Once connected, forcefully terminate the server-side socket
         setTimeout(() => socket.terminate(), 50);
       });
-
-      await new Promise<void>((r) => targetServer.listen(0, "127.0.0.1", r));
-      const targetPort = (targetServer.address() as AddressInfo).port;
 
       const proxy = createProxyServer({ host: "127.0.0.1", port: targetPort });
       const proxyPort = await listenServer(proxy);
