@@ -43,6 +43,37 @@ const res5 = await proxyFetch("http://127.0.0.1:3000", "http://example.com/api/d
 
 It accepts the same `input` and `init` arguments as the global `fetch`, including `Request` objects and streaming bodies, and returns a standard `Response`. Redirects are handled manually by default.
 
+## Proxy Upgrade
+
+`proxyUpgrade` is a standalone WebSocket upgrade proxy. It forwards `upgrade` requests to a target server without needing a `ProxyServer` instance — the WebSocket counterpart to `proxyFetch`.
+
+```ts
+import { createServer } from "node:http";
+import { proxyUpgrade } from "httpxy";
+
+const server = createServer((req, res) => {
+  // Handle regular HTTP requests...
+});
+
+server.on("upgrade", (req, socket, head) => {
+  proxyUpgrade("http://127.0.0.1:8080", req, socket, head);
+});
+
+server.listen(3000);
+```
+
+It accepts the same `addr` formats as `proxyFetch` (`"http://host:port"`, `"unix:/path"`, or `{ host, port }` / `{ socketPath }`), and returns a `Promise<Socket>` that resolves with the upstream proxy socket once the WebSocket connection is established.
+
+```ts
+// With options
+server.on("upgrade", (req, socket, head) => {
+  proxyUpgrade({ host: "127.0.0.1", port: 8080 }, req, socket, head, {
+    // changeOrigin: true, // rewrite Host header
+    // xfwd: false, // disable x-forwarded-* headers (enabled by default)
+  });
+});
+```
+
 ## Proxy Server
 
 > [!NOTE]

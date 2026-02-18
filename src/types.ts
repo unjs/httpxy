@@ -17,6 +17,11 @@ export interface ProxyTargetDetailed {
 
 export type ProxyTarget = string | URL | ProxyTargetDetailed;
 
+/** Resolved proxy address — either TCP (host + port) or Unix socket. */
+export type ProxyAddr =
+  | { host?: string; port: number; socketPath?: undefined }
+  | { host?: undefined; port?: undefined; socketPath: string };
+
 export interface ProxyServerOptions {
   /** URL string to be parsed. */
   target?: ProxyTarget;

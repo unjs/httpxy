@@ -562,6 +562,48 @@ describe("lib/http-proxy/common.js", () => {
     });
   });
 
+  describe("#parseAddr", () => {
+    it("should default to port 80 for http", () => {
+      expect(common.parseAddr("http://localhost")).to.eql({ host: "localhost", port: 80 });
+    });
+
+    it("should default to port 443 for https", () => {
+      expect(common.parseAddr("https://localhost")).to.eql({ host: "localhost", port: 443 });
+    });
+
+    it("should default to port 443 for wss", () => {
+      expect(common.parseAddr("wss://localhost")).to.eql({ host: "localhost", port: 443 });
+    });
+
+    it("should default to port 80 for ws", () => {
+      expect(common.parseAddr("ws://localhost")).to.eql({ host: "localhost", port: 80 });
+    });
+
+    it("should use explicit port over protocol default", () => {
+      expect(common.parseAddr("https://localhost:8443")).to.eql({ host: "localhost", port: 8443 });
+    });
+
+    it("should parse unix socket path", () => {
+      expect(common.parseAddr("unix:/tmp/sock")).to.eql({ socketPath: "/tmp/sock" });
+    });
+
+    it("should pass through a valid ProxyAddr with port", () => {
+      const addr = { host: "127.0.0.1", port: 3000 };
+      expect(common.parseAddr(addr)).to.eql(addr);
+    });
+
+    it("should pass through a valid ProxyAddr with socketPath", () => {
+      const addr = { socketPath: "/tmp/proxy.sock" };
+      expect(common.parseAddr(addr)).to.eql(addr);
+    });
+
+    it("should throw for ProxyAddr missing port and socketPath", () => {
+      expect(() => common.parseAddr({} as any)).toThrowError(
+        /ProxyAddr must have either `port` or `socketPath`/,
+      );
+    });
+  });
+
   describe("#setupSocket", () => {
     it("should setup a socket", () => {
       const socketConfig = {
