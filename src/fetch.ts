@@ -1,6 +1,8 @@
 import type { IncomingMessage, RequestOptions } from "node:http";
 import { request as httpRequest } from "node:http";
 import { Readable } from "node:stream";
+import type { ProxyAddr } from "./types.ts";
+import { parseAddr } from "./_utils.ts";
 
 /**
  * Proxy a request to a specific server address (TCP host/port or Unix socket)
@@ -13,11 +15,11 @@ import { Readable } from "node:stream";
  * @param inputInit - Optional {@link RequestInit} or {@link Request} to override method, headers, and body.
  */
 export async function proxyFetch(
-  addr: string | { port?: number; host?: string; socketPath?: string },
+  addr: string | ProxyAddr,
   input: string | URL | Request,
   inputInit?: RequestInit | Request,
 ) {
-  const resolvedAddr = typeof addr === "string" ? parseAddr(addr) : addr;
+  const resolvedAddr = parseAddr(addr);
 
   let url: URL;
   let init: RequestInit | undefined;
@@ -98,17 +100,6 @@ export async function proxyFetch(
     statusText: res.statusMessage,
     headers,
   });
-}
-
-function parseAddr(addr: string): { port?: number; host?: string; socketPath?: string } {
-  if (addr.startsWith("unix:")) {
-    return { socketPath: addr.slice(5) };
-  }
-  const url = new URL(addr);
-  return {
-    host: url.hostname,
-    port: url.port ? Number(url.port) : undefined,
-  };
 }
 
 function toInit(init?: RequestInit | Request): RequestInit | undefined {

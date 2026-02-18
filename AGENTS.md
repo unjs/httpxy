@@ -2,10 +2,11 @@
 
 Full-featured HTTP/WebSocket proxy for Node.js. Zero production dependencies. Originally forked from [http-party/node-http-proxy](https://github.com/http-party/node-http-proxy).
 
-## Dual API
+## API
 
 - **`createProxyServer(opts)`** / **`ProxyServer`** — Traditional event-driven proxy server with middleware pipeline
 - **`proxyFetch(addr, input, init?)`** — Web-standard `Request`/`Response` interface for proxying individual requests
+- **`proxyUpgrade(addr, req, socket, head?, opts?)`** — Standalone WebSocket upgrade proxy without a `ProxyServer` instance
 
 ## Source Architecture (`src/`)
 
@@ -15,6 +16,7 @@ src/
 ├── types.ts              — ProxyTarget, ProxyServerOptions, ProxyTargetDetailed
 ├── server.ts             — ProxyServer class (EventEmitter), createProxyServer()
 ├── fetch.ts              — proxyFetch() using Node.js http module → Web Response
+├── upgrade.ts            — proxyUpgrade() standalone WebSocket upgrade proxy
 ├── _utils.ts             — setupOutgoing(), setupSocket(), joinURL(), cookie/header helpers
 └── middleware/
     ├── _utils.ts          — Middleware type definitions (ProxyMiddleware, ProxyOutgoingMiddleware)
@@ -41,6 +43,13 @@ Target upgrade → bidirectional socket pipe
 
 ```
 proxyFetch(addr, request) → http.request to addr → Web Response
+```
+
+### Request flow (proxyUpgrade)
+
+```
+proxyUpgrade(addr, req, socket, head) → http.request to addr → upgrade → bidirectional socket pipe
+Returns Promise<Socket> (the upstream proxy socket)
 ```
 
 ### Key design patterns
@@ -105,12 +114,23 @@ proxyFetch(addr, request) → http.request to addr → Web Response
 - Response body is `null` for `204` and `304`.
 - Network and request-body-stream errors reject the Promise.
 
+### `proxyUpgrade` semantics
+
+- Standalone WebSocket upgrade proxy — no `ProxyServer` instance or `EventEmitter` needed.
+- `addr` accepts same formats as `proxyFetch`: `http://host:port`, `ws://host:port`, `unix:/path`, or object `{ host, port }` / `{ socketPath }`.
+- Validates that the request is a valid WS upgrade (`GET` + `upgrade: websocket`); rejects with error and destroys socket otherwise.
+- Supports `xfwd`, `changeOrigin`, `headers`, `ssl`, `secure`, `agent`, `auth`, `prependPath`, `ignorePath`, `toProxy` options via `ProxyUpgradeOptions`.
+- Returns `Promise<Socket>` — resolves with the upstream proxy socket on successful upgrade, rejects on connection or socket error.
+- If the upstream responds without upgrading (e.g., 404), the response is relayed to the client socket.
+- Uses `setupOutgoing()` and `setupSocket()` from shared utils, consistent with `ProxyServer.ws()`.
+
 ## Tests (`test/`)
 
 ```
 test/
 ├── index.test.ts                  — Main proxy: paths, headers, changeOrigin, xfwd, WebSocket, errors
 ├── fetch.test.ts                  — proxyFetch: TCP/Unix, GET/POST, redirects, cookies, 204/304
+├── upgrade.test.ts                — proxyUpgrade: WS proxy, addr formats, xfwd, error handling
 ├── http-proxy.test.ts             — Forward, target, WebSocket, socket.io, SSE, timeouts, error events
 ├── https-proxy.test.ts            — HTTPS targets, SSL certs, certificate validation
 ├── _utils.test.ts                 — setupOutgoing, setupSocket, path joining, auth, changeOrigin

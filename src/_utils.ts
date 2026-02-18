@@ -2,7 +2,7 @@ import httpNative from "node:http";
 import httpsNative from "node:https";
 import net from "node:net";
 import type tls from "node:tls";
-import type { ProxyServerOptions, ProxyTarget, ProxyTargetDetailed } from "./types.ts";
+import type { ProxyAddr, ProxyServerOptions, ProxyTarget, ProxyTargetDetailed } from "./types.ts";
 
 const upgradeHeader = /(^|,)\s*upgrade\s*($|,)/i;
 
@@ -250,6 +250,30 @@ export function rewriteCookieProperty(
       return newValue ? prefix + newValue : "";
     },
   );
+}
+
+/**
+ * Parse and validate a proxy address.
+ *
+ * @param addr - URL string (`http://host:port`, `ws://host:port`, `unix:/path`) or a `ProxyAddr` object.
+ *
+ * @api private
+ */
+export function parseAddr(addr: string | ProxyAddr): ProxyAddr {
+  if (typeof addr === "string") {
+    if (addr.startsWith("unix:")) {
+      return { socketPath: addr.slice(5) };
+    }
+    const url = new URL(addr);
+    return {
+      host: url.hostname,
+      port: Number(url.port) || (isSSL.test(url.protocol) ? 443 : 80),
+    };
+  }
+  if (!addr.socketPath && !addr.port) {
+    throw new Error("ProxyAddr must have either `port` or `socketPath`");
+  }
+  return addr;
 }
 
 /**
