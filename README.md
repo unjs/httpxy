@@ -68,8 +68,8 @@ It accepts the same `addr` formats as `proxyFetch` (`"http://host:port"`, `"unix
 // With options
 server.on("upgrade", (req, socket, head) => {
   proxyUpgrade({ host: "127.0.0.1", port: 8080 }, req, socket, head, {
-    xfwd: true, // add x-forwarded-* headers
-    changeOrigin: true, // rewrite Host header
+    // changeOrigin: true, // rewrite Host header
+    // xfwd: false, // disable x-forwarded-* headers (enabled by default)
   });
 });
 ```

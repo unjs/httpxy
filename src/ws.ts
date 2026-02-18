@@ -19,7 +19,7 @@ import {
 export interface ProxyUpgradeOptions {
   /**
    * Add `x-forwarded-for`, `x-forwarded-port`, and `x-forwarded-proto` headers.
-   * Default: `false` (headers are not added).
+   * Default: `true`.
    */
   xfwd?: boolean;
   /**
@@ -102,8 +102,8 @@ export function proxyUpgrade(
     return Promise.reject(new Error("Not a valid WebSocket upgrade request"));
   }
 
-  // Set x-forwarded-* headers
-  if (opts?.xfwd) {
+  // Set x-forwarded-* headers (enabled by default)
+  if (opts?.xfwd !== false) {
     const xfFor = req.headers["x-forwarded-for"];
     const xfPort = req.headers["x-forwarded-port"];
     const xfProto = req.headers["x-forwarded-proto"];
