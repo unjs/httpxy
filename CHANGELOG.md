@@ -1,5 +1,25 @@
 # Changelog
 
+## v0.3.1
+
+[compare changes](https://github.com/unjs/httpxy/compare/v0.3.0...v0.3.1)
+
+### 🚀 Enhancements
+
+- Standalone `proxyUpgrade` util ([#100](https://github.com/unjs/httpxy/pull/100))
+
+### 🏡 Chore
+
+- Apply automated updates ([d8c97ee](https://github.com/unjs/httpxy/commit/d8c97ee))
+
+### ✅ Tests
+
+- Use stub objects ([2287e56](https://github.com/unjs/httpxy/commit/2287e56))
+
+### ❤️ Contributors
+
+- Pooya Parsa ([@pi0](https://github.com/pi0))
+
 ## v0.3.0
 
 [compare changes](https://github.com/unjs/httpxy/compare/v0.2.2...v0.3.0)
