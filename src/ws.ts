@@ -104,17 +104,13 @@ export function proxyUpgrade(
 
   // Set x-forwarded-* headers
   if (opts?.xfwd) {
-    const values = {
-      for: req.socket?.remoteAddress,
-      port: getPort(req),
-      proto: hasEncryptedConnection(req) ? "wss" : "ws",
-    };
-    for (const header of ["for", "port", "proto"] as const) {
-      req.headers["x-forwarded-" + header] =
-        (req.headers["x-forwarded-" + header] || "") +
-        (req.headers["x-forwarded-" + header] ? "," : "") +
-        values[header];
-    }
+    const xfFor = req.headers["x-forwarded-for"];
+    const xfPort = req.headers["x-forwarded-port"];
+    const xfProto = req.headers["x-forwarded-proto"];
+    req.headers["x-forwarded-for"] = `${xfFor ? `${xfFor},` : ""}${req.socket?.remoteAddress}`;
+    req.headers["x-forwarded-port"] = `${xfPort ? `${xfPort},` : ""}${getPort(req)}`;
+    req.headers["x-forwarded-proto"] =
+      `${xfProto ? `${xfProto},` : ""}${hasEncryptedConnection(req) ? "wss" : "ws"}`;
   }
 
   // Build target URL for setupOutgoing
@@ -142,19 +138,19 @@ export function proxyUpgrade(
       sock.unshift(head);
     }
 
-    sock.on("error", onSocketError);
+    sock.once("error", onSocketError);
 
     const doRequest = isSSL.test(target.protocol) ? httpsRequest : httpRequest;
     const proxyReq = doRequest(outgoing as RequestOptions);
 
-    proxyReq.on("error", onOutgoingError);
+    proxyReq.once("error", onOutgoingError);
 
-    proxyReq.on("response", (res) => {
+    proxyReq.once("response", (res) => {
       // If upgrade event isn't going to happen, relay the response and reject
       if (!(res as any).upgrade) {
         sock.write(
           _createHttpHeader(
-            "HTTP/" + res.httpVersion + " " + res.statusCode + " " + res.statusMessage,
+            `HTTP/${res.httpVersion} ${res.statusCode} ${res.statusMessage}`,
             res.headers,
           ),
         );
@@ -166,10 +162,11 @@ export function proxyUpgrade(
       }
     });
 
-    proxyReq.on("upgrade", (proxyRes, proxySocket, proxyHead) => {
-      proxySocket.on("error", onOutgoingError);
+    proxyReq.once("upgrade", (proxyRes, proxySocket, proxyHead) => {
+      proxySocket.once("error", onOutgoingError);
 
-      sock.on("error", () => {
+      sock.removeListener("error", onSocketError);
+      sock.once("error", () => {
         proxySocket.end();
       });
 
@@ -214,32 +211,26 @@ function _buildTargetURL(addr: ProxyAddr): URL {
     (url as any).socketPath = addr.socketPath;
     return url;
   }
-  return new URL(`http://${addr.host || "localhost"}${addr.port ? ":" + addr.port : ""}`);
+  return new URL(`http://${addr.host || "localhost"}${addr.port ? `:${addr.port}` : ""}`);
 }
 
 function _createHttpHeader(
   line: string,
   headers: Record<string, string | string[] | undefined>,
 ): string {
-  return (
-    Object.keys(headers)
-      .reduce(
-        (head: string[], key) => {
-          const value = headers[key];
-          if (value === undefined) {
-            return head;
-          }
-          if (!Array.isArray(value)) {
-            head.push(key + ": " + value);
-            return head;
-          }
-          for (const element of value) {
-            head.push(key + ": " + element);
-          }
-          return head;
-        },
-        [line],
-      )
-      .join("\r\n") + "\r\n\r\n"
-  );
+  let result = line;
+  for (const key of Object.keys(headers)) {
+    const value = headers[key];
+    if (value === undefined) {
+      continue;
+    }
+    if (Array.isArray(value)) {
+      for (const element of value) {
+        result += `\r\n${key}: ${element}`;
+      }
+    } else {
+      result += `\r\n${key}: ${value}`;
+    }
+  }
+  return `${result}\r\n\r\n`;
 }
