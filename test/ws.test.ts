@@ -35,10 +35,7 @@ afterAll(() => {
 
 // --- Helper: create a local HTTP server that uses proxyUpgrade on upgrade ---
 
-function createProxyServer(
-  addr: string | ProxyAddr,
-  opts?: Parameters<typeof proxyUpgrade>[4],
-) {
+function createProxyServer(addr: string | ProxyAddr, opts?: Parameters<typeof proxyUpgrade>[4]) {
   const server = createServer((_req, res) => {
     res.writeHead(404);
     res.end();
@@ -227,7 +224,9 @@ describe("proxyUpgrade", () => {
     const sock = net.connect(proxyPort, "127.0.0.1", () => {
       sock.write(
         "GET / HTTP/1.1\r\n" +
-          "Host: 127.0.0.1:" + proxyPort + "\r\n" +
+          "Host: 127.0.0.1:" +
+          proxyPort +
+          "\r\n" +
           "Upgrade: websocket\r\n" +
           "Connection: Upgrade\r\n" +
           "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n" +
