@@ -3,12 +3,11 @@ import * as https from "node:https";
 import * as httpProxy from "../src/index.ts";
 import * as path from "node:path";
 import * as fs from "node:fs";
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, afterAll } from "vitest";
 
 import { Agent, fetch } from "undici";
-
-let initialPort = 4096;
-const getPort = () => initialPort++;
+import { listenOn, proxyListen } from "./https-proxy.test.ts";
+import { inspect } from "node:util";
 
 const http1Agent = new Agent({
   allowH2: false,
@@ -26,52 +25,55 @@ const http2Agent = new Agent({
 });
 
 describe("http/2 listener", () => {
-  describe("http2 -> http", () => {
-    const httpPort = getPort();
-    const proxyPort = getPort();
+  describe("http2 -> http", async () => {
+    const source = http.createServer((_req, res) => {
+      res.writeHead(200, { "Content-Type": "text/plain" });
+      res.end("Hello from " + sourcePort);
+    });
+    const sourcePort = await listenOn(source);
 
-    const source = http
-      .createServer((_req, res) => {
-        res.writeHead(200, { "Content-Type": "text/plain" });
-        res.write("hello httpxy\n");
-        res.end();
-      })
-      .listen(httpPort);
-
-    const proxy = httpProxy
-      .createProxyServer({
-        target: {
-          host: "localhost",
-          port: httpPort,
-        },
-        ssl: {
-          key: fs.readFileSync(path.join(__dirname, "fixtures", "agent2-key.pem")),
-          cert: fs.readFileSync(path.join(__dirname, "fixtures", "agent2-cert.pem")),
-        },
-        http2: true,
-        // Allow to use SSL self signed
-        secure: false,
-      })
-      .listen(proxyPort);
+    const proxy = httpProxy.createProxyServer({
+      target: "http://127.0.0.1:" + sourcePort,
+      ssl: {
+        key: fs.readFileSync(path.join(__dirname, "fixtures", "agent2-key.pem")),
+        cert: fs.readFileSync(path.join(__dirname, "fixtures", "agent2-cert.pem")),
+      },
+      http2: true,
+      // Allow to use SSL self signed
+      secure: false,
+    });
+    const proxyPort = await proxyListen(proxy);
 
     it("target http server should be working", async () => {
-      const r = await (
-        await fetch(`http://localhost:${httpPort}`, { dispatcher: http1Agent })
-      ).text();
-      expect(r).toContain("hello httpxy");
+      try {
+        const r = await (
+          await fetch(`http://127.0.0.1:${sourcePort}`, { dispatcher: http1Agent })
+        ).text();
+        expect(r).to.eql("Hello from " + sourcePort);
+      } catch (err) {
+        expect.fail("Failed to fetch target server: " + inspect(err));
+      }
     });
 
     it("fetch proxy server over http1", async () => {
-      const r = await (
-        await fetch(`https://localhost:${proxyPort}`, { dispatcher: http1Agent })
-      ).text();
-      expect(r).toContain("hello httpxy");
+      try {
+        const r = await (
+          await fetch(`https://127.0.0.1:${proxyPort}`, { dispatcher: http1Agent })
+        ).text();
+        expect(r).to.eql("Hello from " + sourcePort);
+      } catch (err) {
+        expect.fail("Failed to fetch target server: " + inspect(err));
+      }
     });
 
     it("fetch proxy server over http2", async () => {
-      const resp = await fetch(`https://localhost:${proxyPort}`, { dispatcher: http2Agent });
-      const r = await resp.text();
-      expect(r).toContain("hello httpxy");
+      try {
+        const resp = await fetch(`https://127.0.0.1:${proxyPort}`, { dispatcher: http2Agent });
+        const r = await resp.text();
+        expect(r).to.eql("Hello from " + sourcePort);
+      } catch (err) {
+        expect.fail("Failed to fetch target server: " + inspect(err));
+      }
     });
 
     afterAll(async () => {
@@ -81,58 +83,62 @@ describe("http/2 listener", () => {
     });
   });
 
-  // TODO: fix this test
-  describe.skip("http2 -> https", () => {
-    const httpsPort = getPort();
-    const proxyPort = getPort();
+  describe("http2 -> https", async () => {
+    const source = https.createServer(
+      {
+        key: fs.readFileSync(path.join(__dirname, "fixtures", "agent2-key.pem")),
+        cert: fs.readFileSync(path.join(__dirname, "fixtures", "agent2-cert.pem")),
+        ciphers: "AES128-GCM-SHA256",
+      },
+      function (req, res) {
+        res.writeHead(200, { "Content-Type": "text/plain" });
+        res.end("Hello from " + sourcePort);
+      },
+    );
+    const sourcePort = await listenOn(source);
 
-    const source = https
-      .createServer(
-        {
-          key: fs.readFileSync(path.join(__dirname, "fixtures", "agent2-key.pem")),
-          cert: fs.readFileSync(path.join(__dirname, "fixtures", "agent2-cert.pem")),
-        },
-        function (req, res) {
-          res.writeHead(200, { "Content-Type": "text/plain" });
-          res.end("hello httpxy");
-        },
-      )
-      .listen(httpsPort);
-
-    const proxy = httpProxy
-      .createProxyServer({
-        target: {
-          host: "localhost",
-          port: httpsPort,
-        },
-        ssl: {
-          key: fs.readFileSync(path.join(__dirname, "fixtures", "agent2-key.pem")),
-          cert: fs.readFileSync(path.join(__dirname, "fixtures", "agent2-cert.pem")),
-        },
-        http2: true,
-        // Allow to use SSL self signed
-        secure: false,
-      })
-      .listen(proxyPort);
+    const proxy = httpProxy.createProxyServer({
+      target: "https://127.0.0.1:" + sourcePort,
+      ssl: {
+        key: fs.readFileSync(path.join(__dirname, "fixtures", "agent2-key.pem")),
+        cert: fs.readFileSync(path.join(__dirname, "fixtures", "agent2-cert.pem")),
+      },
+      http2: true,
+      // Allow to use SSL self signed
+      secure: false,
+    });
+    const proxyPort = await proxyListen(proxy);
 
     it("target https server should be working", async () => {
-      const r = await (
-        await fetch(`https://localhost:${httpsPort}`, { dispatcher: http1Agent })
-      ).text();
-      expect(r).toContain("hello httpxy");
+      try {
+        const r = await (
+          await fetch(`https://127.0.0.1:${sourcePort}`, { dispatcher: http1Agent })
+        ).text();
+        expect(r).to.eql("Hello from " + sourcePort);
+      } catch (err) {
+        expect.fail("Failed to fetch target server: " + inspect(err));
+      }
     });
 
     it("fetch proxy server over http1", async () => {
-      const r = await (
-        await fetch(`https://localhost:${proxyPort}`, { dispatcher: http1Agent })
-      ).text();
-      expect(r).toContain("hello httpxy");
+      try {
+        const r = await (
+          await fetch(`https://127.0.0.1:${proxyPort}`, { dispatcher: http1Agent })
+        ).text();
+        expect(r).to.eql("Hello from " + sourcePort);
+      } catch (err) {
+        expect.fail("Failed to fetch target server: " + inspect(err));
+      }
     });
 
     it("fetch proxy server over http2", async () => {
-      const resp = await fetch(`https://localhost:${proxyPort}`, { dispatcher: http2Agent });
-      const r = await resp.text();
-      expect(r).toContain("hello httpxy");
+      try {
+        const resp = await fetch(`https://127.0.0.1:${proxyPort}`, { dispatcher: http2Agent });
+        const r = await resp.text();
+        expect(r).to.eql("Hello from " + sourcePort);
+      } catch (err) {
+        expect.fail("Failed to fetch target server: " + inspect(err));
+      }
     });
 
     afterAll(async () => {
