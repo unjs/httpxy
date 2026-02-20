@@ -77,6 +77,7 @@ export function setupOutgoing(
   if (req.headers?.[":authority"]) {
     outgoing.headers.host = req.headers[":authority"] as string;
   }
+  // host override must happen before composing/merging the final outgoing headers
 
   if (options.headers) {
     outgoing.headers = { ...outgoing.headers, ...options.headers };
