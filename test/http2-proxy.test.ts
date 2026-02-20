@@ -1,6 +1,6 @@
 import * as http from "node:http";
 import * as https from "node:https";
-import * as httpProxy from "../src";
+import * as httpProxy from "../src/index.ts";
 import * as path from "node:path";
 import * as fs from "node:fs";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";

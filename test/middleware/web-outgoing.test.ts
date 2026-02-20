@@ -330,6 +330,7 @@ describe("middleware:web-outgoing", () => {
       webOutgoing.setConnection(
         stubIncomingMessage({
           httpVersion: "2.0",
+          httpVersionMajor: 2,
           headers: { connection: "namstey" },
         }),
         stubServerResponse(),
@@ -345,6 +346,7 @@ describe("middleware:web-outgoing", () => {
       webOutgoing.setConnection(
         stubIncomingMessage({
           httpVersion: "2.0",
+          httpVersionMajor: 2,
           headers: {},
         }),
         stubServerResponse(),

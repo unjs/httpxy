@@ -44,27 +44,9 @@ export class ProxyServer<
 
   options: ProxyServerOptions;
 
-  web: {
-    (
-      req: http.IncomingMessage,
-      res: http.ServerResponse,
-      opts?: ProxyServerOptions,
-      head?: any,
-    ): Promise<void>;
-    (
-      req: http2.Http2ServerRequest,
-      res: http2.Http2ServerResponse,
-      opts?: ProxyServerOptions,
-      head?: any,
-    ): Promise<void>;
-  };
+  web: (req: Req, res: Res, opts?: ProxyServerOptions, head?: any) => Promise<void>;
 
-  ws: (
-    req: http.IncomingMessage,
-    socket: net.Socket,
-    opts: ProxyServerOptions,
-    head?: any,
-  ) => Promise<void>;
+  ws: (req: Req, socket: net.Socket, opts: ProxyServerOptions, head?: any) => Promise<void>;
 
   /**
    * Creates the proxy server with specified options.
@@ -201,12 +183,15 @@ export function createProxyServer(options: ProxyServerOptions = {}) {
 
 // --- Internal ---
 
-function _createProxyFn<Type extends "web" | "ws">(type: Type, server: ProxyServer) {
-  type Res = ResOfType<Type>;
+function _createProxyFn<
+  Type extends "web" | "ws",
+  ProxyServerReq extends http.IncomingMessage | http2.Http2ServerRequest,
+  ProxyServerRes extends http.ServerResponse | http2.Http2ServerResponse,
+>(type: Type, server: ProxyServer<ProxyServerReq, ProxyServerRes>) {
   return function (
-    this: ProxyServer,
-    req: http.IncomingMessage | http2.Http2ServerRequest,
-    res: Res,
+    this: ProxyServer<ProxyServerReq, ProxyServerRes>,
+    req: ProxyServerReq,
+    res: ResOfType<Type>,
     opts?: ProxyServerOptions,
     head?: any,
   ): Promise<void> {
@@ -242,11 +227,14 @@ function _createProxyFn<Type extends "web" | "ws">(type: Type, server: ProxyServ
         req,
         res,
         requestOptions as ProxyServerOptions & { target: URL; forward: URL },
-        server,
+        server as ProxyServer<
+          http.IncomingMessage | http2.Http2ServerRequest,
+          http.ServerResponse | http2.Http2ServerResponse
+        >,
         head,
         (error) => {
           if (server.listenerCount("error") > 0) {
-            server.emit("error", error, req, res);
+            server.emit("error", error, req, res as ProxyServerRes | net.Socket);
             _resolve();
           } else {
             _reject(error);
