@@ -104,6 +104,7 @@ describe("middleware:web-outgoing", () => {
     describe("rewrites location host with autoRewrite", () => {
       beforeEach(() => {
         ctx.options.autoRewrite = true;
+        delete ctx.req.headers[":authority"];
       });
       for (const code of [201, 301, 302, 307, 308]) {
         it("on " + code, () => {
@@ -117,6 +118,17 @@ describe("middleware:web-outgoing", () => {
           expect(ctx.proxyRes.headers.location).to.eql("http://ext-auto.com/");
         });
       }
+
+      it("with HTTP/2 :authority", () => {
+        ctx.req.headers[":authority"] = "ext-auto.com";
+        webOutgoing.setRedirectHostRewrite(
+          ctx.req,
+          stubServerResponse(),
+          ctx.proxyRes,
+          ctx.options,
+        );
+        expect(ctx.proxyRes.headers.location).to.eql("http://ext-auto.com/");
+      });
 
       it("not on 200", () => {
         ctx.proxyRes.statusCode = 200;

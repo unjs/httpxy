@@ -1,7 +1,6 @@
 import httpNative from "node:http";
 import httpsNative from "node:https";
 import net from "node:net";
-import type tls from "node:tls";
 import type { ProxyAddr, ProxyServerOptions, ProxyTarget, ProxyTargetDetailed } from "./types.ts";
 import type { Http2ServerRequest } from "node:http2";
 
