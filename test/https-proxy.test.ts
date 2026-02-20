@@ -9,7 +9,7 @@ import type { AddressInfo } from "node:net";
 
 // Source: https://github.com/http-party/node-http-proxy/blob/master/test/lib-https-proxy-test.js
 
-function listenOn(server: http.Server | https.Server | net.Server): Promise<number> {
+export function listenOn(server: http.Server | https.Server | net.Server): Promise<number> {
   return new Promise((resolve, reject) => {
     server.once("error", reject);
     server.listen(0, "127.0.0.1", () => {
@@ -18,7 +18,9 @@ function listenOn(server: http.Server | https.Server | net.Server): Promise<numb
   });
 }
 
-function proxyListen(proxy: ReturnType<typeof httpProxy.createProxyServer>): Promise<number> {
+export function proxyListen(
+  proxy: ReturnType<typeof httpProxy.createProxyServer>,
+): Promise<number> {
   return new Promise((resolve, reject) => {
     proxy.listen(0, "127.0.0.1");
     const server = (proxy as any)._server as net.Server;

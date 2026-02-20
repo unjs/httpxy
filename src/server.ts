@@ -1,5 +1,6 @@
 import http from "node:http";
 import https from "node:https";
+import http2 from "node:http2";
 import { EventEmitter } from "node:events";
 import { webIncomingMiddleware } from "./middleware/web-incoming.ts";
 import { websocketIncomingMiddleware } from "./middleware/ws-incoming.ts";
@@ -8,8 +9,8 @@ import type { ProxyMiddleware, ResOfType } from "./middleware/_utils.ts";
 import type net from "node:net";
 
 export interface ProxyServerEventMap<
-  Req extends http.IncomingMessage = http.IncomingMessage,
-  Res extends http.ServerResponse = http.ServerResponse,
+  Req extends http.IncomingMessage | http2.Http2ServerRequest = http.IncomingMessage,
+  Res extends http.ServerResponse | http2.Http2ServerResponse = http.ServerResponse,
 > {
   error: [err: Error, req?: Req, res?: Res | net.Socket, target?: URL | ProxyTarget];
   start: [req: Req, res: Res, target: URL | ProxyTarget];
@@ -32,29 +33,20 @@ export interface ProxyServerEventMap<
 
 // eslint-disable-next-line unicorn/prefer-event-target
 export class ProxyServer<
-  Req extends http.IncomingMessage = http.IncomingMessage,
-  Res extends http.ServerResponse = http.ServerResponse,
+  Req extends http.IncomingMessage | http2.Http2ServerRequest = http.IncomingMessage,
+  Res extends http.ServerResponse | http2.Http2ServerResponse = http.ServerResponse,
 > extends EventEmitter<ProxyServerEventMap<Req, Res>> {
-  private _server?: http.Server | https.Server;
+  // we use http2.Http2Server to handle HTTP/1.1 HTTPS as well (with allowHTTP1 enabled)
+  private _server?: http.Server | http2.Http2SecureServer;
 
   _webPasses: ProxyMiddleware<http.ServerResponse>[] = [...webIncomingMiddleware];
   _wsPasses: ProxyMiddleware<net.Socket>[] = [...websocketIncomingMiddleware];
 
   options: ProxyServerOptions;
 
-  web: (
-    req: http.IncomingMessage,
-    res: http.ServerResponse,
-    opts?: ProxyServerOptions,
-    head?: any,
-  ) => Promise<void>;
+  web: (req: Req, res: Res, opts?: ProxyServerOptions, head?: any) => Promise<void>;
 
-  ws: (
-    req: http.IncomingMessage,
-    socket: net.Socket,
-    opts: ProxyServerOptions,
-    head?: any,
-  ) => Promise<void>;
+  ws: (req: Req, socket: net.Socket, opts: ProxyServerOptions, head?: any) => Promise<void>;
 
   /**
    * Creates the proxy server with specified options.
@@ -76,17 +68,27 @@ export class ProxyServer<
    * @param hostname - The hostname to listen on
    */
   listen(port: number, hostname?: string) {
-    const closure = (req: http.IncomingMessage, res: http.ServerResponse) => {
-      this.web(req, res);
+    interface ListenerCallback {
+      (
+        req: http.IncomingMessage | http2.Http2ServerRequest,
+        res: http.ServerResponse | http2.Http2ServerResponse,
+      ): Promise<void>;
+    }
+
+    const closure: ListenerCallback = (req, res) => {
+      return this.web(req as any, res as any);
     };
 
-    this._server = this.options.ssl
-      ? https.createServer(this.options.ssl, closure)
-      : http.createServer(closure);
+    if (this.options.http2) {
+      this._server = http2.createSecureServer({ ...this.options.ssl, allowHTTP1: true }, closure);
+    } else if (this.options.ssl) {
+      this._server = https.createServer(this.options.ssl, closure);
+    } else {
+      this._server = http.createServer(closure);
+    }
 
     if (this.options.ws) {
       this._server.on("upgrade", (req, socket, head) => {
-        // @ts-expect-error
         this.ws(req, socket, head).catch(() => {});
       });
     }
@@ -181,12 +183,15 @@ export function createProxyServer(options: ProxyServerOptions = {}) {
 
 // --- Internal ---
 
-function _createProxyFn<Type extends "web" | "ws">(type: Type, server: ProxyServer) {
-  type Res = ResOfType<Type>;
+function _createProxyFn<
+  Type extends "web" | "ws",
+  ProxyServerReq extends http.IncomingMessage | http2.Http2ServerRequest,
+  ProxyServerRes extends http.ServerResponse | http2.Http2ServerResponse,
+>(type: Type, server: ProxyServer<ProxyServerReq, ProxyServerRes>) {
   return function (
-    this: ProxyServer,
-    req: http.IncomingMessage,
-    res: Res,
+    this: ProxyServer<ProxyServerReq, ProxyServerRes>,
+    req: ProxyServerReq,
+    res: ResOfType<Type>,
     opts?: ProxyServerOptions,
     head?: any,
   ): Promise<void> {
@@ -222,11 +227,14 @@ function _createProxyFn<Type extends "web" | "ws">(type: Type, server: ProxyServ
         req,
         res,
         requestOptions as ProxyServerOptions & { target: URL; forward: URL },
-        server,
+        server as ProxyServer<
+          http.IncomingMessage | http2.Http2ServerRequest,
+          http.ServerResponse | http2.Http2ServerResponse
+        >,
         head,
         (error) => {
           if (server.listenerCount("error") > 0) {
-            server.emit("error", error, req, res);
+            server.emit("error", error, req, res as ProxyServerRes | net.Socket);
             _resolve();
           } else {
             _reject(error);

@@ -1,8 +1,8 @@
 import httpNative from "node:http";
 import httpsNative from "node:https";
 import net from "node:net";
-import type tls from "node:tls";
 import type { ProxyAddr, ProxyServerOptions, ProxyTarget, ProxyTargetDetailed } from "./types.ts";
+import type { Http2ServerRequest } from "node:http2";
 
 const upgradeHeader = /(^|,)\s*upgrade\s*($|,)/i;
 
@@ -10,6 +10,15 @@ const upgradeHeader = /(^|,)\s*upgrade\s*($|,)/i;
  * Simple Regex for testing if protocol is https
  */
 export const isSSL = /^https|wss/;
+
+/**
+ * Node.js HTTP/2 accepts pseudo headers and it may conflict
+ * with request options.
+ *
+ * Let's just blacklist those potential conflicting pseudo
+ * headers.
+ */
+const HTTP2_HEADER_BLACKLIST = [":method", ":path", ":scheme", ":authority"];
 
 /**
  * Copies the right headers from `options` and `req` to
@@ -38,7 +47,7 @@ export function setupOutgoing(
     ca?: string;
     method?: string;
   },
-  req: httpNative.IncomingMessage,
+  req: httpNative.IncomingMessage | Http2ServerRequest,
   forward?: "forward" | "target",
 ): httpNative.RequestOptions | httpsNative.RequestOptions {
   outgoing.port =
@@ -64,8 +73,21 @@ export function setupOutgoing(
   outgoing.method = options.method || req.method;
   outgoing.headers = { ...req.headers };
 
+  // before clean up HTTP/2 blacklist header, we might wanna override host first
+  if (req.headers?.[":authority"]) {
+    outgoing.headers.host = req.headers[":authority"] as string;
+  }
+  // host override must happen before composing/merging the final outgoing headers
+
   if (options.headers) {
     outgoing.headers = { ...outgoing.headers, ...options.headers };
+  }
+
+  if (req.httpVersionMajor > 1) {
+    // ignore potential conflicting HTTP/2 pseudo headers
+    for (const header of HTTP2_HEADER_BLACKLIST) {
+      delete outgoing.headers[header];
+    }
   }
 
   if (options.auth) {
@@ -181,8 +203,9 @@ export function setupSocket(socket: net.Socket): net.Socket {
  *
  * @api private
  */
-export function getPort(req: httpNative.IncomingMessage): string {
-  const res = req.headers.host ? req.headers.host.match(/:(\d+)/) : "";
+export function getPort(req: httpNative.IncomingMessage | Http2ServerRequest): string {
+  const hostHeader = (req.headers[":authority"] as string | undefined) || req.headers.host;
+  const res = hostHeader ? hostHeader.match(/:(\d+)/) : "";
   if (res) {
     return res[1]!;
   }
@@ -198,11 +221,29 @@ export function getPort(req: httpNative.IncomingMessage): string {
  *
  * @api private
  */
-export function hasEncryptedConnection(req: httpNative.IncomingMessage): boolean {
-  return Boolean(
-    // req.connection.pair probably does not exist anymore
-    (req.connection as tls.TLSSocket).encrypted || (req.connection as any).pair,
-  );
+export function hasEncryptedConnection(
+  req: httpNative.IncomingMessage | Http2ServerRequest,
+): boolean {
+  // req.connection.pair probably does not exist anymore
+  if ("connection" in req) {
+    if ("encrypted" in req.connection) {
+      return req.connection.encrypted;
+    }
+    if ("pair" in req.connection) {
+      return !!req.connection.pair;
+    }
+  }
+  // Since Node.js v16 we now have req.socket
+  if ("socket" in req) {
+    if ("encrypted" in req.socket) {
+      return req.socket.encrypted;
+    }
+    if ("pair" in req.socket) {
+      return !!req.socket.pair;
+    }
+  }
+
+  return false;
 }
 
 /**
