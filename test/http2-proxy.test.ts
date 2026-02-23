@@ -6,7 +6,8 @@ import * as fs from "node:fs";
 import { describe, it, expect, afterAll, beforeAll } from "vitest";
 
 import { Agent, fetch } from "undici";
-import { listenOn, proxyListen } from "./https-proxy.test.ts";
+import { listenOn, proxyListen } from "./_utils.ts";
+
 import { inspect } from "node:util";
 
 const http1Agent = new Agent({

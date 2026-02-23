@@ -7,28 +7,9 @@ import * as io from "socket.io";
 import SSE from "sse";
 import ioClient from "socket.io-client";
 import type { AddressInfo } from "node:net";
+import { listenOn, proxyListen } from "./_utils.ts";
 
 // Source: https://github.com/http-party/node-http-proxy/blob/master/test/lib-http-proxy-test.js
-
-function listenOn(server: http.Server | net.Server): Promise<number> {
-  return new Promise((resolve, reject) => {
-    server.once("error", reject);
-    server.listen(0, "127.0.0.1", () => {
-      resolve((server.address() as AddressInfo).port);
-    });
-  });
-}
-
-function proxyListen(proxy: ReturnType<typeof httpProxy.createProxyServer>): Promise<number> {
-  return new Promise((resolve, reject) => {
-    proxy.listen(0, "127.0.0.1");
-    const server = (proxy as any)._server as net.Server;
-    server.once("error", reject);
-    server.once("listening", () => {
-      resolve((server.address() as AddressInfo).port);
-    });
-  });
-}
 
 describe("http-proxy", () => {
   describe("#createProxyServer", () => {
