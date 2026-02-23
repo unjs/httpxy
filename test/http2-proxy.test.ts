@@ -3,7 +3,7 @@ import * as https from "node:https";
 import * as httpProxy from "../src/index.ts";
 import * as path from "node:path";
 import * as fs from "node:fs";
-import { describe, it, expect, afterAll } from "vitest";
+import { describe, it, expect, afterAll, beforeAll } from "vitest";
 
 import { Agent, fetch } from "undici";
 import { listenOn, proxyListen } from "./https-proxy.test.ts";
@@ -26,23 +26,30 @@ const http2Agent = new Agent({
 
 describe("http/2 listener", () => {
   describe("http2 -> http", async () => {
-    const source = http.createServer((_req, res) => {
-      res.writeHead(200, { "Content-Type": "text/plain" });
-      res.end("Hello from " + sourcePort);
-    });
-    const sourcePort = await listenOn(source);
+    let source: http.Server;
+    let sourcePort: number;
+    let proxy: httpProxy.ProxyServer;
+    let proxyPort: number;
 
-    const proxy = httpProxy.createProxyServer({
-      target: "http://127.0.0.1:" + sourcePort,
-      ssl: {
-        key: fs.readFileSync(path.join(__dirname, "fixtures", "agent2-key.pem")),
-        cert: fs.readFileSync(path.join(__dirname, "fixtures", "agent2-cert.pem")),
-      },
-      http2: true,
-      // Allow to use SSL self signed
-      secure: false,
+    beforeAll(async () => {
+      source = http.createServer((_req, res) => {
+        res.writeHead(200, { "Content-Type": "text/plain" });
+        res.end("Hello from " + sourcePort);
+      });
+      sourcePort = await listenOn(source);
+
+      proxy = httpProxy.createProxyServer({
+        target: "http://127.0.0.1:" + sourcePort,
+        ssl: {
+          key: fs.readFileSync(path.join(__dirname, "fixtures", "agent2-key.pem")),
+          cert: fs.readFileSync(path.join(__dirname, "fixtures", "agent2-cert.pem")),
+        },
+        http2: true,
+        // Allow to use SSL self signed
+        secure: false,
+      });
+      proxyPort = await proxyListen(proxy);
     });
-    const proxyPort = await proxyListen(proxy);
 
     it("target http server should be working", async () => {
       try {
@@ -84,30 +91,39 @@ describe("http/2 listener", () => {
   });
 
   describe("http2 -> https", async () => {
-    const source = https.createServer(
-      {
-        key: fs.readFileSync(path.join(__dirname, "fixtures", "agent2-key.pem")),
-        cert: fs.readFileSync(path.join(__dirname, "fixtures", "agent2-cert.pem")),
-        ciphers: "AES128-GCM-SHA256",
-      },
-      function (req, res) {
-        res.writeHead(200, { "Content-Type": "text/plain" });
-        res.end("Hello from " + sourcePort);
-      },
-    );
-    const sourcePort = await listenOn(source);
+    let source: https.Server;
+    let sourcePort: number;
+    let proxy: httpProxy.ProxyServer;
+    let proxyPort: number;
 
-    const proxy = httpProxy.createProxyServer({
-      target: "https://127.0.0.1:" + sourcePort,
-      ssl: {
-        key: fs.readFileSync(path.join(__dirname, "fixtures", "agent2-key.pem")),
-        cert: fs.readFileSync(path.join(__dirname, "fixtures", "agent2-cert.pem")),
-      },
-      http2: true,
-      // Allow to use SSL self signed
-      secure: false,
+    beforeAll(async () => {
+      source = https.createServer(
+        {
+          key: fs.readFileSync(path.join(__dirname, "fixtures", "agent2-key.pem")),
+          cert: fs.readFileSync(path.join(__dirname, "fixtures", "agent2-cert.pem")),
+          ciphers: "AES128-GCM-SHA256",
+        },
+        function (req, res) {
+          res.writeHead(200, { "Content-Type": "text/plain" });
+          res.end("Hello from " + sourcePort);
+        },
+      );
+
+      sourcePort = await listenOn(source);
+
+      proxy = httpProxy.createProxyServer({
+        target: "https://127.0.0.1:" + sourcePort,
+        ssl: {
+          key: fs.readFileSync(path.join(__dirname, "fixtures", "agent2-key.pem")),
+          cert: fs.readFileSync(path.join(__dirname, "fixtures", "agent2-cert.pem")),
+        },
+        http2: true,
+        // Allow to use SSL self signed
+        secure: false,
+      });
+
+      proxyPort = await proxyListen(proxy);
     });
-    const proxyPort = await proxyListen(proxy);
 
     it("target https server should be working", async () => {
       try {
