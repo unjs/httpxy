@@ -224,23 +224,37 @@ export function getPort(req: httpNative.IncomingMessage | Http2ServerRequest): s
 export function hasEncryptedConnection(
   req: httpNative.IncomingMessage | Http2ServerRequest,
 ): boolean {
-  // req.connection.pair probably does not exist anymore
-  if ("connection" in req) {
-    if ("encrypted" in req.connection) {
-      return req.connection.encrypted;
-    }
-    if ("pair" in req.connection) {
-      return !!req.connection.pair;
-    }
-  }
   // Since Node.js v16 we now have req.socket
   if ("socket" in req) {
+    /* v8 ignore start */
+
+    // encrypted is only present in TLS sockets, not plain net sockets
     if ("encrypted" in req.socket) {
       return req.socket.encrypted;
     }
+
+    // "pair" is deprecated and is not typed by @types/node, but it actually hasn't been removed yet
+    // we can still fall back to "pair" for backward compatibility, but normally not reachable
     if ("pair" in req.socket) {
       return !!req.socket.pair;
     }
+    /* v8 ignore stop */
+  }
+
+  if ("connection" in req) {
+    /* v8 ignore start */
+
+    // encrypted is only present in TLS sockets, not plain net sockets
+    if ("encrypted" in req.connection) {
+      return req.connection.encrypted;
+    }
+
+    // "pair" is deprecated and is not typed by @types/node, but it actually hasn't been removed yet
+    // we can still fall back to "pair" for backward compatibility, but normally not reachable
+    if ("pair" in req.connection) {
+      return !!req.connection.pair;
+    }
+    /* v8 ignore stop */
   }
 
   return false;
