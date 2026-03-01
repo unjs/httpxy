@@ -2,32 +2,11 @@ import { describe, it, expect } from "vitest";
 import * as httpProxy from "../src/index.ts";
 import http from "node:http";
 import https from "node:https";
-import net from "node:net";
 import path from "node:path";
 import fs from "node:fs";
-import type { AddressInfo } from "node:net";
+import { listenOn, proxyListen } from "./_utils.ts";
 
 // Source: https://github.com/http-party/node-http-proxy/blob/master/test/lib-https-proxy-test.js
-
-function listenOn(server: http.Server | https.Server | net.Server): Promise<number> {
-  return new Promise((resolve, reject) => {
-    server.once("error", reject);
-    server.listen(0, "127.0.0.1", () => {
-      resolve((server.address() as AddressInfo).port);
-    });
-  });
-}
-
-function proxyListen(proxy: ReturnType<typeof httpProxy.createProxyServer>): Promise<number> {
-  return new Promise((resolve, reject) => {
-    proxy.listen(0, "127.0.0.1");
-    const server = (proxy as any)._server as net.Server;
-    server.once("error", reject);
-    server.once("listening", () => {
-      resolve((server.address() as AddressInfo).port);
-    });
-  });
-}
 
 describe("lib/http-proxy.js", () => {
   describe("HTTPS #createProxyServer", () => {

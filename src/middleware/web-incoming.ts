@@ -52,7 +52,8 @@ export const XHeaders = defineProxyMiddleware((req, res, options) => {
       values[header];
   }
 
-  req.headers["x-forwarded-host"] = req.headers["x-forwarded-host"] || req.headers.host || "";
+  req.headers["x-forwarded-host"] =
+    req.headers["x-forwarded-host"] || req.headers[":authority"] || req.headers.host || "";
 });
 
 /**

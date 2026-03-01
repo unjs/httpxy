@@ -7,7 +7,8 @@ const redirectRegex = /^201|30([1278])$/;
  * If is a HTTP 1.0 request, remove chunk headers
  */
 export const removeChunked = defineProxyOutgoingMiddleware((req, res, proxyRes) => {
-  if (req.httpVersion === "1.0") {
+  // HTTP/1.0 and HTTP/2 do not have transfer-encoding: chunked
+  if (req.httpVersion !== "1.1") {
     delete proxyRes.headers["transfer-encoding"];
   }
 });
@@ -15,12 +16,17 @@ export const removeChunked = defineProxyOutgoingMiddleware((req, res, proxyRes) 
 /**
  * If is a HTTP 1.0 request, set the correct connection header
  * or if connection header not present, then use `keep-alive`
+ *
+ * If is a HTTP/2 request, remove connection header no matter what,
+ * this avoids sending connection header to the underlying http2 client
  */
 export const setConnection = defineProxyOutgoingMiddleware((req, res, proxyRes) => {
   if (req.httpVersion === "1.0") {
     proxyRes.headers.connection = req.headers.connection || "close";
-  } else if (req.httpVersion !== "2.0" && !proxyRes.headers.connection) {
+  } else if (req.httpVersionMajor < 2 && !proxyRes.headers.connection) {
     proxyRes.headers.connection = req.headers.connection || "keep-alive";
+  } else if (req.httpVersionMajor >= 2) {
+    delete proxyRes.headers.connection;
   }
 });
 
@@ -42,8 +48,12 @@ export const setRedirectHostRewrite = defineProxyOutgoingMiddleware(
 
       if (options.hostRewrite) {
         u.host = options.hostRewrite;
-      } else if (options.autoRewrite && req.headers.host) {
-        u.host = req.headers.host;
+      } else if (options.autoRewrite) {
+        if (req.headers[":authority"]) {
+          u.host = req.headers[":authority"] as string;
+        } else if (req.headers.host) {
+          u.host = req.headers.host;
+        }
       }
       if (options.protocolRewrite) {
         u.protocol = options.protocolRewrite;
@@ -116,13 +126,16 @@ export const writeHeaders = defineProxyOutgoingMiddleware((req, res, proxyRes, o
  */
 export const writeStatusCode = defineProxyOutgoingMiddleware((req, res, proxyRes) => {
   // From Node.js docs: response.writeHead(statusCode[, statusMessage][, headers])
-  if (proxyRes.statusMessage) {
-    // @ts-expect-error
-    res.statusCode = proxyRes.statusCode;
+
+  // @ts-expect-error
+  res.statusCode = proxyRes.statusCode;
+
+  if (
+    proxyRes.statusMessage &&
+    // Only HTTP/1.0 and HTTP/1.1 support statusMessage
+    req.httpVersionMajor < 2
+  ) {
     res.statusMessage = proxyRes.statusMessage;
-  } else {
-    // @ts-expect-error
-    res.statusCode = proxyRes.statusCode;
   }
 });
 

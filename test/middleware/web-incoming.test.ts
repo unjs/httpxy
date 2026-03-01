@@ -4,24 +4,15 @@ import * as webPasses from "../../src/middleware/web-incoming.ts";
 import * as httpProxy from "../../src/index.ts";
 import concat from "concat-stream";
 import http from "node:http";
-import type { AddressInfo } from "node:net";
 import {
   stubIncomingMessage,
   stubServerResponse,
   stubMiddlewareOptions,
   stubProxyServer,
 } from "../_stubs.ts";
+import { listenOn } from "../_utils.ts";
 
 // Source: https://github.com/http-party/node-http-proxy/blob/master/test/lib-http-proxy-passes-web-incoming-test.js
-
-function listenOn(server: http.Server): Promise<number> {
-  return new Promise((resolve, reject) => {
-    server.once("error", reject);
-    server.listen(0, "127.0.0.1", () => {
-      resolve((server.address() as AddressInfo).port);
-    });
-  });
-}
 
 describe("middleware:web-incoming", () => {
   describe("#deleteLength", () => {
