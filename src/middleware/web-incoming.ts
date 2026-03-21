@@ -140,7 +140,7 @@ export const stream = defineProxyMiddleware((req, res, options, server, head, ca
 
       if (callback) {
         callback(err, req, res, url);
-      } else {
+      } else if (server.listenerCount("error") > 0) {
         server.emit("error", err, req, res, url);
       }
     };
@@ -270,8 +270,8 @@ export const stream = defineProxyMiddleware((req, res, options, server, head, ca
       res.on("close", function () {
         proxyRes.destroy();
       });
-      proxyRes.on("aborted", function () {
-        if (!res.destroyed) {
+      proxyRes.on("close", function () {
+        if (!proxyRes.complete && !res.destroyed) {
           res.destroy();
         }
       });
