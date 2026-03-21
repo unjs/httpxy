@@ -117,6 +117,72 @@ describe("http-proxy", () => {
       await promise;
     });
 
+    it("should close downstream SSE stream when upstream aborts", async () => {
+      const source = http.createServer((_, res) => {
+        res.writeHead(200, {
+          "content-type": "text/event-stream",
+          "cache-control": "no-cache",
+          connection: "keep-alive",
+        });
+        res.write(":ok\n\n");
+
+        setTimeout(() => {
+          res.socket?.destroy();
+        }, 20);
+      });
+      const sourcePort = await listenOn(source);
+
+      const proxy = httpProxy.createProxyServer({
+        target: "http://127.0.0.1:" + sourcePort,
+      });
+      const proxyPort = await proxyListen(proxy);
+
+      const { promise, resolve } = Promise.withResolvers<void>();
+      let gotFirstChunk = false;
+      let requestError: Error | undefined;
+
+      const finish = () => {
+        source.close();
+        proxy.close(resolve);
+      };
+
+      const timeout = setTimeout(() => {
+        requestError = new Error("Timed out waiting for downstream SSE close");
+        finish();
+      }, 1000);
+
+      http
+        .request(
+          {
+            hostname: "127.0.0.1",
+            port: proxyPort,
+            method: "GET",
+          },
+          (res) => {
+            res.on("data", (chunk) => {
+              if (chunk.toString("utf8").includes(":ok")) {
+                gotFirstChunk = true;
+              }
+            });
+
+            res.once("close", () => {
+              clearTimeout(timeout);
+              finish();
+            });
+          },
+        )
+        .on("error", (error) => {
+          clearTimeout(timeout);
+          requestError = error;
+          finish();
+        })
+        .end();
+
+      await promise;
+      expect(requestError).toBeUndefined();
+      expect(gotFirstChunk).toBe(true);
+    });
+
     it("should make the request on pipe and finish it", async () => {
       const source = http.createServer();
       const sourcePort = await listenOn(source);
