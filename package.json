@@ -51,7 +51,7 @@
     "socket.io": "^4.8.3",
     "socket.io-client": "^4.8.3",
     "sse": "^0.0.8",
-    "typescript": "^5.9.3",
+    "typescript": "^6.0.2",
     "unbuild": "^3.6.1",
     "vitest": "^4.0.18",
     "ws": "^8.19.0"
