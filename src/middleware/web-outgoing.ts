@@ -33,7 +33,7 @@ export const setRedirectHostRewrite = defineProxyOutgoingMiddleware(
     ) {
       const target =
         options.target instanceof URL ? options.target : new URL(options.target as string | URL);
-      const u = new URL(proxyRes.headers.location);
+      const u = new URL(proxyRes.headers.location, target);
 
       // Make sure the redirected host matches the target host before rewriting
       if (target.host !== u.host) {
