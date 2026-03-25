@@ -30,7 +30,7 @@ describe("middleware:web-outgoing", () => {
       beforeEach(() => {
         ctx.options.hostRewrite = "ext-manual.com";
       });
-      for (const code of [201, 301, 302, 307, 308]) {
+      for (const code of [201, 301, 302, 303, 307, 308]) {
         it("on " + code, () => {
           ctx.proxyRes.statusCode = code;
           webOutgoing.setRedirectHostRewrite(
@@ -130,7 +130,7 @@ describe("middleware:web-outgoing", () => {
         ctx.options.autoRewrite = true;
         delete ctx.req.headers[":authority"];
       });
-      for (const code of [201, 301, 302, 307, 308]) {
+      for (const code of [201, 301, 302, 303, 307, 308]) {
         it("on " + code, () => {
           ctx.proxyRes.statusCode = code;
           webOutgoing.setRedirectHostRewrite(
@@ -235,7 +235,7 @@ describe("middleware:web-outgoing", () => {
       beforeEach(() => {
         ctx.options.protocolRewrite = "https";
       });
-      for (const code of [201, 301, 302, 307, 308]) {
+      for (const code of [201, 301, 302, 303, 307, 308]) {
         it("on " + code, () => {
           ctx.proxyRes.statusCode = code;
           webOutgoing.setRedirectHostRewrite(

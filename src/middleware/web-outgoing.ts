@@ -2,7 +2,7 @@ import { rewriteCookieProperty } from "../_utils.ts";
 import type { ProxyTarget, ProxyTargetDetailed } from "../types.ts";
 import { type ProxyOutgoingMiddleware, defineProxyOutgoingMiddleware } from "./_utils.ts";
 
-const redirectRegex = /^201|30([1278])$/;
+const redirectRegex = /^201|30([12378])$/;
 
 /**
  * Remove chunked transfer-encoding for HTTP/1.0 and HTTP/2 requests
