@@ -202,7 +202,11 @@ export async function proxyFetch(
   for (let i = 0; i < rawHeaders.length; i += 2) {
     const key = rawHeaders[i]!;
     const keyLower = key.toLowerCase();
-    if (keyLower === "transfer-encoding" || keyLower === "keep-alive" || keyLower === "connection") {
+    if (
+      keyLower === "transfer-encoding" ||
+      keyLower === "keep-alive" ||
+      keyLower === "connection"
+    ) {
       continue;
     }
     resHeaders.push([key, rawHeaders[i + 1]!]);
