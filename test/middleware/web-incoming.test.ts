@@ -185,6 +185,47 @@ describe("#stream middleware direct tests", () => {
   });
 });
 
+describe("#stream POST body piping", () => {
+  it("should deliver the full POST body to the target server", async () => {
+    const { resolve, promise } = Promise.withResolvers<void>();
+
+    const postBody = "x".repeat(8192); // large enough to test chunked piping
+
+    const source = http.createServer((req, res) => {
+      let body = "";
+      req.on("data", (chunk: Buffer) => (body += chunk));
+      req.on("end", () => {
+        res.writeHead(200, { "Content-Type": "text/plain" });
+        res.end(body);
+      });
+    });
+    const sourcePort = await listenOn(source);
+
+    const proxy = httpProxy.createProxyServer({
+      target: `http://127.0.0.1:${sourcePort}`,
+    });
+
+    const proxyServer = http.createServer((req, res) => {
+      proxy.web(req, res);
+    });
+    const proxyPort = await listenOn(proxyServer);
+
+    http
+      .request(`http://127.0.0.1:${proxyPort}`, { method: "POST" }, function (res) {
+        let body = "";
+        res.on("data", (chunk: Buffer) => (body += chunk));
+        res.on("end", () => {
+          source.close();
+          proxyServer.close();
+          expect(body).to.eql(postBody);
+          resolve();
+        });
+      })
+      .end(postBody);
+    await promise;
+  });
+});
+
 describe("#createProxyServer.web() using own http server", () => {
   it("should proxy the request using the web proxy handler", async () => {
     const { resolve, promise } = Promise.withResolvers<void>();

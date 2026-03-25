@@ -164,7 +164,13 @@ export const stream = defineProxyMiddleware((req, res, options, server, head, ca
       proxyReq.destroy(err);
     });
   } else {
-    (options.buffer || req).pipe(proxyReq);
+    proxyReq.on("socket", (socket) => {
+      if (socket.pending) {
+        socket.on("connect", () => (options.buffer || req).pipe(proxyReq));
+      } else {
+        (options.buffer || req).pipe(proxyReq);
+      }
+    });
   }
 
   function handleResponse(proxyRes: IncomingMessage, redirectCount: number, currentUrl: URL) {
