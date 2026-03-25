@@ -4,7 +4,7 @@ import { type ProxyOutgoingMiddleware, defineProxyOutgoingMiddleware } from "./_
 const redirectRegex = /^201|30([1278])$/;
 
 /**
- * If is a HTTP 1.0 request, remove chunk headers
+ * Remove chunked transfer-encoding for HTTP/1.0 and HTTP/2 requests
  */
 export const removeChunked = defineProxyOutgoingMiddleware((req, res, proxyRes) => {
   // HTTP/1.0 and HTTP/2 do not have transfer-encoding: chunked
