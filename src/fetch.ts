@@ -3,7 +3,7 @@ import { request as httpRequest } from "node:http";
 import { request as httpsRequest } from "node:https";
 import { Readable } from "node:stream";
 import type { ProxyAddr } from "./types.ts";
-import { isSSL, joinURL, parseAddr, parseURL } from "./_utils.ts";
+import { defaultAgents, isSSL, joinURL, parseAddr, parseURL } from "./_utils.ts";
 
 /**
  * Options for {@link proxyFetch}.
@@ -101,18 +101,32 @@ export async function proxyFetch(
 
   const reqHeaders: Record<string, string | string[]> = {};
   if (init.headers) {
-    const h =
-      init.headers instanceof Headers ? init.headers : new Headers(init.headers as HeadersInit);
-    for (const [key, value] of h) {
-      // Preserve multi-value headers (e.g. set-cookie) as arrays
-      if (key in reqHeaders) {
-        const existing = reqHeaders[key];
-        reqHeaders[key] = Array.isArray(existing)
-          ? [...existing, value]
-          : [existing as string, value];
-      } else {
-        reqHeaders[key] = value;
+    // Fast path: plain object headers (most common from programmatic use)
+    if (init.headers instanceof Headers) {
+      for (const [key, value] of init.headers) {
+        if (key in reqHeaders) {
+          const existing = reqHeaders[key];
+          reqHeaders[key] = Array.isArray(existing)
+            ? [...existing, value]
+            : [existing as string, value];
+        } else {
+          reqHeaders[key] = value;
+        }
       }
+    } else if (Array.isArray(init.headers)) {
+      for (const [key, value] of init.headers) {
+        if (key in reqHeaders) {
+          const existing = reqHeaders[key];
+          reqHeaders[key] = Array.isArray(existing)
+            ? [...existing, value]
+            : [existing as string, value];
+        } else {
+          reqHeaders[key] = value;
+        }
+      }
+    } else {
+      // Record<string, string> — direct assign, no iteration needed
+      Object.assign(reqHeaders, init.headers);
     }
   }
 
@@ -152,16 +166,28 @@ export async function proxyFetch(
         ? 5
         : 0;
 
+  // Fast path: sync conversion for string/ArrayBuffer/TypedArray bodies
+  // Falls back to async _bufferBody for ReadableStream/Blob
+  const body = _toBuffer(init.body) ?? (await _bufferBody(init.body));
+
+  // Default to keep-alive agent for connection reuse
+  const agent =
+    opts?.agent !== undefined
+      ? opts.agent || false
+      : useHTTPS
+        ? defaultAgents.https
+        : defaultAgents.http;
+
   const res = await _sendRequest(
     useHTTPS ? httpsRequest : httpRequest,
     init.method || "GET",
     path,
     reqHeaders,
     resolvedAddr,
-    await _bufferBody(init.body),
+    body,
     {
       signal: init.signal || undefined,
-      agent: opts?.agent,
+      agent,
       timeout: opts?.timeout,
       ssl: opts?.ssl,
       maxRedirects,
@@ -170,26 +196,23 @@ export async function proxyFetch(
     },
   );
 
-  // Build Response
-  const headers = new Headers();
-  for (const [key, value] of Object.entries(res.headers)) {
-    if (key === "transfer-encoding" || key === "keep-alive" || key === "connection") {
+  // Build Response — use plain header pairs to avoid Headers object overhead
+  const resHeaders: [string, string][] = [];
+  const rawHeaders = res.rawHeaders;
+  for (let i = 0; i < rawHeaders.length; i += 2) {
+    const key = rawHeaders[i]!;
+    const keyLower = key.toLowerCase();
+    if (keyLower === "transfer-encoding" || keyLower === "keep-alive" || keyLower === "connection") {
       continue;
     }
-    if (Array.isArray(value)) {
-      for (const v of value) {
-        headers.append(key, v);
-      }
-    } else if (value) {
-      headers.set(key, value);
-    }
+    resHeaders.push([key, rawHeaders[i + 1]!]);
   }
 
   const hasBody = res.statusCode !== 204 && res.statusCode !== 304;
   return new Response(hasBody ? (Readable.toWeb(res) as ReadableStream) : null, {
     status: res.statusCode,
     statusText: res.statusMessage,
-    headers,
+    headers: resHeaders,
   });
 }
 
@@ -210,10 +233,27 @@ function toInit(init?: RequestInit | Request): RequestInit | undefined {
   return init;
 }
 
-/** Normalize any body type to Buffer (or undefined). */
-async function _bufferBody(body: BodyInit | null | undefined): Promise<Buffer | undefined> {
+/** Synchronous body conversion for non-stream types. Returns undefined for streams. */
+function _toBuffer(body: BodyInit | null | undefined): Buffer | undefined {
   if (!body) {
     return undefined;
+  }
+  if (typeof body === "string") {
+    return Buffer.from(body);
+  }
+  if (body instanceof ArrayBuffer || ArrayBuffer.isView(body)) {
+    return Buffer.from(body as ArrayBuffer);
+  }
+  // ReadableStream / Blob: fall through — caller should use _bufferBody for these
+  return undefined;
+}
+
+/** Normalize any body type to Buffer (or undefined), including async types. */
+async function _bufferBody(body: BodyInit | null | undefined): Promise<Buffer | undefined> {
+  // Try sync first
+  const buf = _toBuffer(body);
+  if (buf || !body) {
+    return buf;
   }
   if (body instanceof ReadableStream) {
     const readable = Readable.fromWeb(body as import("node:stream/web").ReadableStream);
@@ -222,9 +262,6 @@ async function _bufferBody(body: BodyInit | null | undefined): Promise<Buffer | 
       chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk);
     }
     return Buffer.concat(chunks);
-  }
-  if (body instanceof ArrayBuffer || ArrayBuffer.isView(body)) {
-    return Buffer.from(body as ArrayBuffer);
   }
   if (body instanceof Blob) {
     return Buffer.from(await body.arrayBuffer());
@@ -258,7 +295,7 @@ function _sendRequest(
       method,
       path,
       headers,
-      agent: opts.agent ?? false,
+      agent: opts.agent,
     };
 
     if (addr.socketPath) {
