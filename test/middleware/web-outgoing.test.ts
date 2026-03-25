@@ -121,9 +121,7 @@ describe("middleware:web-outgoing", () => {
           ctx.proxyRes,
           ctx.options,
         );
-        expect(ctx.proxyRes.headers.location).to.eql(
-          "http://ext-manual.com/redirect/here?foo=bar",
-        );
+        expect(ctx.proxyRes.headers.location).to.eql("http://ext-manual.com/redirect/here?foo=bar");
       });
     });
 
