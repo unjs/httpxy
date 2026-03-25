@@ -8,7 +8,7 @@ const redirectRegex = /^201|30([1278])$/;
  */
 export const removeChunked = defineProxyOutgoingMiddleware((req, res, proxyRes) => {
   // HTTP/1.0 and HTTP/2 do not have transfer-encoding: chunked
-  if (req.httpVersion !== "1.1") {
+  if (req.httpVersion === "1.0" || req.httpVersionMajor >= 2) {
     delete proxyRes.headers["transfer-encoding"];
   }
 });

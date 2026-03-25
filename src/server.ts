@@ -37,7 +37,7 @@ export class ProxyServer<
   Res extends http.ServerResponse | http2.Http2ServerResponse = http.ServerResponse,
 > extends EventEmitter<ProxyServerEventMap<Req, Res>> {
   // we use http2.Http2Server to handle HTTP/1.1 HTTPS as well (with allowHTTP1 enabled)
-  private _server?: http.Server | http2.Http2SecureServer;
+  private _server?: http.Server | https.Server | http2.Http2SecureServer;
 
   _webPasses: ProxyMiddleware<http.ServerResponse>[] = [...webIncomingMiddleware];
   _wsPasses: ProxyMiddleware<net.Socket>[] = [...websocketIncomingMiddleware];
