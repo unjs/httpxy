@@ -692,18 +692,68 @@ describe("middleware:web-outgoing", () => {
     });
   });
 
-  it("#removeChunked", () => {
-    const proxyRes = {
-      headers: {
-        "transfer-encoding": "hello",
-      },
-    };
-    webOutgoing.removeChunked(
-      stubIncomingMessage({ httpVersion: "1.0" }),
-      stubServerResponse(),
-      proxyRes as any,
-      stubMiddlewareOptions(),
-    );
-    expect(proxyRes.headers["transfer-encoding"]).to.eql(undefined);
+  describe("#removeChunked", () => {
+    it("removes transfer-encoding on HTTP/1.0", () => {
+      const proxyRes = {
+        headers: {
+          "transfer-encoding": "hello",
+        },
+      };
+      webOutgoing.removeChunked(
+        stubIncomingMessage({ httpVersion: "1.0" }),
+        stubServerResponse(),
+        proxyRes as any,
+        stubMiddlewareOptions(),
+      );
+      expect(proxyRes.headers["transfer-encoding"]).to.eql(undefined);
+    });
+
+    it("removes transfer-encoding on 204 response", () => {
+      const proxyRes = {
+        statusCode: 204,
+        headers: {
+          "transfer-encoding": "chunked",
+        },
+      };
+      webOutgoing.removeChunked(
+        stubIncomingMessage({ httpVersion: "1.1" }),
+        stubServerResponse(),
+        proxyRes as any,
+        stubMiddlewareOptions(),
+      );
+      expect(proxyRes.headers["transfer-encoding"]).to.eql(undefined);
+    });
+
+    it("removes transfer-encoding on 304 response", () => {
+      const proxyRes = {
+        statusCode: 304,
+        headers: {
+          "transfer-encoding": "chunked",
+        },
+      };
+      webOutgoing.removeChunked(
+        stubIncomingMessage({ httpVersion: "1.1" }),
+        stubServerResponse(),
+        proxyRes as any,
+        stubMiddlewareOptions(),
+      );
+      expect(proxyRes.headers["transfer-encoding"]).to.eql(undefined);
+    });
+
+    it("preserves transfer-encoding on normal HTTP/1.1 responses", () => {
+      const proxyRes = {
+        statusCode: 200,
+        headers: {
+          "transfer-encoding": "chunked",
+        },
+      };
+      webOutgoing.removeChunked(
+        stubIncomingMessage({ httpVersion: "1.1" }),
+        stubServerResponse(),
+        proxyRes as any,
+        stubMiddlewareOptions(),
+      );
+      expect(proxyRes.headers["transfer-encoding"]).to.eql("chunked");
+    });
   });
 });

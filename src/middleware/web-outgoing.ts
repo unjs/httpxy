@@ -5,11 +5,17 @@ import { type ProxyOutgoingMiddleware, defineProxyOutgoingMiddleware } from "./_
 const redirectRegex = /^201|30([1278])$/;
 
 /**
- * Remove chunked transfer-encoding for HTTP/1.0 and HTTP/2 requests
+ * Remove chunked transfer-encoding for HTTP/1.0, HTTP/2, and bodyless (204/304) responses
  */
 export const removeChunked = defineProxyOutgoingMiddleware((req, res, proxyRes) => {
   // HTTP/1.0 and HTTP/2 do not have transfer-encoding: chunked
-  if (req.httpVersion === "1.0" || req.httpVersionMajor >= 2) {
+  // 204 and 304 responses MUST NOT contain a message body (RFC 9110)
+  if (
+    req.httpVersion === "1.0" ||
+    req.httpVersionMajor >= 2 ||
+    proxyRes.statusCode === 204 ||
+    proxyRes.statusCode === 304
+  ) {
     delete proxyRes.headers["transfer-encoding"];
   }
 });
