@@ -35,10 +35,10 @@ export const XHeaders = defineProxyMiddleware<Socket>((req, socket, options) => 
   };
 
   for (const header of ["for", "port", "proto"] as const) {
-    req.headers["x-forwarded-" + header] =
-      (req.headers["x-forwarded-" + header] || "") +
-      (req.headers["x-forwarded-" + header] ? "," : "") +
-      values[header];
+    const key = "x-forwarded-" + header;
+    if (!req.headers[key]) {
+      req.headers[key] = values[header];
+    }
   }
 });
 

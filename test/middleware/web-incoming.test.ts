@@ -105,6 +105,32 @@ describe("middleware:web-incoming", () => {
       expect(req.headers["x-forwarded-port"]).toBe("8080");
       expect(req.headers["x-forwarded-proto"]).toBe("http");
     });
+
+    it("should not overwrite existing x-forwarded-* headers", () => {
+      const stubRequest = stubIncomingMessage({
+        connection: {
+          remoteAddress: "192.168.1.2",
+          remotePort: "8080",
+        },
+        headers: {
+          host: "192.168.1.2:8080",
+          "x-forwarded-host": "192.168.1.3:8081",
+          "x-forwarded-for": "192.168.1.3",
+          "x-forwarded-port": "8081",
+          "x-forwarded-proto": "https",
+        },
+      });
+      webPasses.XHeaders(
+        stubRequest,
+        stubServerResponse(),
+        stubMiddlewareOptions({ xfwd: true }),
+        stubProxyServer(),
+      );
+      expect(stubRequest.headers["x-forwarded-for"]).toBe("192.168.1.3");
+      expect(stubRequest.headers["x-forwarded-port"]).toBe("8081");
+      expect(stubRequest.headers["x-forwarded-proto"]).toBe("https");
+      expect(stubRequest.headers["x-forwarded-host"]).toBe("192.168.1.3:8081");
+    });
   });
 });
 

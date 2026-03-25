@@ -136,5 +136,32 @@ describe("middleware:ws-incoming", () => {
       expect(req.headers["x-forwarded-port"]).toBe("8181");
       expect(req.headers["x-forwarded-proto"]).toBe("wss");
     });
+
+    it("should not overwrite existing x-forwarded-* headers", () => {
+      const req = stubIncomingMessage({
+        socket: {
+          remoteAddress: "192.168.1.3",
+          remotePort: "8181",
+        },
+        connection: {
+          pair: true,
+        },
+        headers: {
+          host: "192.168.1.3:8181",
+          "x-forwarded-for": "192.168.1.2",
+          "x-forwarded-port": "8182",
+          "x-forwarded-proto": "ws",
+        },
+      });
+      wsIncoming.XHeaders(
+        req,
+        stubSocket(),
+        stubMiddlewareOptions({ xfwd: true }),
+        stubProxyServer(),
+      );
+      expect(req.headers["x-forwarded-for"]).toBe("192.168.1.2");
+      expect(req.headers["x-forwarded-port"]).toBe("8182");
+      expect(req.headers["x-forwarded-proto"]).toBe("ws");
+    });
   });
 });
