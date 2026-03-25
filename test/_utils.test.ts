@@ -280,6 +280,45 @@ describe("lib/http-proxy/common.js", () => {
       expect(outgoing.path).to.eql("//test?foo=bar");
     });
 
+    it("should preserve target query string when merging paths", () => {
+      const outgoing = createOutgoing();
+      common.setupOutgoing(
+        outgoing,
+        {
+          target: URL.parse("http://localhost/api?key=val")!,
+        },
+        stubIncomingMessage({ url: "/endpoint" }),
+      );
+
+      expect(outgoing.path).to.eql("/api/endpoint?key=val");
+    });
+
+    it("should merge target and request query strings with &", () => {
+      const outgoing = createOutgoing();
+      common.setupOutgoing(
+        outgoing,
+        {
+          target: URL.parse("http://localhost/api?key=val")!,
+        },
+        stubIncomingMessage({ url: "/endpoint?foo=bar" }),
+      );
+
+      expect(outgoing.path).to.eql("/api/endpoint?key=val&foo=bar");
+    });
+
+    it("should preserve target query string with no request path", () => {
+      const outgoing = createOutgoing();
+      common.setupOutgoing(
+        outgoing,
+        {
+          target: URL.parse("http://localhost?project=example&path=")!,
+        },
+        stubIncomingMessage({ url: "/" }),
+      );
+
+      expect(outgoing.path).to.eql("/?project=example&path=");
+    });
+
     it("should not modify the query string", () => {
       const outgoing = createOutgoing();
       common.setupOutgoing(

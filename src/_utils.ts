@@ -122,6 +122,8 @@ export function setupOutgoing(
   // the final path is target path + relative path requested by user:
   const target = options[forward || "target"];
   const targetPath = target && options.prependPath !== false ? (target as URL).pathname || "" : "";
+  const targetSearch =
+    target instanceof URL && options.prependPath !== false ? target.search || "" : "";
 
   const reqUrl = req.url || "";
   const qIdx = reqUrl.indexOf("?");
@@ -136,7 +138,14 @@ export function setupOutgoing(
   // you are doing and are using conflicting options.
   //
   outgoingPath = options.ignorePath ? "" : outgoingPath;
-  outgoing.path = joinURL(targetPath, outgoingPath);
+
+  let fullPath = joinURL(targetPath, outgoingPath);
+  // Merge target query string into the outgoing path
+  if (targetSearch) {
+    const hasQuery = fullPath.includes("?");
+    fullPath = hasQuery ? fullPath.replace("?", targetSearch + "&") : fullPath + targetSearch;
+  }
+  outgoing.path = fullPath;
 
   if (options.changeOrigin) {
     outgoing.headers.host =
