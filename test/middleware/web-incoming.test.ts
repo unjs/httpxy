@@ -911,21 +911,18 @@ describe("#req-aborted-memory-leak", () => {
     });
     const proxyPort = await proxyListen(proxy);
 
-    const clientReq = http.get(
-      `http://127.0.0.1:${proxyPort}/stream`,
-      (res) => {
-        res.once("data", () => {
-          // Client received first chunk; now abort
-          clientReq.destroy();
+    const clientReq = http.get(`http://127.0.0.1:${proxyPort}/stream`, (res) => {
+      res.once("data", () => {
+        // Client received first chunk; now abort
+        clientReq.destroy();
 
-          setTimeout(() => {
-            expect(upstreamAborted).to.eql(true);
-            source.close();
-            proxy.close(resolve);
-          }, 100);
-        });
-      },
-    );
+        setTimeout(() => {
+          expect(upstreamAborted).to.eql(true);
+          source.close();
+          proxy.close(resolve);
+        }, 100);
+      });
+    });
 
     await promise;
   });
