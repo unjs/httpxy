@@ -68,15 +68,11 @@ export class ProxyServer<
    * @param hostname - The hostname to listen on
    */
   listen(port: number, hostname?: string) {
-    interface ListenerCallback {
-      (
-        req: http.IncomingMessage | http2.Http2ServerRequest,
-        res: http.ServerResponse | http2.Http2ServerResponse,
-      ): Promise<void>;
-    }
-
-    const closure: ListenerCallback = (req, res) => {
-      return this.web(req as any, res as any);
+    const closure = (
+      req: http.IncomingMessage | http2.Http2ServerRequest,
+      res: http.ServerResponse | http2.Http2ServerResponse,
+    ) => {
+      return this.web(req as Req, res as Res);
     };
 
     if (this.options.http2) {
