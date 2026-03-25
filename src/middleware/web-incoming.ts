@@ -129,7 +129,7 @@ export const stream = defineProxyMiddleware((req, res, options, server, head, ca
 
   function createErrorHandler(proxyReq: ClientRequest, url: URL | ProxyTargetDetailed) {
     return function proxyError(err: Error) {
-      if (req.socket?.destroyed && (err as NodeJS.ErrnoException).code === "ECONNRESET") {
+      if (!req.socket?.writable && (err as NodeJS.ErrnoException).code === "ECONNRESET") {
         server.emit("econnreset", err, req, res, url);
         return proxyReq.destroy();
       }

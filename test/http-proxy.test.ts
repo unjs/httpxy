@@ -379,6 +379,73 @@ describe("http-proxy", () => {
     });
   });
 
+  describe("#createProxyServer client disconnect", () => {
+    it("should emit econnreset instead of error when client disconnects", async () => {
+      const { promise, resolve, reject } = Promise.withResolvers<void>();
+
+      // Target server that accepts connections but never responds
+      const source = net.createServer();
+      const sourcePort = await listenOn(source);
+
+      const proxy = httpProxy.createProxyServer({
+        target: "http://127.0.0.1:" + sourcePort,
+      });
+
+      // Intercept proxyReq to simulate the race condition where the client
+      // has disconnected (socket is no longer writable) but req.socket.destroyed
+      // is still false — reproducing the timing issue from upstream PR #1542.
+      proxy.on("proxyReq", (proxyReq, req) => {
+        setTimeout(() => {
+          const socket = req.socket;
+          Object.defineProperty(socket, "writable", { value: false, configurable: true });
+          Object.defineProperty(socket, "destroyed", { value: false, configurable: true });
+          proxyReq.emit(
+            "error",
+            Object.assign(new Error("read ECONNRESET"), { code: "ECONNRESET" }),
+          );
+        }, 50);
+      });
+
+      const proxyServer = http.createServer((req, res) => {
+        proxy.web(req, res);
+      });
+      const proxyPort = await listenOn(proxyServer);
+
+      proxy.on("econnreset", (err) => {
+        expect(err).toBeInstanceOf(Error);
+        expect((err as any).code).toBe("ECONNRESET");
+        proxy.close(() => {});
+        proxyServer.close();
+        source.close();
+        resolve();
+      });
+
+      proxy.on("error", (err) => {
+        proxy.close(() => {});
+        proxyServer.close();
+        source.close();
+        reject(new Error(`Unexpected error event: ${(err as any).code || err.message}`));
+      });
+
+      const testReq = http.request(
+        {
+          hostname: "127.0.0.1",
+          port: proxyPort,
+          method: "GET",
+        },
+        () => {},
+      );
+
+      testReq.on("error", () => {
+        // Expected
+      });
+
+      testReq.end();
+
+      await promise;
+    });
+  });
+
   describe("#createProxyServer with xfwd option", () => {
     it("should not throw on empty http host header", async () => {
       const source = http.createServer();
