@@ -99,6 +99,32 @@ describe("middleware:web-outgoing", () => {
         );
         expect(ctx.proxyRes.headers.location).to.eql("http://backend.com:8080/");
       });
+
+      it("handles relative Location URLs (issue #20)", () => {
+        ctx.proxyRes.statusCode = 201;
+        ctx.proxyRes.headers.location = "/api/books/1";
+        webOutgoing.setRedirectHostRewrite(
+          ctx.req,
+          stubServerResponse(),
+          ctx.proxyRes,
+          ctx.options,
+        );
+        expect(ctx.proxyRes.headers.location).to.eql("http://ext-manual.com/api/books/1");
+      });
+
+      it("handles relative Location URLs with path", () => {
+        ctx.proxyRes.statusCode = 301;
+        ctx.proxyRes.headers.location = "/redirect/here?foo=bar";
+        webOutgoing.setRedirectHostRewrite(
+          ctx.req,
+          stubServerResponse(),
+          ctx.proxyRes,
+          ctx.options,
+        );
+        expect(ctx.proxyRes.headers.location).to.eql(
+          "http://ext-manual.com/redirect/here?foo=bar",
+        );
+      });
     });
 
     describe("rewrites location host with autoRewrite", () => {
