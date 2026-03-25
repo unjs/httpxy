@@ -630,6 +630,46 @@ describe("#client abort propagation", () => {
   });
 });
 
+// Regression: upstream http-party/node-http-proxy#1634
+// When req.socket is undefined, the error handler in stream middleware
+// would throw TypeError: Cannot read properties of undefined (reading 'destroyed')
+describe("#req.socket undefined", () => {
+  it("should not crash when req.socket is undefined and error occurs", async () => {
+    const { resolve, promise } = Promise.withResolvers<void>();
+
+    // Use a port that refuses connections to trigger the error handler
+    const proxy = httpProxy.createProxyServer({
+      target: "http://127.0.0.1:1",
+    });
+
+    const proxyServer = http.createServer((req, res) => {
+      // Set req.socket to undefined after proxyReq is emitted but before
+      // the error handler fires (simulates HTTP/2 or edge-case teardown)
+      proxy.once("proxyReq", () => {
+        Object.defineProperty(req, "socket", {
+          value: undefined,
+          writable: true,
+          configurable: true,
+        });
+      });
+      proxy.web(req, res);
+    });
+    const proxyPort = await listenOn(proxyServer);
+
+    proxy.once("error", () => {
+      // Should reach here without TypeError crash
+      proxyServer.close();
+      resolve();
+    });
+
+    const req = http.request(`http://127.0.0.1:${proxyPort}`, () => {});
+    req.on("error", () => {}); // Ignore client-side errors
+    req.end();
+
+    await promise;
+  });
+});
+
 describe("#followRedirects", () => {
   it("should follow 301 redirect", async () => {
     const { resolve, promise } = Promise.withResolvers<void>();
