@@ -606,6 +606,38 @@ describe("middleware:web-outgoing", () => {
       );
     });
 
+    it("skips invalid headers instead of crashing", () => {
+      const options = {};
+      const proxyRes = {
+        headers: {
+          hey: "hello",
+          how: "are you?",
+          "invalid-header": "value\u0001with\u0002invalid\u0003chars",
+          "set-cookie": ["hello; domain=my.domain; path=/", "there; domain=my.domain; path=/"],
+        },
+      };
+      // Use a real-ish setHeader that validates like Node.js does
+      const headers: Record<string, any> = {};
+      const res = {
+        setHeader(k: string, v: string | string[]) {
+          // Simulate Node.js ERR_INVALID_CHAR for control characters
+          if (typeof v === "string" && /[\u0000-\u001F]/.test(v)) {
+            throw new TypeError(`Invalid character in header content ["${k}"]`);
+          }
+          headers[k.toLowerCase()] = v;
+        },
+      };
+      webOutgoing.writeHeaders(stubIncomingMessage(), res as any, proxyRes as any, options as any);
+
+      // Valid headers should still be set
+      expect(headers.hey).to.eql("hello");
+      expect(headers.how).to.eql("are you?");
+      expect(headers["set-cookie"]).toBeInstanceOf(Array);
+      expect(headers["set-cookie"]).to.have.length(2);
+      // Invalid header should be skipped (not set)
+      expect(headers).to.not.have.key("invalid-header");
+    });
+
     it("skips undefined header values", () => {
       const proxyRes = {
         headers: {

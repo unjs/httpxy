@@ -99,7 +99,12 @@ export const writeHeaders = defineProxyOutgoingMiddleware((req, res, proxyRes, o
     if (rewriteCookiePathConfig && key.toLowerCase() === "set-cookie") {
       header = rewriteCookieProperty(header, rewriteCookiePathConfig, "path");
     }
-    res.setHeader(String(key).trim(), header);
+    try {
+      res.setHeader(String(key).trim(), header);
+    } catch {
+      // Skip headers with invalid characters (e.g. control chars)
+      // to avoid crashing with ERR_INVALID_CHAR
+    }
   };
 
   // message.rawHeaders is added in: v0.11.6
