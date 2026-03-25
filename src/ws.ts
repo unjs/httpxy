@@ -148,13 +148,15 @@ export function proxyUpgrade(
     proxyReq.once("response", (res) => {
       // If upgrade event isn't going to happen, relay the response and reject
       if (!(res as any).upgrade) {
-        sock.write(
-          _createHttpHeader(
-            `HTTP/${res.httpVersion} ${res.statusCode} ${res.statusMessage}`,
-            res.headers,
-          ),
-        );
-        res.pipe(sock);
+        if (sock.writable) {
+          sock.write(
+            _createHttpHeader(
+              `HTTP/${res.httpVersion} ${res.statusCode} ${res.statusMessage}`,
+              res.headers,
+            ),
+          );
+          res.pipe(sock);
+        }
         if (!settled) {
           settled = true;
           reject(new Error("Upstream server did not upgrade the connection"));

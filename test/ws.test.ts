@@ -255,6 +255,59 @@ describe("proxyUpgrade", () => {
     server.close();
   }, 5000);
 
+  it("should not write to socket when it closes before non-upgrade response", async () => {
+    // Regression: upstream PR http-party/node-http-proxy#1552
+    // If the client socket is not writable when the upstream non-upgrade
+    // response arrives, socket.write() should be skipped to avoid
+    // "This socket has been ended by the other party" errors.
+    const { promise: targetReqReceived, resolve: onTargetReq } = Promise.withResolvers<void>();
+    const { promise: canRespond, resolve: allowResponse } = Promise.withResolvers<void>();
+
+    const targetServer = createServer(async (_req, res) => {
+      onTargetReq();
+      await canRespond;
+      res.writeHead(404);
+      res.end("Not Found");
+    });
+    const targetPort = await listenServer(targetServer);
+
+    const server = createServer();
+    const { promise, resolve } = Promise.withResolvers<void>();
+    let socketWriteCalled = false;
+
+    server.on("upgrade", (req, socket, head) => {
+      const origWrite = socket.write.bind(socket) as typeof socket.write;
+      socket.write = function (chunk: any, encodingOrCb?: any, cb?: any) {
+        socketWriteCalled = true;
+        return origWrite(chunk, encodingOrCb, cb);
+      } as typeof socket.write;
+
+      // Destroy the server-side socket before the upstream responds,
+      // simulating a client that disconnects and the server detects it.
+      targetReqReceived.then(() => {
+        socket.destroy();
+        // Allow the target to respond after the socket is destroyed
+        setTimeout(allowResponse, 10);
+      });
+
+      proxyUpgrade({ host: "127.0.0.1", port: targetPort }, req, socket, head).catch(() => {
+        resolve();
+      });
+    });
+
+    const port = await listenServer(server);
+
+    const rawSocket = connect(port, "127.0.0.1", () => {
+      rawSocket.write(wsUpgradeRequest(port));
+    });
+    rawSocket.on("error", () => {});
+
+    await promise;
+    expect(socketWriteCalled).toBe(false);
+    targetServer.close();
+    server.close();
+  }, 5000);
+
   it("should not emit undefined header values", async () => {
     const { server: targetServer, port: targetPort } = await createTargetServer((req, socket) => {
       socket.write(

@@ -97,13 +97,15 @@ export const stream = defineProxyMiddleware<Socket>(
     proxyReq.on("response", function (res) {
       // if upgrade event isn't going to happen, close the socket
       if (!(res as any).upgrade) {
-        socket.write(
-          createHttpHeader(
-            "HTTP/" + res.httpVersion + " " + res.statusCode + " " + res.statusMessage,
-            res.headers,
-          ),
-        );
-        res.pipe(socket);
+        if (socket.writable) {
+          socket.write(
+            createHttpHeader(
+              "HTTP/" + res.httpVersion + " " + res.statusCode + " " + res.statusMessage,
+              res.headers,
+            ),
+          );
+          res.pipe(socket);
+        }
       }
     });
 
