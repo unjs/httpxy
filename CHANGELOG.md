@@ -27,14 +27,14 @@
 - **web-outgoing:** Skip empty header names ([#121](https://github.com/unjs/httpxy/pull/121))
 - **ssl:** Prevent undefined target values from overwriting ssl options ([#118](https://github.com/unjs/httpxy/pull/118))
 - **utils:** Preserve target URL query string in path merging ([#117](https://github.com/unjs/httpxy/pull/117))
-- **middleware:** Do not append duplicate x-forwarded-* header values ([#120](https://github.com/unjs/httpxy/pull/120))
+- **middleware:** Do not append duplicate x-forwarded-\* header values ([#120](https://github.com/unjs/httpxy/pull/120))
 - **web-outgoing:** Strip transfer-encoding on 204/304 ([#122](https://github.com/unjs/httpxy/pull/122))
 - **web-incoming:** Use `isSSL` regex for consistent https/wss protocol checks ([#123](https://github.com/unjs/httpxy/pull/123))
 - **ws:** Preserve wss:// protocol and fix error handling in proxyUpgrade ([cb01605](https://github.com/unjs/httpxy/commit/cb01605))
 
 ### 📦 Build
 
-- ⚠️  Esm-only ([d65b3f7](https://github.com/unjs/httpxy/commit/d65b3f7))
+- ⚠️ Esm-only ([d65b3f7](https://github.com/unjs/httpxy/commit/d65b3f7))
 
 ### 🏡 Chore
 
@@ -42,7 +42,7 @@
 
 #### ⚠️ Breaking Changes
 
-- ⚠️  Esm-only ([d65b3f7](https://github.com/unjs/httpxy/commit/d65b3f7))
+- ⚠️ Esm-only ([d65b3f7](https://github.com/unjs/httpxy/commit/d65b3f7))
 
 ### ❤️ Contributors
 
