@@ -241,6 +241,10 @@ proxy.listen(3000);
 - Install dependencies using `pnpm install`
 - Run interactive tests using `pnpm dev`
 
+## Acknowledgements
+
+Performance optimizations in httpxy were inspired by analysis of [fast-proxy](https://github.com/fastify/fast-proxy) and [@fastify/http-proxy](https://github.com/fastify/fastify-http-proxy).
+
 ## License
 
 Made with 💛
