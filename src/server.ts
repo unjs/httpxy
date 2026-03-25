@@ -80,6 +80,9 @@ export class ProxyServer<
     };
 
     if (this.options.http2) {
+      if (!this.options.ssl) {
+        throw new Error("HTTP/2 requires ssl option");
+      }
       this._server = http2.createSecureServer({ ...this.options.ssl, allowHTTP1: true }, closure);
     } else if (this.options.ssl) {
       this._server = https.createServer(this.options.ssl, closure);
