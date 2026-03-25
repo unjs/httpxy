@@ -26,7 +26,7 @@ const http2Agent = new Agent({
 });
 
 describe("http/2 listener", () => {
-  describe("http2 -> http", async () => {
+  describe("http2 -> http", () => {
     let source: http.Server;
     let sourcePort: number;
     let proxy: httpProxy.ProxyServer;
@@ -91,7 +91,7 @@ describe("http/2 listener", () => {
     });
   });
 
-  describe("http2 -> https", async () => {
+  describe("http2 -> https", () => {
     let source: https.Server;
     let sourcePort: number;
     let proxy: httpProxy.ProxyServer;
