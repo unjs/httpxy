@@ -90,7 +90,7 @@ export const writeHeaders = defineProxyOutgoingMiddleware((req, res, proxyRes, o
   const preserveHeaderKeyCase = options.preserveHeaderKeyCase;
   let rawHeaderKeyMap: Record<string, string> | undefined;
   const setHeader = function (key: string, header: string | string[] | undefined) {
-    if (header === undefined) {
+    if (header === undefined || !String(key).trim()) {
       return;
     }
     if (rewriteCookieDomainConfig && key.toLowerCase() === "set-cookie") {

@@ -668,6 +668,37 @@ describe("middleware:web-outgoing", () => {
       expect(headers).to.not.have.key("invalid-header");
     });
 
+    it("skips empty header names (upstream#1551)", () => {
+      const proxyRes = {
+        headers: {
+          "": "empty-key-value",
+          "  ": "whitespace-key-value",
+          hey: "hello",
+        },
+      };
+      const headers: Record<string, any> = {};
+      const res = {
+        setHeader(k: string, v: string | string[]) {
+          // Simulate Node.js ERR_INVALID_HTTP_TOKEN for empty/invalid header names
+          if (!k || !/^[\w!#$%&'*+\-.^`|~]+$/.test(k)) {
+            throw new TypeError(`Header name must be a valid HTTP token ["${k}"]`);
+          }
+          headers[k.toLowerCase()] = v;
+        },
+      };
+      webOutgoing.writeHeaders(
+        stubIncomingMessage(),
+        res as any,
+        proxyRes as any,
+        stubMiddlewareOptions(),
+      );
+      // Valid headers should still be set
+      expect(headers.hey).to.eql("hello");
+      // Empty/whitespace-only header names should be skipped
+      expect(headers).to.not.have.key("");
+      expect(headers).to.not.have.key("  ");
+    });
+
     it("skips undefined header values", () => {
       const proxyRes = {
         headers: {
