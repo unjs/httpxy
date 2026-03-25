@@ -201,6 +201,36 @@ describe("middleware:web-outgoing", () => {
       });
     });
 
+    describe("handles object target (ProxyTargetDetailed)", () => {
+      it("rewrites location when target is an object with hostRewrite", () => {
+        ctx.options.target = {
+          protocol: "http:",
+          host: "backend.com",
+          hostname: "backend.com",
+        };
+        ctx.options.hostRewrite = "ext-manual.com";
+        webOutgoing.setRedirectHostRewrite(
+          ctx.req,
+          stubServerResponse(),
+          ctx.proxyRes,
+          ctx.options,
+        );
+        expect(ctx.proxyRes.headers.location).to.eql("http://ext-manual.com/");
+      });
+
+      it("rewrites location when target is a URL instance", () => {
+        ctx.options.target = new URL("http://backend.com");
+        ctx.options.hostRewrite = "ext-manual.com";
+        webOutgoing.setRedirectHostRewrite(
+          ctx.req,
+          stubServerResponse(),
+          ctx.proxyRes,
+          ctx.options,
+        );
+        expect(ctx.proxyRes.headers.location).to.eql("http://ext-manual.com/");
+      });
+    });
+
     describe("rewrites location protocol with protocolRewrite", () => {
       beforeEach(() => {
         ctx.options.protocolRewrite = "https";

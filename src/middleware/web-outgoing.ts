@@ -1,4 +1,5 @@
 import { rewriteCookieProperty } from "../_utils.ts";
+import type { ProxyTarget, ProxyTargetDetailed } from "../types.ts";
 import { type ProxyOutgoingMiddleware, defineProxyOutgoingMiddleware } from "./_utils.ts";
 
 const redirectRegex = /^201|30([1278])$/;
@@ -37,8 +38,7 @@ export const setRedirectHostRewrite = defineProxyOutgoingMiddleware(
       proxyRes.headers.location &&
       redirectRegex.test(String(proxyRes.statusCode))
     ) {
-      const target =
-        options.target instanceof URL ? options.target : new URL(options.target as string | URL);
+      const target = _toURL(options.target!);
       const u = new URL(proxyRes.headers.location, target);
 
       // Make sure the redirected host matches the target host before rewriting
@@ -146,3 +146,19 @@ export const webOutgoingMiddleware: readonly ProxyOutgoingMiddleware[] = [
   writeHeaders,
   writeStatusCode,
 ] as const;
+
+// --- Internal ---
+
+function _toURL(target: ProxyTarget): URL {
+  if (target instanceof URL) {
+    return target;
+  }
+  if (typeof target === "string") {
+    return new URL(target);
+  }
+  const protocol = (target as ProxyTargetDetailed).protocol || "http:";
+  const host =
+    (target as ProxyTargetDetailed).host || (target as ProxyTargetDetailed).hostname || "localhost";
+  const port = (target as ProxyTargetDetailed).port;
+  return new URL(`${protocol}//${host}${port ? ":" + port : ""}`);
+}
