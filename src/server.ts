@@ -208,7 +208,7 @@ function _createProxyFn<
     }
 
     let _resolve!: () => void;
-    let _reject: (error: any) => void;
+    let _reject!: (error: any) => void;
     const callbackPromise = new Promise<void>((resolve, reject) => {
       _resolve = resolve;
       _reject = reject;
@@ -222,24 +222,35 @@ function _createProxyFn<
     });
 
     for (const pass of server._getPasses(type)) {
-      const stop = pass(
-        req,
-        res,
-        requestOptions as ProxyServerOptions & { target: URL; forward: URL },
-        server as ProxyServer<
-          http.IncomingMessage | http2.Http2ServerRequest,
-          http.ServerResponse | http2.Http2ServerResponse
-        >,
-        head,
-        (error) => {
-          if (server.listenerCount("error") > 0) {
-            server.emit("error", error, req, res as ProxyServerRes | net.Socket);
-            _resolve();
-          } else {
-            _reject(error);
-          }
-        },
-      );
+      let stop: void | true;
+      try {
+        stop = pass(
+          req,
+          res,
+          requestOptions as ProxyServerOptions & { target: URL; forward: URL },
+          server as ProxyServer<
+            http.IncomingMessage | http2.Http2ServerRequest,
+            http.ServerResponse | http2.Http2ServerResponse
+          >,
+          head,
+          (error) => {
+            if (server.listenerCount("error") > 0) {
+              server.emit("error", error, req, res as ProxyServerRes | net.Socket);
+              _resolve();
+            } else {
+              _reject(error);
+            }
+          },
+        );
+      } catch (error) {
+        if (server.listenerCount("error") > 0) {
+          server.emit("error", error as Error, req, res as ProxyServerRes | net.Socket);
+          _resolve();
+        } else {
+          _reject(error);
+        }
+        break;
+      }
       // Passes can return a truthy value to halt the loop
       if (stop) {
         _resolve();
