@@ -2,7 +2,7 @@ import type { ClientRequest, IncomingMessage, ServerResponse } from "node:http";
 import type { ProxyTargetDetailed } from "../types.ts";
 import nodeHTTP from "node:http";
 import nodeHTTPS from "node:https";
-import { getPort, hasEncryptedConnection, setupOutgoing } from "../_utils.ts";
+import { getPort, hasEncryptedConnection, isSSL, setupOutgoing } from "../_utils.ts";
 import { webOutgoingMiddleware } from "./web-outgoing.ts";
 import { type ProxyMiddleware, defineProxyMiddleware } from "./_utils.ts";
 
@@ -78,7 +78,7 @@ export const stream = defineProxyMiddleware((req, res, options, server, head, ca
 
   if (options.forward) {
     // If forward enable, so just pipe the request
-    const forwardReq = (options.forward.protocol === "https:" ? https : http).request(
+    const forwardReq = (isSSL.test(options.forward.protocol || "http") ? https : http).request(
       setupOutgoing(options.ssl || {}, options, req, "forward"),
     );
 
@@ -96,7 +96,7 @@ export const stream = defineProxyMiddleware((req, res, options, server, head, ca
   }
 
   // Request initalization
-  const proxyReq = (options.target.protocol === "https:" ? https : http).request(
+  const proxyReq = (isSSL.test(options.target.protocol || "http") ? https : http).request(
     setupOutgoing(options.ssl || {}, options, req),
   );
 
@@ -186,7 +186,7 @@ export const stream = defineProxyMiddleware((req, res, options, server, head, ca
       const preserveMethod = statusCode === 307 || statusCode === 308;
       const redirectMethod = preserveMethod ? req.method || "GET" : "GET";
 
-      const isHTTPS = location.protocol === "https:";
+      const isHTTPS = isSSL.test(location.protocol);
       const agent = isHTTPS ? https : http;
 
       // Build headers from original request
