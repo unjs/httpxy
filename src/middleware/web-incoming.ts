@@ -52,7 +52,8 @@ export const XHeaders = defineProxyMiddleware((req, res, options) => {
       values[header];
   }
 
-  req.headers["x-forwarded-host"] = req.headers["x-forwarded-host"] || req.headers.host || "";
+  req.headers["x-forwarded-host"] =
+    req.headers["x-forwarded-host"] || req.headers[":authority"] || req.headers.host || "";
 });
 
 /**
@@ -269,6 +270,20 @@ export const stream = defineProxyMiddleware((req, res, options, server, head, ca
     } else {
       res.on("close", function () {
         proxyRes.destroy();
+      });
+      proxyRes.on("close", function () {
+        if (!proxyRes.complete && !res.destroyed) {
+          res.destroy();
+        }
+      });
+      proxyRes.on("error", function (err) {
+        if (!res.destroyed) {
+          res.destroy(err);
+        }
+
+        if (server.listenerCount("error") > 0) {
+          server.emit("error", err, req, res, currentUrl);
+        }
       });
       proxyRes.on("end", function () {
         if (server) {

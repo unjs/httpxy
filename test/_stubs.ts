@@ -22,7 +22,14 @@ export function createOutgoing(): OutgoingOptions {
 // --- IncomingMessage stubs ---
 
 export function stubIncomingMessage(overrides: Record<string, unknown> = {}): IncomingMessage {
-  return { method: "GET", url: "/", headers: {}, ...overrides } as unknown as IncomingMessage;
+  return {
+    method: "GET",
+    url: "/",
+    headers: {},
+    httpVersion: "1.1",
+    httpVersionMajor: 1,
+    ...overrides,
+  } as unknown as IncomingMessage;
 }
 
 // --- ServerResponse stub ---
@@ -50,6 +57,6 @@ export function stubMiddlewareOptions(overrides: Record<string, unknown> = {}): 
 
 // --- ProxyServer stub ---
 
-export function stubProxyServer(overrides: Record<string, unknown> = {}): ProxyServer {
+export function stubProxyServer(overrides: Record<string, unknown> = {}): ProxyServer<any, any> {
   return overrides as unknown as ProxyServer;
 }

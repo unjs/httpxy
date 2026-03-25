@@ -7,28 +7,9 @@ import * as io from "socket.io";
 import SSE from "sse";
 import ioClient from "socket.io-client";
 import type { AddressInfo } from "node:net";
+import { listenOn, proxyListen } from "./_utils.ts";
 
 // Source: https://github.com/http-party/node-http-proxy/blob/master/test/lib-http-proxy-test.js
-
-function listenOn(server: http.Server | net.Server): Promise<number> {
-  return new Promise((resolve, reject) => {
-    server.once("error", reject);
-    server.listen(0, "127.0.0.1", () => {
-      resolve((server.address() as AddressInfo).port);
-    });
-  });
-}
-
-function proxyListen(proxy: ReturnType<typeof httpProxy.createProxyServer>): Promise<number> {
-  return new Promise((resolve, reject) => {
-    proxy.listen(0, "127.0.0.1");
-    const server = (proxy as any)._server as net.Server;
-    server.once("error", reject);
-    server.once("listening", () => {
-      resolve((server.address() as AddressInfo).port);
-    });
-  });
-}
 
 describe("http-proxy", () => {
   describe("#createProxyServer", () => {
@@ -115,6 +96,72 @@ describe("http-proxy", () => {
         .end();
 
       await promise;
+    });
+
+    it("should close downstream SSE stream when upstream aborts", async () => {
+      const source = http.createServer((_, res) => {
+        res.writeHead(200, {
+          "content-type": "text/event-stream",
+          "cache-control": "no-cache",
+          connection: "keep-alive",
+        });
+        res.write(":ok\n\n");
+
+        setTimeout(() => {
+          res.socket?.destroy();
+        }, 20);
+      });
+      const sourcePort = await listenOn(source);
+
+      const proxy = httpProxy.createProxyServer({
+        target: "http://127.0.0.1:" + sourcePort,
+      });
+      const proxyPort = await proxyListen(proxy);
+
+      const { promise, resolve } = Promise.withResolvers<void>();
+      let gotFirstChunk = false;
+      let requestError: Error | undefined;
+
+      const finish = () => {
+        source.close();
+        proxy.close(resolve);
+      };
+
+      const timeout = setTimeout(() => {
+        requestError = new Error("Timed out waiting for downstream SSE close");
+        finish();
+      }, 1000);
+
+      http
+        .request(
+          {
+            hostname: "127.0.0.1",
+            port: proxyPort,
+            method: "GET",
+          },
+          (res) => {
+            res.on("data", (chunk) => {
+              if (chunk.toString("utf8").includes(":ok")) {
+                gotFirstChunk = true;
+              }
+            });
+
+            res.once("close", () => {
+              clearTimeout(timeout);
+              finish();
+            });
+          },
+        )
+        .on("error", (error) => {
+          clearTimeout(timeout);
+          requestError = error;
+          finish();
+        })
+        .end();
+
+      await promise;
+      expect(requestError).toBeUndefined();
+      expect(gotFirstChunk).toBe(true);
     });
 
     it("should make the request on pipe and finish it", async () => {
