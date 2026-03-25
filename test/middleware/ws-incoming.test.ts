@@ -119,10 +119,9 @@ describe("middleware:ws-incoming", () => {
         socket: {
           remoteAddress: "192.168.1.3",
           remotePort: "8181",
+          encrypted: true,
         },
-        connection: {
-          pair: true,
-        },
+        connection: {},
         headers: {
           host: "192.168.1.3:8181",
         },
