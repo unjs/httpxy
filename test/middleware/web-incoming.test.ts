@@ -10,7 +10,7 @@ import {
   stubMiddlewareOptions,
   stubProxyServer,
 } from "../_stubs.ts";
-import { listenOn } from "../_utils.ts";
+import { listenOn, proxyListen } from "../_utils.ts";
 
 // Source: https://github.com/http-party/node-http-proxy/blob/master/test/lib-http-proxy-passes-web-incoming-test.js
 
@@ -851,6 +851,82 @@ describe("#followRedirects", () => {
         });
       })
       .end();
+    await promise;
+  });
+});
+
+// Regression: upstream http-party/node-http-proxy#1559
+// req.on('aborted') stopped firing on Node 15.5+ and was later removed,
+// causing a memory leak from accumulated listeners that never get cleaned up.
+describe("#req-aborted-memory-leak", () => {
+  it("should not attach deprecated 'aborted' listener on req", async () => {
+    const { promise, resolve } = Promise.withResolvers<void>();
+
+    const source = http.createServer((_req, res) => {
+      res.writeHead(200);
+      res.end("ok");
+    });
+    const sourcePort = await listenOn(source);
+
+    const proxyServer = httpProxy.createProxyServer({
+      target: `http://127.0.0.1:${sourcePort}`,
+    });
+
+    // Intercept the incoming request to inspect its listeners
+    const server = http.createServer((req, res) => {
+      const abortedBefore = req.listenerCount("aborted");
+      proxyServer.web(req, res).then(() => {
+        const abortedAfter = req.listenerCount("aborted");
+        const addedAbortedListeners = abortedAfter - abortedBefore;
+
+        expect(addedAbortedListeners).to.eql(0);
+
+        source.close();
+        server.close();
+        proxyServer.close();
+        resolve();
+      });
+    });
+    const port = await listenOn(server);
+
+    http.get(`http://127.0.0.1:${port}/test`);
+    await promise;
+  });
+
+  it("should abort upstream request when client disconnects via res close", async () => {
+    const { promise, resolve } = Promise.withResolvers<void>();
+
+    let upstreamAborted = false;
+    const source = http.createServer((req, res) => {
+      res.writeHead(200, { "content-type": "text/plain" });
+      res.write("start");
+      req.on("close", () => {
+        upstreamAborted = true;
+      });
+    });
+    const sourcePort = await listenOn(source);
+
+    const proxy = httpProxy.createProxyServer({
+      target: `http://127.0.0.1:${sourcePort}`,
+    });
+    const proxyPort = await proxyListen(proxy);
+
+    const clientReq = http.get(
+      `http://127.0.0.1:${proxyPort}/stream`,
+      (res) => {
+        res.once("data", () => {
+          // Client received first chunk; now abort
+          clientReq.destroy();
+
+          setTimeout(() => {
+            expect(upstreamAborted).to.eql(true);
+            source.close();
+            proxy.close(resolve);
+          }, 100);
+        });
+      },
+    );
+
     await promise;
   });
 });

@@ -115,11 +115,6 @@ export const stream = defineProxyMiddleware((req, res, options, server, head, ca
     });
   }
 
-  // Ensure we abort proxy if request is aborted
-  req.on("aborted", function () {
-    proxyReq.abort();
-  });
-
   // Abort proxy request when client disconnects
   res.on("close", function () {
     if (!res.writableFinished) {
