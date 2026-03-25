@@ -67,7 +67,9 @@ export function setupOutgoing(
     "secureProtocol",
   ] as const) {
     const value = (options[forward || "target"] as ProxyTargetDetailed)[e];
-    outgoing[e] = value as any;
+    if (value !== undefined) {
+      outgoing[e] = value as any;
+    }
   }
 
   outgoing.method = options.method || req.method;

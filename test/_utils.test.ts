@@ -48,6 +48,37 @@ describe("lib/http-proxy/common.js", () => {
       expect(outgoing.auth).to.eql("username:pass");
     });
 
+    it("should not overwrite existing ssl options with undefined target values", () => {
+      const outgoing = createOutgoing();
+      // Simulate options.ssl having cert/key/ca (as passed from web-incoming)
+      Object.assign(outgoing, {
+        cert: "my-cert",
+        key: "my-key",
+        ca: "my-ca",
+      });
+      common.setupOutgoing(
+        outgoing,
+        {
+          agent: undefined,
+          target: {
+            host: "localhost",
+            hostname: "localhost",
+            port: "8080",
+            // No SSL properties on target — they should NOT overwrite outgoing
+          },
+        },
+        stubIncomingMessage({
+          method: "GET",
+          url: "/",
+          headers: {},
+        }),
+      );
+      // SSL options from outgoing (options.ssl) must be preserved
+      expect(outgoing.cert).to.eql("my-cert");
+      expect(outgoing.key).to.eql("my-key");
+      expect(outgoing.ca).to.eql("my-ca");
+    });
+
     it("should not override agentless upgrade header", () => {
       const outgoing = createOutgoing();
       common.setupOutgoing(
