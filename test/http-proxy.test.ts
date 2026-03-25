@@ -164,6 +164,62 @@ describe("http-proxy", () => {
       expect(gotFirstChunk).toBe(true);
     });
 
+    it("should destroy upstream proxy request when client aborts", async () => {
+      const { promise, resolve, reject } = Promise.withResolvers<void>();
+
+      // Track whether the upstream request was properly destroyed
+      let upstreamReqDestroyed = false;
+
+      const source = http.createServer((req, res) => {
+        // SSE-like long-lived response
+        res.writeHead(200, {
+          "content-type": "text/event-stream",
+          "cache-control": "no-cache",
+          connection: "keep-alive",
+        });
+        res.write(":ok\n\n");
+
+        req.socket.on("close", () => {
+          upstreamReqDestroyed = true;
+        });
+      });
+      const sourcePort = await listenOn(source);
+
+      const proxy = httpProxy.createProxyServer({
+        target: "http://127.0.0.1:" + sourcePort,
+      });
+      const proxyPort = await proxyListen(proxy);
+
+      const timeout = setTimeout(() => {
+        reject(new Error("Timed out: upstream request was not destroyed after client abort"));
+      }, 2000);
+
+      // Make a request and abort it after receiving the first chunk
+      const clientReq = http.request(
+        { hostname: "127.0.0.1", port: proxyPort, method: "GET" },
+        (res) => {
+          res.once("data", () => {
+            // Client received data, now abort the connection
+            clientReq.destroy();
+          });
+        },
+      );
+      clientReq.end();
+
+      // Poll for upstream destruction
+      const check = setInterval(() => {
+        if (upstreamReqDestroyed) {
+          clearInterval(check);
+          clearTimeout(timeout);
+          source.close();
+          proxy.close(() => resolve());
+        }
+      }, 20);
+
+      await promise;
+      expect(upstreamReqDestroyed).toBe(true);
+    });
+
     it("should make the request on pipe and finish it", async () => {
       const source = http.createServer();
       const sourcePort = await listenOn(source);

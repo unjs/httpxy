@@ -111,14 +111,9 @@ export const stream = defineProxyMiddleware((req, res, options, server, head, ca
   // show an error page at the initial request
   if (options.proxyTimeout) {
     proxyReq.setTimeout(options.proxyTimeout, function () {
-      proxyReq.abort();
+      proxyReq.destroy();
     });
   }
-
-  // Ensure we abort proxy if request is aborted
-  req.on("aborted", function () {
-    proxyReq.abort();
-  });
 
   // Abort proxy request when client disconnects
   res.on("close", function () {
@@ -136,7 +131,7 @@ export const stream = defineProxyMiddleware((req, res, options, server, head, ca
     return function proxyError(err: Error) {
       if (req.socket.destroyed && (err as NodeJS.ErrnoException).code === "ECONNRESET") {
         server.emit("econnreset", err, req, res, url);
-        return proxyReq.abort();
+        return proxyReq.destroy();
       }
 
       if (callback) {
@@ -230,7 +225,7 @@ export const stream = defineProxyMiddleware((req, res, options, server, head, ca
 
       if (options.proxyTimeout) {
         redirectReq.setTimeout(options.proxyTimeout, () => {
-          redirectReq.abort();
+          redirectReq.destroy();
         });
       }
 
