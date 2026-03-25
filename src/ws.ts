@@ -147,14 +147,17 @@ export function proxyUpgrade(
 
     proxyReq.once("response", (res) => {
       // If upgrade event isn't going to happen, relay the response and reject
+      // Guard against writing to an already-destroyed socket
+      // (https://github.com/http-party/node-http-proxy/pull/1433)
       if (!(res as any).upgrade) {
-        if (sock.writable) {
+        if (!sock.destroyed && sock.writable) {
           sock.write(
             _createHttpHeader(
               `HTTP/${res.httpVersion} ${res.statusCode} ${res.statusMessage}`,
               res.headers,
             ),
           );
+          res.on("error", onOutgoingError);
           res.pipe(sock);
         }
         if (!settled) {

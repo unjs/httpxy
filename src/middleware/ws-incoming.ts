@@ -96,16 +96,17 @@ export const stream = defineProxyMiddleware<Socket>(
     proxyReq.on("error", onOutgoingError);
     proxyReq.on("response", function (res) {
       // if upgrade event isn't going to happen, close the socket
-      if (!(res as any).upgrade) {
-        if (socket.writable) {
-          socket.write(
-            createHttpHeader(
-              "HTTP/" + res.httpVersion + " " + res.statusCode + " " + res.statusMessage,
-              res.headers,
-            ),
-          );
-          res.pipe(socket);
-        }
+      // guard against writing to an already-destroyed socket
+      // (https://github.com/http-party/node-http-proxy/pull/1433)
+      if (!(res as any).upgrade && !socket.destroyed && socket.writable) {
+        socket.write(
+          createHttpHeader(
+            "HTTP/" + res.httpVersion + " " + res.statusCode + " " + res.statusMessage,
+            res.headers,
+          ),
+        );
+        res.on("error", onOutgoingError);
+        res.pipe(socket);
       }
     });
 

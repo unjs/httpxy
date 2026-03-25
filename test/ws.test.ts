@@ -308,6 +308,35 @@ describe("proxyUpgrade", () => {
     server.close();
   }, 5000);
 
+  it("should not crash when upstream response errors during non-upgrade pipe", async () => {
+    // Regression: https://github.com/http-party/node-http-proxy/pull/1439
+    // When upstream returns a non-upgrade response and the response stream errors
+    // (e.g., ECONNRESET), the error on `res` was unhandled and crashed the process.
+    const targetServer = createServer((req, res) => {
+      res.writeHead(502);
+      res.write("partial");
+      setTimeout(() => req.socket.destroy(), 10);
+    });
+    const targetPort = await listenServer(targetServer);
+
+    const server = createServer();
+    const { promise, resolve } = Promise.withResolvers<void>();
+
+    server.on("upgrade", (req, socket, head) => {
+      proxyUpgrade({ host: "127.0.0.1", port: targetPort }, req, socket, head).catch(() => {
+        resolve();
+      });
+    });
+
+    const port = await listenServer(server);
+    const client = new ws.WebSocket("ws://127.0.0.1:" + port);
+    client.on("error", () => {});
+
+    await promise;
+    targetServer.close();
+    server.close();
+  }, 5000);
+
   it("should not emit undefined header values", async () => {
     const { server: targetServer, port: targetPort } = await createTargetServer((req, socket) => {
       socket.write(

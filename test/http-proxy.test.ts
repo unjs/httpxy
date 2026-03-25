@@ -521,6 +521,38 @@ describe("http-proxy", () => {
       await promise;
     });
 
+    it("should not crash when upstream response errors during non-upgrade pipe", async () => {
+      // Regression: https://github.com/http-party/node-http-proxy/pull/1439
+      const { resolve, promise } = Promise.withResolvers<void>();
+
+      const server = http.createServer((req, res) => {
+        res.writeHead(502);
+        res.write("partial");
+        setTimeout(() => req.socket.destroy(), 10);
+      });
+      const sourcePort = await listenOn(server);
+
+      const proxy = httpProxy.createProxyServer({
+        target: "ws://127.0.0.1:" + sourcePort,
+        ws: true,
+      });
+
+      proxy.on("error", () => {
+        // Error handler - the fix ensures this is called instead of crashing
+      });
+
+      const proxyPort = await proxyListen(proxy);
+
+      const client = new ws.WebSocket("ws://127.0.0.1:" + proxyPort);
+      client.on("error", () => {});
+      client.on("close", () => {
+        proxy.close(resolve);
+      });
+
+      await promise;
+      server.close();
+    });
+
     it("should proxy a socket.io stream", async () => {
       const { resolve, promise } = Promise.withResolvers<void>();
 
