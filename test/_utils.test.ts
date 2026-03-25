@@ -131,7 +131,7 @@ describe("lib/http-proxy/common.js", () => {
       common.setupOutgoing(
         outgoing,
         {
-          agent: undefined,
+          agent: false,
           target: {
             host: "hey",
             hostname: "how",
@@ -154,7 +154,7 @@ describe("lib/http-proxy/common.js", () => {
       common.setupOutgoing(
         outgoing,
         {
-          agent: undefined,
+          agent: false,
           target: {
             host: "hey",
             hostname: "how",
@@ -172,11 +172,23 @@ describe("lib/http-proxy/common.js", () => {
       expect(outgoing.headers!.connection).to.eql("close");
     });
 
-    it("should set the agent to false if none is given", () => {
+    it("should use default keep-alive agent if none is given", () => {
       const outgoing = createOutgoing();
       common.setupOutgoing(
         outgoing,
         { target: "http://localhost" },
+        stubIncomingMessage({
+          url: "/",
+        }),
+      );
+      expect(outgoing.agent).to.eql(common.defaultAgents.http);
+    });
+
+    it("should set the agent to false if explicitly set", () => {
+      const outgoing = createOutgoing();
+      common.setupOutgoing(
+        outgoing,
+        { target: "http://localhost", agent: false },
         stubIncomingMessage({
           url: "/",
         }),

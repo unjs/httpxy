@@ -7,6 +7,7 @@ import { websocketIncomingMiddleware } from "./middleware/ws-incoming.ts";
 import type { ProxyServerOptions, ProxyTarget } from "./types.ts";
 import type { ProxyMiddleware, ResOfType } from "./middleware/_utils.ts";
 import type net from "node:net";
+import { parseURL } from "./_utils.ts";
 
 export interface ProxyServerEventMap<
   Req extends http.IncomingMessage | http2.Http2ServerRequest = http.IncomingMessage,
@@ -198,7 +199,7 @@ function _createProxyFn<
 
     for (const key of ["target", "forward"] as const) {
       if (typeof requestOptions[key] === "string") {
-        requestOptions[key] = new URL(requestOptions[key]);
+        requestOptions[key] = parseURL(requestOptions[key]);
       }
     }
 

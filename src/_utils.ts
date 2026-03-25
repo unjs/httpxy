@@ -7,6 +7,35 @@ import type { Http2ServerRequest } from "node:http2";
 const upgradeHeader = /(^|,)\s*upgrade\s*($|,)/i;
 
 /**
+ * Default keep-alive agents for connection reuse.
+ */
+export const defaultAgents = {
+  http: new httpNative.Agent({ keepAlive: true, maxSockets: 256, maxFreeSockets: 64 }),
+  https: new httpsNative.Agent({ keepAlive: true, maxSockets: 256, maxFreeSockets: 64 }),
+};
+
+/**
+ * URL parse cache to avoid repeated `new URL()` for the same string targets.
+ */
+const _urlCache = new Map<string, URL>();
+const _urlCacheMaxSize = 256;
+
+export function parseURL(str: string): URL {
+  let cached = _urlCache.get(str);
+  if (cached) {
+    return cached;
+  }
+  cached = new URL(str);
+  if (_urlCache.size >= _urlCacheMaxSize) {
+    // Evict oldest entry
+    const firstKey = _urlCache.keys().next().value!;
+    _urlCache.delete(firstKey);
+  }
+  _urlCache.set(str, cached);
+  return cached;
+}
+
+/**
  * Simple Regex for testing if protocol is https
  */
 export const isSSL = /^https|wss/;
@@ -73,16 +102,21 @@ export function setupOutgoing(
   }
 
   outgoing.method = options.method || req.method;
-  outgoing.headers = { ...req.headers };
+
+  // Single copy: merge req.headers + options.headers in one pass
+  if (options.headers) {
+    const headers: Record<string, string | string[] | undefined> = { ...req.headers };
+    for (const key of Object.keys(options.headers)) {
+      headers[key] = options.headers[key];
+    }
+    outgoing.headers = headers;
+  } else {
+    outgoing.headers = { ...req.headers };
+  }
 
   // before clean up HTTP/2 blacklist header, we might wanna override host first
   if (req.headers?.[":authority"]) {
     outgoing.headers.host = req.headers[":authority"] as string;
-  }
-  // host override must happen before composing/merging the final outgoing headers
-
-  if (options.headers) {
-    outgoing.headers = { ...outgoing.headers, ...options.headers };
   }
 
   if (req.httpVersionMajor > 1) {
@@ -104,7 +138,16 @@ export function setupOutgoing(
     outgoing.rejectUnauthorized = options.secure === undefined ? true : options.secure;
   }
 
-  outgoing.agent = options.agent || false;
+  if (options.agent !== undefined) {
+    outgoing.agent = options.agent || false;
+  } else if (req.httpVersionMajor > 1) {
+    // HTTP/2 incoming requests: keep-alive agents can conflict with stream lifecycle
+    outgoing.agent = false;
+  } else {
+    // Use default keep-alive agents for connection reuse
+    const targetProto = (options[forward || "target"] as URL).protocol ?? "http";
+    outgoing.agent = isSSL.test(targetProto) ? defaultAgents.https : defaultAgents.http;
+  }
   outgoing.localAddress = options.localAddress;
 
   //
@@ -298,7 +341,7 @@ export function parseAddr(addr: string | ProxyAddr): ProxyAddr {
     if (addr.startsWith("unix:")) {
       return { socketPath: addr.slice(5) };
     }
-    const url = new URL(addr);
+    const url = parseURL(addr);
     return {
       host: url.hostname,
       port: Number(url.port) || (isSSL.test(url.protocol) ? 443 : 80),
