@@ -140,7 +140,7 @@ export const stream = defineProxyMiddleware((req, res, options, server, head, ca
 
       if (callback) {
         callback(err, req, res, url);
-      } else if (server.listenerCount("error") > 0) {
+      } else {
         server.emit("error", err, req, res, url);
       }
     };
