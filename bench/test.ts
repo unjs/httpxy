@@ -1,8 +1,9 @@
-import { bench, group, compact, summary, run } from "mitata";
+#!/usr/bin/env node
 import http from "node:http";
 import { createProxyServer, proxyFetch } from "../src/index.ts";
 import fastProxy from "fast-proxy";
 import { createProxyServer as createHttpProxy3 } from "http-proxy-3";
+import httpProxyLegacy from "http-proxy";
 import Fastify from "fastify";
 import httpProxy from "@fastify/http-proxy";
 
@@ -14,6 +15,7 @@ const HTTPXY_FETCH_PORT = 9_902;
 const FAST_PROXY_PORT = 9_903;
 const FASTIFY_PROXY_PORT = 9_904;
 const HTTP_PROXY_3_PORT = 9_905;
+const HTTP_PROXY_PORT = 9_906;
 
 const SMALL_BODY = JSON.stringify({ message: "hello world", ts: Date.now() });
 const LARGE_BODY = JSON.stringify({
@@ -35,7 +37,6 @@ function createTargetServer(): Promise<http.Server> {
         res.end('{"ok":true}');
         return;
       }
-      // Echo POST body
       const chunks: Buffer[] = [];
       req.on("data", (c) => chunks.push(c));
       req.on("end", () => {
@@ -127,7 +128,17 @@ async function setupHttpProxy3(): Promise<http.Server> {
   });
 }
 
-// --- Helpers ---
+async function setupHttpProxyLegacy(): Promise<http.Server> {
+  const proxy = httpProxyLegacy.createProxyServer({ target: TARGET });
+  const server = http.createServer((req, res) => {
+    proxy.web(req, res);
+  });
+  return new Promise((resolve) => {
+    server.listen(HTTP_PROXY_PORT, () => resolve(server));
+  });
+}
+
+// --- HTTP helpers ---
 
 interface HttpResult {
   status: number;
@@ -182,40 +193,6 @@ function httpPost(port: number, body: string, path = "/"): Promise<HttpResult> {
   });
 }
 
-// Lean versions for benchmarks (drain body, minimal allocations)
-function benchGet(port: number): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const req = http.get(`http://127.0.0.1:${port}/`, (res) => {
-      res.resume();
-      res.on("end", resolve);
-    });
-    req.on("error", reject);
-  });
-}
-
-function benchPost(port: number, body: string): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const req = http.request(
-      {
-        hostname: "127.0.0.1",
-        port,
-        path: "/",
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          "content-length": Buffer.byteLength(body),
-        },
-      },
-      (res) => {
-        res.resume();
-        res.on("end", resolve);
-      },
-    );
-    req.on("error", reject);
-    req.end(body);
-  });
-}
-
 // --- Main ---
 
 async function main() {
@@ -227,8 +204,8 @@ async function main() {
   const fastProxySetup = await setupFastProxy();
   const fastifyApp = await setupFastifyProxy();
   const httpProxy3Server = await setupHttpProxy3();
+  const httpProxyLegacyServer = await setupHttpProxyLegacy();
 
-  // --- Validation ---
   console.log("Validating proxy implementations...");
 
   const proxies = [
@@ -237,6 +214,7 @@ async function main() {
     { name: "fast-proxy", port: FAST_PROXY_PORT },
     { name: "@fastify/http-proxy", port: FASTIFY_PROXY_PORT },
     { name: "http-proxy-3", port: HTTP_PROXY_3_PORT },
+    { name: "http-proxy", port: HTTP_PROXY_PORT },
   ];
 
   let allValid = true;
@@ -244,7 +222,6 @@ async function main() {
   for (const { name, port } of proxies) {
     const errors: string[] = [];
 
-    // GET: should return 200 with {"ok":true}
     const getRes = await httpGet(port);
     if (getRes.status !== 200) {
       errors.push(`GET status=${getRes.status}, expected 200`);
@@ -253,7 +230,6 @@ async function main() {
       errors.push(`GET body=${JSON.stringify(getRes.body)}, expected '{"ok":true}'`);
     }
 
-    // POST small: should echo back the body
     const postSmall = await httpPost(port, SMALL_BODY);
     if (postSmall.status !== 200) {
       errors.push(`POST(1KB) status=${postSmall.status}, expected 200`);
@@ -264,7 +240,6 @@ async function main() {
       );
     }
 
-    // POST large: should echo back the body
     const postLarge = await httpPost(port, LARGE_BODY);
     if (postLarge.status !== 200) {
       errors.push(`POST(100KB) status=${postLarge.status}, expected 200`);
@@ -286,67 +261,7 @@ async function main() {
     }
   }
 
-  if (!allValid) {
-    console.error("\nValidation failed — aborting benchmarks.");
-    process.exit(1);
-  }
-  console.log("");
-
-  // Warmup — ensure all connections are established
-  console.log("Warming up...");
-  for (const { port } of proxies) {
-    for (let i = 0; i < 50; i++) {
-      await benchGet(port);
-    }
-  }
-  console.log("Running benchmarks...\n");
-
-  // --- GET (no body) ---
-
-  compact(() => {
-    summary(() => {
-      group("GET proxy (no body)", () => {
-        bench("httpxy server", () => benchGet(HTTPXY_SERVER_PORT));
-        bench("httpxy proxyFetch", () => benchGet(HTTPXY_FETCH_PORT));
-        bench("fast-proxy", () => benchGet(FAST_PROXY_PORT));
-        bench("@fastify/http-proxy", () => benchGet(FASTIFY_PROXY_PORT));
-        bench("http-proxy-3", () => benchGet(HTTP_PROXY_3_PORT));
-      });
-    });
-  });
-
-  // --- POST small body (~1KB) ---
-
-  compact(() => {
-    summary(() => {
-      group("POST proxy (~1KB JSON body)", () => {
-        bench("httpxy server", () => benchPost(HTTPXY_SERVER_PORT, SMALL_BODY));
-        bench("httpxy proxyFetch", () => benchPost(HTTPXY_FETCH_PORT, SMALL_BODY));
-        bench("fast-proxy", () => benchPost(FAST_PROXY_PORT, SMALL_BODY));
-        bench("@fastify/http-proxy", () => benchPost(FASTIFY_PROXY_PORT, SMALL_BODY));
-        bench("http-proxy-3", () => benchPost(HTTP_PROXY_3_PORT, SMALL_BODY));
-      });
-    });
-  });
-
-  // --- POST large body (~100KB) ---
-
-  compact(() => {
-    summary(() => {
-      group("POST proxy (~100KB JSON body)", () => {
-        bench("httpxy server", () => benchPost(HTTPXY_SERVER_PORT, LARGE_BODY));
-        bench("httpxy proxyFetch", () => benchPost(HTTPXY_FETCH_PORT, LARGE_BODY));
-        bench("fast-proxy", () => benchPost(FAST_PROXY_PORT, LARGE_BODY));
-        bench("@fastify/http-proxy", () => benchPost(FASTIFY_PROXY_PORT, LARGE_BODY));
-        bench("http-proxy-3", () => benchPost(HTTP_PROXY_3_PORT, LARGE_BODY));
-      });
-    });
-  });
-
-  await run();
-
   // Cleanup
-  console.log("\nShutting down servers...");
   targetServer.close();
   httpxyServer.close();
   httpxyFetchServer.close();
@@ -354,6 +269,14 @@ async function main() {
   fastProxySetup.close();
   await fastifyApp.close();
   httpProxy3Server.close();
+  httpProxyLegacyServer.close();
+
+  if (!allValid) {
+    console.error("\nValidation failed.");
+    process.exit(1);
+  }
+
+  console.log("\nAll implementations valid.");
 }
 
 main().catch((err) => {

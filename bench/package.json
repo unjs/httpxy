@@ -1,0 +1,14 @@
+{
+  "name": "bench",
+  "private": true,
+  "type": "module",
+  "devDependencies": {
+    "@fastify/http-proxy": "^11.4.2",
+    "@types/http-proxy": "^1.17.17",
+    "fast-proxy": "^2.2.0",
+    "fastify": "^5.8.4",
+    "http-proxy": "^1.18.1",
+    "http-proxy-3": "^1.23.2",
+    "mitata": "^1.0.34"
+  }
+}
