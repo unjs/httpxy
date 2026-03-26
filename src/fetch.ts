@@ -101,32 +101,21 @@ export async function proxyFetch(
 
   const reqHeaders: Record<string, string | string[]> = {};
   if (init.headers) {
-    // Fast path: plain object headers (most common from programmatic use)
-    if (init.headers instanceof Headers) {
-      for (const [key, value] of init.headers) {
-        if (key in reqHeaders) {
-          const existing = reqHeaders[key];
-          reqHeaders[key] = Array.isArray(existing)
-            ? [...existing, value]
-            : [existing as string, value];
-        } else {
-          reqHeaders[key] = value;
-        }
-      }
-    } else if (Array.isArray(init.headers)) {
-      for (const [key, value] of init.headers) {
-        if (key in reqHeaders) {
-          const existing = reqHeaders[key];
-          reqHeaders[key] = Array.isArray(existing)
-            ? [...existing, value]
-            : [existing as string, value];
-        } else {
-          reqHeaders[key] = value;
-        }
-      }
-    } else {
-      // Record<string, string> — direct assign, no iteration needed
+    // Fast path: plain object — direct assign, no iteration needed
+    if (!(init.headers instanceof Headers) && !Array.isArray(init.headers)) {
       Object.assign(reqHeaders, init.headers);
+    } else {
+      // Headers or [key, value][] — both are iterable pairs
+      for (const [key, value] of init.headers as Iterable<[string, string]>) {
+        const existing = reqHeaders[key];
+        if (existing === undefined) {
+          reqHeaders[key] = value;
+        } else {
+          reqHeaders[key] = Array.isArray(existing)
+            ? [...existing, value]
+            : [existing, value];
+        }
+      }
     }
   }
 
