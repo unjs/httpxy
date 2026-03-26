@@ -34,7 +34,6 @@ const PROXIES = [
 
 // --- Helpers ---
 
-const bold = (s: string) => `\x1B[1m${s}\x1B[0m`;
 const blue = (s: string) => `\x1B[1;34m${s}\x1B[0m`;
 const green = (s: string) => `\x1B[1;32m${s}\x1B[0m`;
 // const red = (s: string) => `\x1B[1;31m${s}\x1B[0m`;
@@ -178,29 +177,44 @@ function parseResult(json: string): BenchResult {
   };
 }
 
-const TABLE_COLS = [22, 10, 7, 10, 10, 10, 12] as const;
-const TABLE_WIDTH = TABLE_COLS.reduce((sum, w) => sum + w, 0) + TABLE_COLS.length - 1;
+const HEADERS = ["Proxy", "Req/s", "Scale", "Avg", "P50", "P99", "Throughput"];
 
 function printTable(title: string, results: [name: string, result: BenchResult][]) {
-  console.log();
-  console.log(bold(title));
-  console.log(
-    `${"Proxy".padEnd(TABLE_COLS[0])} ${"Req/s".padStart(TABLE_COLS[1])} ${"Scale".padStart(TABLE_COLS[2])} ${"Avg".padStart(TABLE_COLS[3])} ${"P50".padStart(TABLE_COLS[4])} ${"P99".padStart(TABLE_COLS[5])} ${"Throughput".padStart(TABLE_COLS[6])}`,
-  );
-  console.log(TABLE_COLS.map((w) => "─".repeat(w)).join(" "));
-
-  // Sort by req/s descending (matches Scale column)
+  // Sort by req/s descending
   results.sort((a, b) => b[1].rps - a[1].rps);
-
   const bestRps = Math.max(...results.map(([, r]) => r.rps));
 
-  for (const [name, r] of results) {
-    const rps = r.rps.toFixed(0);
+  // Build rows
+  const rows = results.map(([name, r]) => {
     const ratio = bestRps > 0 ? r.rps / bestRps : 0;
-    const scale = ratio >= 1 ? "1.00x" : `${ratio.toFixed(2)}x`;
-    console.log(
-      `${name.padEnd(TABLE_COLS[0])} ${rps.padStart(TABLE_COLS[1])} ${scale.padStart(TABLE_COLS[2])} ${formatNs(r.avgLatency).padStart(TABLE_COLS[3])} ${formatNs(r.p50).padStart(TABLE_COLS[4])} ${formatNs(r.p99).padStart(TABLE_COLS[5])} ${formatThroughput(r.bytesPerSec).padStart(TABLE_COLS[6])}`,
-    );
+    return [
+      name,
+      r.rps.toFixed(0),
+      ratio >= 1 ? "1.00x" : `${ratio.toFixed(2)}x`,
+      formatNs(r.avgLatency),
+      formatNs(r.p50),
+      formatNs(r.p99),
+      formatThroughput(r.bytesPerSec),
+    ];
+  });
+
+  // Compute column widths from headers + data
+  const colWidths = HEADERS.map((h, i) =>
+    Math.max(h.length, ...rows.map((r) => r[i]!.length)),
+  );
+
+  const mdRow = (cells: string[]) =>
+    `| ${cells.map((c, i) => (i === 0 ? c.padEnd(colWidths[i]!) : c.padStart(colWidths[i]!))).join(" | ")} |`;
+
+  console.log();
+  console.log(`### ${title}`);
+  console.log();
+  console.log(mdRow(HEADERS));
+  console.log(
+    `| ${colWidths.map((w, i) => (i === 0 ? `:${"-".repeat(w - 1)}` : `${"-".repeat(w - 1)}:`)).join(" | ")} |`,
+  );
+  for (const row of rows) {
+    console.log(mdRow(row));
   }
 }
 
@@ -244,7 +258,6 @@ async function runBench(label: string, extraArgs: string[] = []) {
   info(
     `Benchmarking ${label} (duration=${DURATION}, connections=${CONNECTIONS}${SEQUENTIAL ? ", sequential" : ""})`,
   );
-  console.log("━".repeat(TABLE_WIDTH));
   const benchOne = async ({ name, port }: (typeof PROXIES)[number]) => {
     const json = await bombJson([
       "-c",
@@ -284,9 +297,9 @@ const postResults = await runBench("POST ~1KB JSON", [
 // --- Summary ---
 
 console.log();
-console.log("━".repeat(TABLE_WIDTH));
 info("Summary");
-console.log("━".repeat(TABLE_WIDTH));
+console.log();
+console.log(`> Duration: **${DURATION}** | Connections: **${CONNECTIONS}** | Mode: **${SEQUENTIAL ? "sequential" : "parallel"}**`);
 
 printTable("GET (no body)", getResults);
 console.log();

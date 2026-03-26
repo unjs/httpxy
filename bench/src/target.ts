@@ -13,8 +13,7 @@ const server = http.createServer((req, res) => {
   req.on("end", () => {
     const body = Buffer.concat(chunks);
     res.writeHead(200, {
-      "content-type":
-        req.headers["content-type"] || "application/octet-stream",
+      "content-type": req.headers["content-type"] || "application/octet-stream",
       "content-length": String(body.length),
     });
     res.end(body);
