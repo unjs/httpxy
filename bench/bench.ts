@@ -12,7 +12,7 @@ const { values: args } = parseArgs({
   options: {
     duration: { type: "string", short: "d", default: "1s" },
     connections: { type: "string", short: "c", default: "128" },
-    sequential: { type: "boolean", short: "s", default: false },
+    sequential: { type: "boolean", short: "s", default: true },
   },
 });
 
@@ -20,7 +20,11 @@ const IMAGE = "httpxy-bench";
 const DURATION = args.duration!;
 const CONNECTIONS = Number(args.connections);
 const SEQUENTIAL = args.sequential!;
-const POST_BODY = '{"message":"hello world","ts":1234567890}';
+const POST_BODY = JSON.stringify({
+  message: "hello world".repeat(30),
+  ts: 1234567890,
+  padding: "x".repeat(1024 - 360),
+}); // ~1KB
 const TARGET_PORT = 3000;
 
 const PROXIES = [
@@ -46,12 +50,11 @@ const containers: string[] = [];
 
 function cleanup() {
   info("Cleaning up...");
+  if (containers.length === 0) return;
   try {
-    const ids = execSync('docker ps -q --filter "name=bench-"', { encoding: "utf8" }).trim();
-    if (ids) {
-      execSync(`docker rm -f ${ids.split("\n").join(" ")}`, { stdio: "ignore" });
-    }
+    execSync(`docker rm -f ${containers.join(" ")}`, { stdio: "ignore" });
   } catch {}
+  containers.length = 0;
 }
 
 function dockerRun(...args: string[]) {
@@ -168,6 +171,18 @@ function formatResult(r: BenchResult): string {
 
 function parseResult(json: string): BenchResult {
   const { result: r } = JSON.parse(json) as { result: BombardierResult };
+
+  const nonOk = r.req1xx + r.req3xx + r.req4xx + r.req5xx + r.others;
+  if (nonOk > 0) {
+    throw new Error(
+      `Non-2xx responses: 1xx=${r.req1xx} 3xx=${r.req3xx} 4xx=${r.req4xx} 5xx=${r.req5xx} other=${r.others}`,
+    );
+  }
+  if (r.errors && r.errors.length > 0) {
+    const details = r.errors.map((e) => `${e.description}(${e.count})`).join(", ");
+    throw new Error(`Transport errors: ${details}`);
+  }
+
   return {
     rps: r.rps.mean,
     avgLatency: r.latency.mean,
