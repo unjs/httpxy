@@ -15,27 +15,6 @@ export const defaultAgents = {
 };
 
 /**
- * URL parse cache to avoid repeated `new URL()` for the same string targets.
- */
-const _urlCache = new Map<string, URL>();
-const _urlCacheMaxSize = 256;
-
-export function parseURL(str: string): URL {
-  let cached = _urlCache.get(str);
-  if (cached) {
-    return cached;
-  }
-  cached = new URL(str);
-  if (_urlCache.size >= _urlCacheMaxSize) {
-    // Evict oldest entry
-    const firstKey = _urlCache.keys().next().value!;
-    _urlCache.delete(firstKey);
-  }
-  _urlCache.set(str, cached);
-  return cached;
-}
-
-/**
  * Simple Regex for testing if protocol is https
  */
 export const isSSL = /^https|wss/;
@@ -102,21 +81,18 @@ export function setupOutgoing(
   }
 
   outgoing.method = options.method || req.method;
-
-  // Single copy: merge req.headers + options.headers in one pass
-  if (options.headers) {
-    const headers: Record<string, string | string[] | undefined> = { ...req.headers };
-    for (const key of Object.keys(options.headers)) {
-      headers[key] = options.headers[key];
-    }
-    outgoing.headers = headers;
-  } else {
-    outgoing.headers = { ...req.headers };
-  }
+  outgoing.headers = { ...req.headers };
 
   // before clean up HTTP/2 blacklist header, we might wanna override host first
   if (req.headers?.[":authority"]) {
     outgoing.headers.host = req.headers[":authority"] as string;
+  }
+  // host override must happen before composing/merging the final outgoing headers
+
+  if (options.headers) {
+    for (const key of Object.keys(options.headers)) {
+      outgoing.headers[key] = options.headers[key];
+    }
   }
 
   if (req.httpVersionMajor > 1) {
@@ -341,7 +317,7 @@ export function parseAddr(addr: string | ProxyAddr): ProxyAddr {
     if (addr.startsWith("unix:")) {
       return { socketPath: addr.slice(5) };
     }
-    const url = parseURL(addr);
+    const url = new URL(addr);
     return {
       host: url.hostname,
       port: Number(url.port) || (isSSL.test(url.protocol) ? 443 : 80),

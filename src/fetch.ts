@@ -3,7 +3,7 @@ import { request as httpRequest } from "node:http";
 import { request as httpsRequest } from "node:https";
 import { Readable } from "node:stream";
 import type { ProxyAddr } from "./types.ts";
-import { defaultAgents, isSSL, joinURL, parseAddr, parseURL } from "./_utils.ts";
+import { defaultAgents, isSSL, joinURL, parseAddr } from "./_utils.ts";
 
 /**
  * Options for {@link proxyFetch}.
@@ -67,7 +67,7 @@ export async function proxyFetch(
   let useHTTPS = false;
   let addrBasePath = "";
   if (typeof addr === "string" && !addr.startsWith("unix:")) {
-    const addrURL = parseURL(addr);
+    const addrURL = new URL(addr);
     useHTTPS = isSSL.test(addrURL.protocol);
     if (addrURL.pathname && addrURL.pathname !== "/") {
       addrBasePath = addrURL.pathname;
@@ -166,9 +166,8 @@ export async function proxyFetch(
         ? 5
         : 0;
 
-  // Fast path: sync conversion for string/ArrayBuffer/TypedArray bodies
-  // Falls back to async _bufferBody for ReadableStream/Blob
-  const body = _toBuffer(init.body) ?? (await _bufferBody(init.body));
+  // Buffer body only when redirects need replay; otherwise stream through
+  const body = maxRedirects > 0 ? await _bufferBody(init.body) : _toNodeStream(init.body);
 
   // Default to keep-alive agent for connection reuse
   const agent =
@@ -237,8 +236,8 @@ function toInit(init?: RequestInit | Request): RequestInit | undefined {
   return init;
 }
 
-/** Synchronous body conversion for non-stream types. Returns undefined for streams. */
-function _toBuffer(body: BodyInit | null | undefined): Buffer | undefined {
+/** Convert body to a Node.js Readable or Buffer for streaming without buffering. */
+function _toNodeStream(body: BodyInit | null | undefined): Readable | Buffer | undefined {
   if (!body) {
     return undefined;
   }
@@ -248,16 +247,25 @@ function _toBuffer(body: BodyInit | null | undefined): Buffer | undefined {
   if (body instanceof ArrayBuffer || ArrayBuffer.isView(body)) {
     return Buffer.from(body as ArrayBuffer);
   }
-  // ReadableStream / Blob: fall through — caller should use _bufferBody for these
-  return undefined;
+  if (body instanceof ReadableStream) {
+    return Readable.fromWeb(body as import("node:stream/web").ReadableStream);
+  }
+  if (body instanceof Blob) {
+    return Readable.fromWeb(body.stream() as import("node:stream/web").ReadableStream);
+  }
+  return Buffer.from(String(body));
 }
 
-/** Normalize any body type to Buffer (or undefined), including async types. */
+/** Normalize any body type to Buffer (or undefined) for redirect replay. */
 async function _bufferBody(body: BodyInit | null | undefined): Promise<Buffer | undefined> {
-  // Try sync first
-  const buf = _toBuffer(body);
-  if (buf || !body) {
-    return buf;
+  if (!body) {
+    return undefined;
+  }
+  if (typeof body === "string") {
+    return Buffer.from(body);
+  }
+  if (body instanceof ArrayBuffer || ArrayBuffer.isView(body)) {
+    return Buffer.from(body as ArrayBuffer);
   }
   if (body instanceof ReadableStream) {
     const readable = Readable.fromWeb(body as import("node:stream/web").ReadableStream);
@@ -270,7 +278,7 @@ async function _bufferBody(body: BodyInit | null | undefined): Promise<Buffer | 
   if (body instanceof Blob) {
     return Buffer.from(await body.arrayBuffer());
   }
-  return Buffer.from(body as string);
+  return Buffer.from(String(body));
 }
 
 const _redirectStatuses = new Set([301, 302, 303, 307, 308]);
@@ -291,7 +299,7 @@ function _sendRequest(
   path: string,
   headers: Record<string, string | string[]>,
   addr: ProxyAddr,
-  body: Buffer | undefined,
+  body: Buffer | Readable | undefined,
   opts: _RequestOpts,
 ): Promise<IncomingMessage> {
   return new Promise<IncomingMessage>((resolve, reject) => {
@@ -377,7 +385,10 @@ function _sendRequest(
       });
     }
 
-    if (body) {
+    if (body instanceof Readable) {
+      body.on("error", reject);
+      body.pipe(req);
+    } else if (body) {
       req.end(body);
     } else {
       req.end();
