@@ -199,9 +199,7 @@ function printTable(title: string, results: [name: string, result: BenchResult][
   });
 
   // Compute column widths from headers + data
-  const colWidths = HEADERS.map((h, i) =>
-    Math.max(h.length, ...rows.map((r) => r[i]!.length)),
-  );
+  const colWidths = HEADERS.map((h, i) => Math.max(h.length, ...rows.map((r) => r[i]!.length)));
 
   const mdRow = (cells: string[]) =>
     `| ${cells.map((c, i) => (i === 0 ? c.padEnd(colWidths[i]!) : c.padStart(colWidths[i]!))).join(" | ")} |`;
@@ -299,7 +297,9 @@ const postResults = await runBench("POST ~1KB JSON", [
 console.log();
 info("Summary");
 console.log();
-console.log(`> Duration: **${DURATION}** | Connections: **${CONNECTIONS}** | Mode: **${SEQUENTIAL ? "sequential" : "parallel"}**`);
+console.log(
+  `> Duration: **${DURATION}** | Connections: **${CONNECTIONS}** | Mode: **${SEQUENTIAL ? "sequential" : "parallel"}**`,
+);
 
 printTable("GET (no body)", getResults);
 console.log();
