@@ -1,12 +1,25 @@
 #!/usr/bin/env node
 
-import { execSync, execFileSync } from "node:child_process";
+import { execSync, execFileSync, execFile as _execFile } from "node:child_process";
+import { parseArgs } from "node:util";
+import { promisify } from "node:util";
+
+const execFileAsync = promisify(_execFile);
 
 // --- Config ---
 
+const { values: args } = parseArgs({
+  options: {
+    duration: { type: "string", short: "d", default: "1s" },
+    connections: { type: "string", short: "c", default: "128" },
+    sequential: { type: "boolean", short: "s", default: false },
+  },
+});
+
 const IMAGE = "httpxy-bench";
-const DURATION = process.env.DURATION || "1s";
-const CONNECTIONS = process.env.CONNECTIONS || "128";
+const DURATION = args.duration!;
+const CONNECTIONS = Number(args.connections);
+const SEQUENTIAL = args.sequential!;
 const POST_BODY = '{"message":"hello world","ts":1234567890}';
 const TARGET_PORT = 3000;
 
@@ -24,12 +37,11 @@ const PROXIES = [
 const bold = (s: string) => `\x1B[1m${s}\x1B[0m`;
 const blue = (s: string) => `\x1B[1;34m${s}\x1B[0m`;
 const green = (s: string) => `\x1B[1;32m${s}\x1B[0m`;
-const red = (s: string) => `\x1B[1;31m${s}\x1B[0m`;
-const yellow = (s: string) => `\x1B[1;33m${s}\x1B[0m`;
+// const red = (s: string) => `\x1B[1;31m${s}\x1B[0m`;
 
 const info = (msg: string) => console.log(blue(`=> ${msg}`));
 const ok = (msg: string) => console.log(green(`   ${msg}`));
-const err = (msg: string) => console.log(red(`   ${msg}`));
+// const err = (msg: string) => console.log(red(`   ${msg}`));
 
 const containers: string[] = [];
 
@@ -43,68 +55,53 @@ function cleanup() {
   } catch {}
 }
 
+function dockerRun(...args: string[]) {
+  return execFileSync("docker", ["run", "--rm", "--network", "host", ...args], {
+    encoding: "utf8",
+  }).trim();
+}
+
 function startContainer(name: string, script: string, port: number) {
-  const cid = execFileSync(
-    "docker",
-    [
-      "run",
-      "-d",
-      "--rm",
-      "--name",
-      name,
-      "--network",
-      "host",
-      "--cpus=1",
-      "--memory=256m",
-      "-e",
-      `PORT=${port}`,
-      "-e",
-      `TARGET=http://127.0.0.1:${TARGET_PORT}`,
-      IMAGE,
-      "node",
-      script,
-    ],
-    { encoding: "utf8" },
-  ).trim();
+  const cid = dockerRun(
+    "-d",
+    "--name",
+    name,
+    "--cpus=1",
+    "--memory=256m",
+    "-e",
+    `PORT=${port}`,
+    "-e",
+    `TARGET=http://127.0.0.1:${TARGET_PORT}`,
+    IMAGE,
+    "node",
+    script,
+  );
   containers.push(cid);
 }
 
-function bomb(args: string[]) {
-  execFileSync(
-    "docker",
-    [
-      "run",
-      "--rm",
-      "--name",
-      `bench-bombardier-${process.pid}`,
-      "--network",
-      "host",
-      IMAGE,
-      "bombardier",
-      ...args,
-    ],
-    { stdio: "inherit" },
-  );
-}
+let bombCounter = 0;
 
-function bombJson(args: string[]): string {
-  return execFileSync(
+async function bombJson(args: string[]): Promise<string> {
+  const name = `bench-bombardier-${process.pid}-${bombCounter++}`;
+  const { stdout } = await execFileAsync(
     "docker",
     [
       "run",
       "--rm",
-      "--name",
-      `bench-bombardier-${process.pid}`,
       "--network",
       "host",
+      "--name",
+      name,
       IMAGE,
       "bombardier",
       "--format=json",
       "--print=result",
+      "--latencies",
       ...args,
     ],
-    { encoding: "utf8", stdio: ["pipe", "pipe", "ignore"] },
+    { encoding: "utf8" },
   );
+  return stdout;
 }
 
 function waitForReady(port: number, retries = 60) {
@@ -119,57 +116,90 @@ function waitForReady(port: number, retries = 60) {
   throw new Error(`Timed out waiting for port ${port}`);
 }
 
+// --- Bombardier types ---
+
+interface BombardierResult {
+  bytesRead: number;
+  bytesWritten: number;
+  timeTakenSeconds: number;
+  req1xx: number;
+  req2xx: number;
+  req3xx: number;
+  req4xx: number;
+  req5xx: number;
+  others: number;
+  errors?: { description: string; count: number }[];
+  latency: {
+    mean: number; // nanoseconds
+    stddev: number;
+    max: number;
+    percentiles: Record<string, number>; // "50", "75", "90", "95", "99"
+  };
+  rps: {
+    mean: number;
+    stddev: number;
+    max: number;
+    percentiles: Record<string, number>;
+  };
+}
+
+interface BenchResult {
+  rps: number;
+  avgLatency: number; // ns
+  p50: number; // ns
+  p99: number; // ns
+  bytesPerSec: number;
+}
+
 // --- Result parsing ---
 
 function formatNs(ns: number): string {
   return ns < 1e6 ? `${(ns / 1e3).toFixed(0)}µs` : `${(ns / 1e6).toFixed(2)}ms`;
 }
 
-function parseResult(json: string): string {
-  const j = JSON.parse(json);
-  const r = j.result;
-  const rps = r.rps.mean.toFixed(0);
-  const avgLatency = formatNs(r.latency.mean);
-  const p50 = formatNs(r.latency?.percentiles?.["0.5"] ?? r.latency?.["50"] ?? 0);
-  const p99 = formatNs(r.latency?.percentiles?.["0.99"] ?? r.latency?.["99"] ?? 0);
-  const bytesPerSec = r.bytesRead / r.timeTakenSeconds;
-  const throughput =
-    bytesPerSec > 1e6
-      ? `${(bytesPerSec / 1e6).toFixed(1)}MB/s`
-      : `${(bytesPerSec / 1e3).toFixed(0)}KB/s`;
-  return `${rps}|${avgLatency}|${p50}|${p99}|${throughput}|${bytesPerSec}`;
+function formatThroughput(bytesPerSec: number): string {
+  return bytesPerSec > 1e6
+    ? `${(bytesPerSec / 1e6).toFixed(1)}MB/s`
+    : `${(bytesPerSec / 1e3).toFixed(0)}KB/s`;
 }
 
-function printTable(title: string, results: [name: string, result: string][]) {
+function formatResult(r: BenchResult): string {
+  return `${r.rps.toFixed(0)} req/s | ${formatNs(r.avgLatency)} avg | ${formatThroughput(r.bytesPerSec)}`;
+}
+
+function parseResult(json: string): BenchResult {
+  const { result: r } = JSON.parse(json) as { result: BombardierResult };
+  return {
+    rps: r.rps.mean,
+    avgLatency: r.latency.mean,
+    p50: r.latency.percentiles["50"] ?? 0,
+    p99: r.latency.percentiles["99"] ?? 0,
+    bytesPerSec: r.bytesRead / r.timeTakenSeconds,
+  };
+}
+
+const TABLE_COLS = [22, 10, 7, 10, 10, 10, 12] as const;
+const TABLE_WIDTH = TABLE_COLS.reduce((sum, w) => sum + w, 0) + TABLE_COLS.length - 1;
+
+function printTable(title: string, results: [name: string, result: BenchResult][]) {
   console.log();
   console.log(bold(title));
   console.log(
-    `${"Proxy".padEnd(22)} ${"Req/s".padStart(10)} ${"Scale".padStart(7)} ${"Avg".padStart(10)} ${"P50".padStart(10)} ${"P99".padStart(10)} ${"Throughput".padStart(12)}`,
+    `${"Proxy".padEnd(TABLE_COLS[0])} ${"Req/s".padStart(TABLE_COLS[1])} ${"Scale".padStart(TABLE_COLS[2])} ${"Avg".padStart(TABLE_COLS[3])} ${"P50".padStart(TABLE_COLS[4])} ${"P99".padStart(TABLE_COLS[5])} ${"Throughput".padStart(TABLE_COLS[6])}`,
   );
-  console.log(
-    `${"─".repeat(22)} ${"─".repeat(10)} ${"─".repeat(7)} ${"─".repeat(10)} ${"─".repeat(10)} ${"─".repeat(10)} ${"─".repeat(12)}`,
-  );
+  console.log(TABLE_COLS.map((w) => "─".repeat(w)).join(" "));
 
-  // Sort by throughput (bytes/sec) descending
-  results.sort((a, b) => {
-    const aTP = Number.parseFloat(a[1].split("|")[5]!);
-    const bTP = Number.parseFloat(b[1].split("|")[5]!);
-    return bTP - aTP;
-  });
+  // Sort by req/s descending (matches Scale column)
+  results.sort((a, b) => b[1].rps - a[1].rps);
 
-  let bestRps = 0;
-  for (const [, result] of results) {
-    const rps = Number.parseInt(result.split("|")[0]);
-    if (rps > bestRps) bestRps = rps;
-  }
+  const bestRps = Math.max(...results.map(([, r]) => r.rps));
 
-  for (const [name, result] of results) {
-    const parts = result.split("|");
-    const [rps, avg, p50, p99, tp] = [parts[0]!, parts[1]!, parts[2]!, parts[3]!, parts[4]!];
-    const ratio = bestRps > 0 ? Number.parseInt(rps) / bestRps : 0;
-    const x = ratio >= 1 ? "1.00x" : `${ratio.toFixed(2)}x`;
+  for (const [name, r] of results) {
+    const rps = r.rps.toFixed(0);
+    const ratio = bestRps > 0 ? r.rps / bestRps : 0;
+    const scale = ratio >= 1 ? "1.00x" : `${ratio.toFixed(2)}x`;
     console.log(
-      `${name.padEnd(22)} ${rps.padStart(10)} ${x.padStart(7)} ${avg.padStart(10)} ${p50.padStart(10)} ${p99.padStart(10)} ${tp.padStart(12)}`,
+      `${name.padEnd(TABLE_COLS[0])} ${rps.padStart(TABLE_COLS[1])} ${scale.padStart(TABLE_COLS[2])} ${formatNs(r.avgLatency).padStart(TABLE_COLS[3])} ${formatNs(r.p50).padStart(TABLE_COLS[4])} ${formatNs(r.p99).padStart(TABLE_COLS[5])} ${formatThroughput(r.bytesPerSec).padStart(TABLE_COLS[6])}`,
     );
   }
 }
@@ -210,65 +240,53 @@ for (const { name, port } of PROXIES) {
 }
 console.log();
 
-// --- GET benchmark ---
-
-const getResults: [string, string][] = [];
-
-info(`Benchmarking GET (duration=${DURATION}, connections=${CONNECTIONS})`);
-console.log("━".repeat(63));
-for (const { name, port } of PROXIES) {
-  console.log(`\n${yellow(`▸ ${name}`)}`);
-  bomb(["-c", CONNECTIONS, "-d", DURATION, "--latencies", `http://127.0.0.1:${port}/`]);
-  const json = bombJson(["-c", CONNECTIONS, "-d", DURATION, `http://127.0.0.1:${port}/`]);
-  getResults.push([name, parseResult(json)]);
+async function runBench(label: string, extraArgs: string[] = []) {
+  info(
+    `Benchmarking ${label} (duration=${DURATION}, connections=${CONNECTIONS}${SEQUENTIAL ? ", sequential" : ""})`,
+  );
+  console.log("━".repeat(TABLE_WIDTH));
+  const benchOne = async ({ name, port }: (typeof PROXIES)[number]) => {
+    const json = await bombJson([
+      "-c",
+      String(CONNECTIONS),
+      "-d",
+      DURATION,
+      ...extraArgs,
+      `http://127.0.0.1:${port}/`,
+    ]);
+    const result = parseResult(json);
+    ok(`${name} — ${formatResult(result)}`);
+    return [name, result] as [string, BenchResult];
+  };
+  let results: [string, BenchResult][];
+  if (SEQUENTIAL) {
+    results = [];
+    for (const proxy of PROXIES) {
+      results.push(await benchOne(proxy));
+    }
+  } else {
+    results = await Promise.all(PROXIES.map(benchOne));
+  }
+  console.log();
+  return results;
 }
 
-console.log();
-
-// --- POST benchmark ---
-
-const postResults: [string, string][] = [];
-
-info(`Benchmarking POST ~1KB JSON (duration=${DURATION}, connections=${CONNECTIONS})`);
-console.log("━".repeat(63));
-for (const { name, port } of PROXIES) {
-  console.log(`\n${yellow(`▸ ${name}`)}`);
-  bomb([
-    "-c",
-    CONNECTIONS,
-    "-d",
-    DURATION,
-    "-m",
-    "POST",
-    "-H",
-    "Content-Type: application/json",
-    "-b",
-    POST_BODY,
-    "--latencies",
-    `http://127.0.0.1:${port}/`,
-  ]);
-  const json = bombJson([
-    "-c",
-    CONNECTIONS,
-    "-d",
-    DURATION,
-    "-m",
-    "POST",
-    "-H",
-    "Content-Type: application/json",
-    "-b",
-    POST_BODY,
-    `http://127.0.0.1:${port}/`,
-  ]);
-  postResults.push([name, parseResult(json)]);
-}
+const getResults = await runBench("GET");
+const postResults = await runBench("POST ~1KB JSON", [
+  "-m",
+  "POST",
+  "-H",
+  "Content-Type: application/json",
+  "-b",
+  POST_BODY,
+]);
 
 // --- Summary ---
 
 console.log();
-console.log("━".repeat(63));
+console.log("━".repeat(TABLE_WIDTH));
 info("Summary");
-console.log("━".repeat(63));
+console.log("━".repeat(TABLE_WIDTH));
 
 printTable("GET (no body)", getResults);
 console.log();
