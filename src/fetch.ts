@@ -111,9 +111,7 @@ export async function proxyFetch(
         if (existing === undefined) {
           reqHeaders[key] = value;
         } else {
-          reqHeaders[key] = Array.isArray(existing)
-            ? [...existing, value]
-            : [existing, value];
+          reqHeaders[key] = Array.isArray(existing) ? [...existing, value] : [existing, value];
         }
       }
     }
