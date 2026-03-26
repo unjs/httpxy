@@ -373,7 +373,10 @@ function _sendRequest(
     }
 
     if (body instanceof Readable) {
-      body.on("error", reject);
+      body.on("error", (err) => {
+        req.destroy(err);
+        reject(err);
+      });
       body.pipe(req);
     } else if (body) {
       req.end(body);
