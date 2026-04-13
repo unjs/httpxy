@@ -47,7 +47,7 @@
     "socket.io-client": "^4.8.3",
     "sse": "^0.0.8",
     "typescript": "^6.0.2",
-    "undici": "^7.24.6",
+    "undici": "^8.1.0",
     "vitest": "^4.1.1",
     "ws": "^8.20.0"
   },
