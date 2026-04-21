@@ -116,8 +116,9 @@ export function setupOutgoing(
 
   if (options.agent !== undefined) {
     outgoing.agent = options.agent || false;
-  } else if (req.httpVersionMajor > 1) {
-    // HTTP/2 incoming requests: keep-alive agents can conflict with stream lifecycle
+  } else if (req.httpVersionMajor > 1 || upgradeHeader.test(req.headers.connection || "")) {
+    // WebSocket upgrades and HTTP/2 incoming requests: agents conflict with
+    // the socket lifecycle (upgrade handoff / stream multiplexing).
     outgoing.agent = false;
   } else {
     // Use default keep-alive agents for connection reuse
