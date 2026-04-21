@@ -74,7 +74,7 @@ Returns Promise<Socket> (the upstream proxy socket)
 - `deleteLength` applies to both `DELETE` and `OPTIONS` without content length; it sets `content-length: 0` and removes `transfer-encoding`.
 - `proxyReq` event is intentionally skipped when request has `expect` header (`100-continue` advisory coverage).
 - `selfHandleResponse: true` skips outgoing passes and auto-pipe; callers must finish the response in `proxyRes`.
-- `proxyTimeout` aborts upstream request and surfaces timeout errors (tested as `ECONNRESET`). The timeout callback manually emits `'error'` on the outgoing `proxyReq` because bun's `proxyReq.destroy()` does not emit `'error'` on its own; `createErrorHandler` dedupes via a `fired` flag so node (which *does* emit from destroy) only surfaces the error once.
+- `proxyTimeout` aborts upstream request and surfaces timeout errors (tested as `ECONNRESET`). The timeout callback manually emits `'error'` on the outgoing `proxyReq` because bun's `proxyReq.destroy()` does not emit `'error'` on its own; `createErrorHandler` dedupes via a `fired` flag so node (which _does_ emit from destroy) only surfaces the error once.
 - `followRedirects: true | number` enables native redirect following (301/302/303/307/308). `true` = max 5 hops, number = custom max.
 - On 301/302/303 redirects, method changes to GET and request body is dropped.
 - On 307/308 redirects, original method and body are preserved (body is buffered on first request for replay).
@@ -188,10 +188,14 @@ Shared flags live in `test/_utils.ts`:
 import { isBun, isDeno } from "./_utils.ts";
 
 // Bun: short note on the specific runtime limitation.
-it.skipIf(isBun)("...", async () => { /* ... */ });
+it.skipIf(isBun)("...", async () => {
+  /* ... */
+});
 
 // Bun & Deno: ...
-it.skipIf(isBun || isDeno)("...", async () => { /* ... */ });
+it.skipIf(isBun || isDeno)("...", async () => {
+  /* ... */
+});
 ```
 
 Always leave a comment naming the exact limitation so the gate can be

@@ -176,61 +176,64 @@ describe("http-proxy", () => {
     // the server when the client destroys its socket — deno's `node:http`
     // server does not propagate client disconnects to the request/response
     // objects, so the proxy has no signal to destroy the upstream request.
-    it.skipIf(isBun || isDeno)("should destroy upstream proxy request when client aborts", async () => {
-      const { promise, resolve, reject } = Promise.withResolvers<void>();
+    it.skipIf(isBun || isDeno)(
+      "should destroy upstream proxy request when client aborts",
+      async () => {
+        const { promise, resolve, reject } = Promise.withResolvers<void>();
 
-      // Track whether the upstream request was properly destroyed
-      let upstreamReqDestroyed = false;
+        // Track whether the upstream request was properly destroyed
+        let upstreamReqDestroyed = false;
 
-      const source = http.createServer((req, res) => {
-        // SSE-like long-lived response
-        res.writeHead(200, {
-          "content-type": "text/event-stream",
-          "cache-control": "no-cache",
-          connection: "keep-alive",
-        });
-        res.write(":ok\n\n");
-
-        req.socket.on("close", () => {
-          upstreamReqDestroyed = true;
-        });
-      });
-      const sourcePort = await listenOn(source);
-
-      const proxy = httpProxy.createProxyServer({
-        target: "http://127.0.0.1:" + sourcePort,
-      });
-      const proxyPort = await proxyListen(proxy);
-
-      const timeout = setTimeout(() => {
-        reject(new Error("Timed out: upstream request was not destroyed after client abort"));
-      }, 2000);
-
-      // Make a request and abort it after receiving the first chunk
-      const clientReq = http.request(
-        { hostname: "127.0.0.1", port: proxyPort, method: "GET" },
-        (res) => {
-          res.once("data", () => {
-            // Client received data, now abort the connection
-            clientReq.destroy();
+        const source = http.createServer((req, res) => {
+          // SSE-like long-lived response
+          res.writeHead(200, {
+            "content-type": "text/event-stream",
+            "cache-control": "no-cache",
+            connection: "keep-alive",
           });
-        },
-      );
-      clientReq.end();
+          res.write(":ok\n\n");
 
-      // Poll for upstream destruction
-      const check = setInterval(() => {
-        if (upstreamReqDestroyed) {
-          clearInterval(check);
-          clearTimeout(timeout);
-          source.close();
-          proxy.close(() => resolve());
-        }
-      }, 20);
+          req.socket.on("close", () => {
+            upstreamReqDestroyed = true;
+          });
+        });
+        const sourcePort = await listenOn(source);
 
-      await promise;
-      expect(upstreamReqDestroyed).toBe(true);
-    });
+        const proxy = httpProxy.createProxyServer({
+          target: "http://127.0.0.1:" + sourcePort,
+        });
+        const proxyPort = await proxyListen(proxy);
+
+        const timeout = setTimeout(() => {
+          reject(new Error("Timed out: upstream request was not destroyed after client abort"));
+        }, 2000);
+
+        // Make a request and abort it after receiving the first chunk
+        const clientReq = http.request(
+          { hostname: "127.0.0.1", port: proxyPort, method: "GET" },
+          (res) => {
+            res.once("data", () => {
+              // Client received data, now abort the connection
+              clientReq.destroy();
+            });
+          },
+        );
+        clientReq.end();
+
+        // Poll for upstream destruction
+        const check = setInterval(() => {
+          if (upstreamReqDestroyed) {
+            clearInterval(check);
+            clearTimeout(timeout);
+            source.close();
+            proxy.close(() => resolve());
+          }
+        }, 20);
+
+        await promise;
+        expect(upstreamReqDestroyed).toBe(true);
+      },
+    );
 
     it("should make the request on pipe and finish it", async () => {
       const source = http.createServer();
@@ -273,50 +276,53 @@ describe("http-proxy", () => {
     // Bun & Deno: `http.IncomingMessage.rawHeaders` is always lowercased, so
     // `preserveHeaderKeyCase: true` has no original casing to preserve and the
     // case-sensitive `rawHeaders.indexOf("Content-Type")` check fails.
-    it.skipIf(isBun || isDeno)("should make the request, handle response and finish it", async () => {
-      const source = http.createServer((req, res) => {
-        expect(req.method).to.eql("GET");
-        expect(Number.parseInt(req.headers.host!.split(":")[1]!)).to.eql(proxyPort);
-        res.writeHead(200, { "Content-Type": "text/plain" });
-        res.end("Hello from " + (source.address()! as any).port);
-      });
-      const sourcePort = await listenOn(source);
+    it.skipIf(isBun || isDeno)(
+      "should make the request, handle response and finish it",
+      async () => {
+        const source = http.createServer((req, res) => {
+          expect(req.method).to.eql("GET");
+          expect(Number.parseInt(req.headers.host!.split(":")[1]!)).to.eql(proxyPort);
+          res.writeHead(200, { "Content-Type": "text/plain" });
+          res.end("Hello from " + (source.address()! as any).port);
+        });
+        const sourcePort = await listenOn(source);
 
-      const proxy = httpProxy.createProxyServer({
-        target: "http://127.0.0.1:" + sourcePort,
-        preserveHeaderKeyCase: true,
-      });
-      const proxyPort = await proxyListen(proxy);
+        const proxy = httpProxy.createProxyServer({
+          target: "http://127.0.0.1:" + sourcePort,
+          preserveHeaderKeyCase: true,
+        });
+        const proxyPort = await proxyListen(proxy);
 
-      const { promise, resolve } = Promise.withResolvers<void>();
-      http
-        .request(
-          {
-            hostname: "127.0.0.1",
-            port: proxyPort,
-            method: "GET",
-          },
-          (res) => {
-            expect(res.statusCode).to.eql(200);
-            expect(res.headers["content-type"]).to.eql("text/plain");
-            if (res.rawHeaders != undefined) {
-              expect(res.rawHeaders.indexOf("Content-Type")).not.to.eql(-1);
-              expect(res.rawHeaders.indexOf("text/plain")).not.to.eql(-1);
-            }
+        const { promise, resolve } = Promise.withResolvers<void>();
+        http
+          .request(
+            {
+              hostname: "127.0.0.1",
+              port: proxyPort,
+              method: "GET",
+            },
+            (res) => {
+              expect(res.statusCode).to.eql(200);
+              expect(res.headers["content-type"]).to.eql("text/plain");
+              if (res.rawHeaders != undefined) {
+                expect(res.rawHeaders.indexOf("Content-Type")).not.to.eql(-1);
+                expect(res.rawHeaders.indexOf("text/plain")).not.to.eql(-1);
+              }
 
-            res.on("data", (data) => {
-              expect(data.toString()).to.eql("Hello from " + sourcePort);
-            });
+              res.on("data", (data) => {
+                expect(data.toString()).to.eql("Hello from " + sourcePort);
+              });
 
-            res.on("end", () => {
-              source.close();
-              proxy.close(resolve);
-            });
-          },
-        )
-        .end();
-      await promise;
-    });
+              res.on("end", () => {
+                source.close();
+                proxy.close(resolve);
+              });
+            },
+          )
+          .end();
+        await promise;
+      },
+    );
   });
 
   describe("#createProxyServer() method with error response", () => {

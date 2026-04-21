@@ -1012,37 +1012,40 @@ describe("#req-aborted-memory-leak", () => {
   // Bun: same pipe-suppresses-close-events limitation as `#client abort
   // propagation` — the downstream abort is never observable from the proxy
   // handler once `req.pipe(proxyReq)` is active.
-  it.skipIf(isBun)("should abort upstream request when client disconnects via res close", async () => {
-    const { promise, resolve } = Promise.withResolvers<void>();
+  it.skipIf(isBun)(
+    "should abort upstream request when client disconnects via res close",
+    async () => {
+      const { promise, resolve } = Promise.withResolvers<void>();
 
-    let upstreamAborted = false;
-    const source = http.createServer((req, res) => {
-      res.writeHead(200, { "content-type": "text/plain" });
-      res.write("start");
-      req.on("close", () => {
-        upstreamAborted = true;
+      let upstreamAborted = false;
+      const source = http.createServer((req, res) => {
+        res.writeHead(200, { "content-type": "text/plain" });
+        res.write("start");
+        req.on("close", () => {
+          upstreamAborted = true;
+        });
       });
-    });
-    const sourcePort = await listenOn(source);
+      const sourcePort = await listenOn(source);
 
-    const proxy = httpProxy.createProxyServer({
-      target: `http://127.0.0.1:${sourcePort}`,
-    });
-    const proxyPort = await proxyListen(proxy);
-
-    const clientReq = http.get(`http://127.0.0.1:${proxyPort}/stream`, (res) => {
-      res.once("data", () => {
-        // Client received first chunk; now abort
-        clientReq.destroy();
-
-        setTimeout(() => {
-          expect(upstreamAborted).to.eql(true);
-          source.close();
-          proxy.close(resolve);
-        }, 100);
+      const proxy = httpProxy.createProxyServer({
+        target: `http://127.0.0.1:${sourcePort}`,
       });
-    });
+      const proxyPort = await proxyListen(proxy);
 
-    await promise;
-  });
+      const clientReq = http.get(`http://127.0.0.1:${proxyPort}/stream`, (res) => {
+        res.once("data", () => {
+          // Client received first chunk; now abort
+          clientReq.destroy();
+
+          setTimeout(() => {
+            expect(upstreamAborted).to.eql(true);
+            source.close();
+            proxy.close(resolve);
+          }, 100);
+        });
+      });
+
+      await promise;
+    },
+  );
 });
