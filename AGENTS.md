@@ -74,7 +74,7 @@ Returns Promise<Socket> (the upstream proxy socket)
 - `deleteLength` applies to both `DELETE` and `OPTIONS` without content length; it sets `content-length: 0` and removes `transfer-encoding`.
 - `proxyReq` event is intentionally skipped when request has `expect` header (`100-continue` advisory coverage).
 - `selfHandleResponse: true` skips outgoing passes and auto-pipe; callers must finish the response in `proxyRes`.
-- `proxyTimeout` aborts upstream request and surfaces timeout errors (tested as `ECONNRESET`).
+- `proxyTimeout` aborts upstream request and surfaces timeout errors (tested as `ECONNRESET`). The timeout callback manually emits `'error'` on the outgoing `proxyReq` because bun's `proxyReq.destroy()` does not emit `'error'` on its own; `createErrorHandler` dedupes via a `fired` flag so node (which *does* emit from destroy) only surfaces the error once.
 - `followRedirects: true | number` enables native redirect following (301/302/303/307/308). `true` = max 5 hops, number = custom max.
 - On 301/302/303 redirects, method changes to GET and request body is dropped.
 - On 307/308 redirects, original method and body are preserved (body is buffered on first request for replay).
@@ -121,9 +121,11 @@ Returns Promise<Socket> (the upstream proxy socket)
 - `agent` enables connection pooling/reuse via a custom `http.Agent`. Defaults to `false` (no agent).
 - `followRedirects` enables automatic redirect following. `true` = max 5 hops; number = custom max. On 301/302/303 method changes to GET and body is dropped. On 307/308 method and body are preserved (body is buffered). Sensitive headers (`authorization`, `cookie`) are stripped on cross-origin redirects.
 - `ssl` passes TLS options to `https.request` (e.g. `{ rejectUnauthorized: false }`).
-- `AbortSignal` support is wired through `init.signal` (standard `RequestInit`), aborting the underlying `http.request`.
+- `AbortSignal` support is wired through `init.signal` (standard `RequestInit`), aborting the underlying `http.request`. We drive the abort ourselves (manual `abort` listener + direct `reject`) rather than passing `signal` to `http.request`, because bun's `http.request({ signal })` silently ignores both pre-aborted and in-flight aborts.
 - Multi-value request headers are preserved as arrays (not flattened by the `Headers` API).
 - Body types `ArrayBuffer`, `TypedArray`, and `Blob` are properly converted to `Buffer` before sending.
+- `ReadableStream` bodies are converted via `Readable.from(asyncIterator)` (not `Readable.fromWeb`) so controller errors surface as `'error'` events — `Readable.fromWeb()` swallows them on bun.
+- Request timeouts reject the outer promise directly from the `setTimeout` callback in addition to calling `req.destroy(err)`, because bun's `req.destroy(err)` does not emit `'error'` on the request.
 
 ### `proxyUpgrade` semantics
 
@@ -166,6 +168,35 @@ pnpm test                         # Lint + typecheck + tests with coverage
 - The suite includes legacy parity tests ported from `http-party/node-http-proxy` plus project-specific tests (`test/server.test.ts`, `test/fetch.test.ts`, `test/types.test-d.ts`).
 - `followRedirects` is natively implemented (no external dependency). See behavioral notes below.
 - HTTPS tests rely on local fixtures in `test/fixtures/agent2-*.pem`.
+
+### Runtime compatibility gates (bun / deno)
+
+Bun and Deno each have `node:http` / web-stream compatibility gaps that break a
+handful of tests. Known limitations the proxy cannot work around in userland:
+
+- **Bun client-abort propagation through `req.pipe(proxyReq)`**: once the pipe
+  is active, bun no longer emits `'close'` on `req` / `req.socket` / `res` /
+  `res.socket` when the downstream client drops the TCP connection, so the
+  proxy has no signal to destroy the upstream `proxyReq`. Tests that assert
+  this propagation (`should abort proxy request when client disconnects`,
+  `should abort upstream request when client disconnects via res close`) are
+  gated with `it.skipIf(isBun)`.
+
+Shared flags live in `test/_utils.ts`:
+
+```ts
+import { isBun, isDeno } from "./_utils.ts";
+
+// Bun: short note on the specific runtime limitation.
+it.skipIf(isBun)("...", async () => { /* ... */ });
+
+// Bun & Deno: ...
+it.skipIf(isBun || isDeno)("...", async () => { /* ... */ });
+```
+
+Always leave a comment naming the exact limitation so the gate can be
+re-evaluated when the runtime ships a fix. Do **not** redefine `isBun` /
+`isDeno` inline — always import from `_utils.ts`.
 
 ## Tooling
 

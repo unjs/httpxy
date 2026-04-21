@@ -112,6 +112,10 @@ export const stream = defineProxyMiddleware((req, res, options, server, head, ca
   if (options.proxyTimeout) {
     proxyReq.setTimeout(options.proxyTimeout, function () {
       proxyReq.destroy();
+      // Bun's `proxyReq.destroy()` does not emit an `'error'` event on the
+      // request, so surface `ECONNRESET` manually. `createErrorHandler`
+      // dedupes duplicate fires that node may also dispatch from destroy.
+      proxyReq.emit("error", Object.assign(new Error("socket hang up"), { code: "ECONNRESET" }));
     });
   }
 
@@ -128,7 +132,15 @@ export const stream = defineProxyMiddleware((req, res, options, server, head, ca
   proxyReq.on("error", proxyError);
 
   function createErrorHandler(proxyReq: ClientRequest, url: URL | ProxyTargetDetailed) {
+    let fired = false;
     return function proxyError(err: Error) {
+      // Dedupe: `proxyTimeout` manually dispatches a synthetic `ECONNRESET`
+      // for bun (where `proxyReq.destroy()` does not emit `'error'`), and on
+      // node the same destroy also emits — we only want to surface the error
+      // once per request.
+      if (fired) return;
+      fired = true;
+
       if (!req.socket?.writable && (err as NodeJS.ErrnoException).code === "ECONNRESET") {
         server.emit("econnreset", err, req, res, url);
         return proxyReq.destroy();
@@ -232,6 +244,11 @@ export const stream = defineProxyMiddleware((req, res, options, server, head, ca
       if (options.proxyTimeout) {
         redirectReq.setTimeout(options.proxyTimeout, () => {
           redirectReq.destroy();
+          // Same bun workaround as the initial request path above.
+          redirectReq.emit(
+            "error",
+            Object.assign(new Error("socket hang up"), { code: "ECONNRESET" }),
+          );
         });
       }
 

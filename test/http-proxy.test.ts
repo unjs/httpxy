@@ -4,10 +4,9 @@ import http from "node:http";
 import net from "node:net";
 import * as ws from "ws";
 import * as io from "socket.io";
-import SSE from "sse";
 import ioClient from "socket.io-client";
 import type { AddressInfo } from "node:net";
-import { listenOn, proxyListen } from "./_utils.ts";
+import { isBun, isDeno, listenOn, proxyListen } from "./_utils.ts";
 
 // Source: https://github.com/http-party/node-http-proxy/blob/master/test/lib-http-proxy-test.js
 
@@ -61,19 +60,22 @@ describe("http-proxy", () => {
 
   describe("#createProxyServer using the web-incoming passes", () => {
     it("should proxy sse", async () => {
-      const source = http.createServer();
+      const source = http.createServer((_req, res) => {
+        res.writeHead(200, {
+          "Content-Type": "text/event-stream",
+          "Cache-Control": "no-cache, no-transform",
+          Connection: "keep-alive",
+        });
+        res.write(":ok\n\n");
+        res.write("data: Hello over SSE\n\n");
+        res.end();
+      });
       const sourcePort = await listenOn(source);
 
       const proxy = httpProxy.createProxyServer({
         target: "http://127.0.0.1:" + sourcePort,
       });
       const proxyPort = await proxyListen(proxy);
-
-      const sse = new SSE(source, { path: "/" });
-      sse.on("connection", (client) => {
-        client.send("Hello over SSE");
-        client.close();
-      });
 
       const options = {
         hostname: "127.0.0.1",
@@ -98,7 +100,10 @@ describe("http-proxy", () => {
       await promise;
     });
 
-    it("should close downstream SSE stream when upstream aborts", async () => {
+    // Deno: upstream `res.socket.destroy()` does not propagate through deno's
+    // `node:http` shim into a `'close'` event on the downstream `res`, so the
+    // client never observes the upstream abort and the test hangs.
+    it.skipIf(isDeno)("should close downstream SSE stream when upstream aborts", async () => {
       const source = http.createServer((_, res) => {
         res.writeHead(200, {
           "content-type": "text/event-stream",
@@ -164,7 +169,14 @@ describe("http-proxy", () => {
       expect(gotFirstChunk).toBe(true);
     });
 
-    it("should destroy upstream proxy request when client aborts", async () => {
+    // Bun: `http.ServerResponse` does not emit `'close'` when the underlying
+    // client socket is destroyed, so the proxy's `res.on("close", ...)` hook
+    // never fires and the upstream `proxyReq.destroy()` is never called.
+    // Deno: neither `req.close`, `res.close`, nor `req.socket.close` fires on
+    // the server when the client destroys its socket — deno's `node:http`
+    // server does not propagate client disconnects to the request/response
+    // objects, so the proxy has no signal to destroy the upstream request.
+    it.skipIf(isBun || isDeno)("should destroy upstream proxy request when client aborts", async () => {
       const { promise, resolve, reject } = Promise.withResolvers<void>();
 
       // Track whether the upstream request was properly destroyed
@@ -258,7 +270,10 @@ describe("http-proxy", () => {
   });
 
   describe("#createProxyServer using the web-incoming passes", () => {
-    it("should make the request, handle response and finish it", async () => {
+    // Bun & Deno: `http.IncomingMessage.rawHeaders` is always lowercased, so
+    // `preserveHeaderKeyCase: true` has no original casing to preserve and the
+    // case-sensitive `rawHeaders.indexOf("Content-Type")` check fails.
+    it.skipIf(isBun || isDeno)("should make the request, handle response and finish it", async () => {
       const source = http.createServer((req, res) => {
         expect(req.method).to.eql("GET");
         expect(Number.parseInt(req.headers.host!.split(":")[1]!)).to.eql(proxyPort);
@@ -336,7 +351,12 @@ describe("http-proxy", () => {
   });
 
   describe("#createProxyServer setting the correct timeout value", () => {
-    it("should hang up the socket at the timeout", async () => {
+    // Bun: `req.socket.setTimeout(ms, cb)` registers the callback but never
+    // invokes it, so the `timeout` middleware never destroys the socket.
+    // Deno: the abort path works, but errors surface as `DOMException`
+    // `ABORT_ERR` (code 20) instead of node-style `"ECONNRESET"`, failing
+    // the `err.code` assertion.
+    it.skipIf(isBun || isDeno)("should hang up the socket at the timeout", async () => {
       const { promise, resolve } = Promise.withResolvers<void>();
 
       const source = http.createServer(function (_req, res) {
@@ -483,7 +503,10 @@ describe("http-proxy", () => {
   });
 
   describe("#createProxyServer using the ws-incoming passes", () => {
-    it("should proxy the websockets stream", async () => {
+    // Bun: the socket yielded by `http.Server`'s `'upgrade'` event silently
+    // discards writes — `socket.write("HTTP/1.1 101 ...")` returns `true` but
+    // the bytes never reach the client, so the WS handshake never completes.
+    it.skipIf(isBun)("should proxy the websockets stream", async () => {
       const destiny = new ws.WebSocketServer({ port: 0 });
       await new Promise<void>((r) => destiny.on("listening", r));
       const sourcePort = (destiny.address() as AddressInfo).port;
@@ -519,7 +542,9 @@ describe("http-proxy", () => {
       await promise;
     });
 
-    it("should emit error on proxy error", async () => {
+    // Bun & Deno: `ws.WebSocket` emits DOM-style `ErrorEvent` objects (from the
+    // global `WebSocket`) instead of Node `Error`, so `instanceof Error` fails.
+    it.skipIf(isBun || isDeno)("should emit error on proxy error", async () => {
       const { promise, resolve } = Promise.withResolvers<void>();
 
       const proxy = httpProxy.createProxyServer({
@@ -556,69 +581,81 @@ describe("http-proxy", () => {
       await promise;
     });
 
-    it("should close client socket if upstream is closed before upgrade", async () => {
-      const { resolve, promise } = Promise.withResolvers<void>();
+    // Bun & Deno: same upgrade-socket-write limitation as above — the 101 bytes
+    // written by the proxy never reach the client, and `ws.WebSocket` emits
+    // DOM `ErrorEvent` instead of `Error`, failing `instanceof Error`.
+    it.skipIf(isBun || isDeno)(
+      "should close client socket if upstream is closed before upgrade",
+      async () => {
+        const { resolve, promise } = Promise.withResolvers<void>();
 
-      const server = http.createServer();
-      server.on("upgrade", function (req, socket, head) {
-        const response = ["HTTP/1.1 404 Not Found", "Content-type: text/html", "", ""];
-        socket.write(response.join("\r\n"));
-        socket.end();
-      });
-      const sourcePort = await listenOn(server);
+        const server = http.createServer();
+        server.on("upgrade", function (req, socket, head) {
+          const response = ["HTTP/1.1 404 Not Found", "Content-type: text/html", "", ""];
+          socket.write(response.join("\r\n"));
+          socket.end();
+        });
+        const sourcePort = await listenOn(server);
 
-      const proxy = httpProxy.createProxyServer({
-        // note: we don't ever listen on this port
-        target: "ws://127.0.0.1:" + sourcePort,
-        ws: true,
-      });
-      const proxyPort = await proxyListen(proxy);
-      const proxyServer = proxy;
-      const client = new ws.WebSocket("ws://127.0.0.1:" + proxyPort);
+        const proxy = httpProxy.createProxyServer({
+          // note: we don't ever listen on this port
+          target: "ws://127.0.0.1:" + sourcePort,
+          ws: true,
+        });
+        const proxyPort = await proxyListen(proxy);
+        const proxyServer = proxy;
+        const client = new ws.WebSocket("ws://127.0.0.1:" + proxyPort);
 
-      client.on("open", () => {
-        client.send("hello there");
-      });
+        client.on("open", () => {
+          client.send("hello there");
+        });
 
-      client.on("error", (err) => {
-        expect(err).toBeInstanceOf(Error);
-        proxyServer.close(resolve);
-      });
+        client.on("error", (err) => {
+          expect(err).toBeInstanceOf(Error);
+          proxyServer.close(resolve);
+        });
 
-      await promise;
-    });
+        await promise;
+      },
+    );
 
-    it("should not crash when upstream response errors during non-upgrade pipe", async () => {
-      // Regression: https://github.com/http-party/node-http-proxy/pull/1439
-      const { resolve, promise } = Promise.withResolvers<void>();
+    // Bun & Deno: the proxy's non-upgrade response is piped to the upgrade socket
+    // returned from `http.Server`, and those writes are silently dropped —
+    // the client never receives the 502 payload and the flow hangs.
+    it.skipIf(isBun || isDeno)(
+      "should not crash when upstream response errors during non-upgrade pipe",
+      async () => {
+        // Regression: https://github.com/http-party/node-http-proxy/pull/1439
+        const { resolve, promise } = Promise.withResolvers<void>();
 
-      const server = http.createServer((req, res) => {
-        res.writeHead(502);
-        res.write("partial");
-        setTimeout(() => req.socket.destroy(), 10);
-      });
-      const sourcePort = await listenOn(server);
+        const server = http.createServer((req, res) => {
+          res.writeHead(502);
+          res.write("partial");
+          setTimeout(() => req.socket.destroy(), 10);
+        });
+        const sourcePort = await listenOn(server);
 
-      const proxy = httpProxy.createProxyServer({
-        target: "ws://127.0.0.1:" + sourcePort,
-        ws: true,
-      });
+        const proxy = httpProxy.createProxyServer({
+          target: "ws://127.0.0.1:" + sourcePort,
+          ws: true,
+        });
 
-      proxy.on("error", () => {
-        // Error handler - the fix ensures this is called instead of crashing
-      });
+        proxy.on("error", () => {
+          // Error handler - the fix ensures this is called instead of crashing
+        });
 
-      const proxyPort = await proxyListen(proxy);
+        const proxyPort = await proxyListen(proxy);
 
-      const client = new ws.WebSocket("ws://127.0.0.1:" + proxyPort);
-      client.on("error", () => {});
-      client.on("close", () => {
-        proxy.close(resolve);
-      });
+        const client = new ws.WebSocket("ws://127.0.0.1:" + proxyPort);
+        client.on("error", () => {});
+        client.on("close", () => {
+          proxy.close(resolve);
+        });
 
-      await promise;
-      server.close();
-    });
+        await promise;
+        server.close();
+      },
+    );
 
     it("should proxy a socket.io stream", async () => {
       const { resolve, promise } = Promise.withResolvers<void>();
@@ -660,45 +697,54 @@ describe("http-proxy", () => {
       await promise;
     });
 
-    it("should emit open and close events when socket.io client connects and disconnects", async () => {
-      const { resolve, promise } = Promise.withResolvers<void>();
+    // Bun: socket.io eventually upgrades to WebSocket, but the proxy's 101
+    // response is dropped by bun's upgrade socket, so `'open'`/`'close'` are
+    // never emitted by the proxy.
+    it.skipIf(isBun)(
+      "should emit open and close events when socket.io client connects and disconnects",
+      async () => {
+        const { resolve, promise } = Promise.withResolvers<void>();
 
-      const server = http.createServer();
-      const sourcePort = await listenOn(server);
+        const server = http.createServer();
+        const sourcePort = await listenOn(server);
 
-      const proxy = httpProxy.createProxyServer({
-        target: "ws://127.0.0.1:" + sourcePort,
-        ws: true,
-      });
-      const proxyPort = await proxyListen(proxy);
-      const proxyServer = proxy;
-      const destiny = new io.Server(server);
-
-      function startSocketIo() {
-        const client = ioClient("ws://127.0.0.1:" + proxyPort);
-        client.on("connect", () => {
-          client.disconnect();
+        const proxy = httpProxy.createProxyServer({
+          target: "ws://127.0.0.1:" + sourcePort,
+          ws: true,
         });
-      }
-      let count = 0;
+        const proxyPort = await proxyListen(proxy);
+        const proxyServer = proxy;
+        const destiny = new io.Server(server);
 
-      proxyServer.on("open", () => {
-        count += 1;
-      });
+        function startSocketIo() {
+          const client = ioClient("ws://127.0.0.1:" + proxyPort);
+          client.on("connect", () => {
+            client.disconnect();
+          });
+        }
+        let count = 0;
 
-      proxyServer.on("close", () => {
-        destiny.close();
-        server.close();
-        proxyServer.close(() => {});
-        expect(count).toBe(1);
-        resolve();
-      });
+        proxyServer.on("open", () => {
+          count += 1;
+        });
 
-      startSocketIo();
-      await promise;
-    });
+        proxyServer.on("close", () => {
+          destiny.close();
+          server.close();
+          proxyServer.close(() => {});
+          expect(count).toBe(1);
+          resolve();
+        });
 
-    it("should pass all set-cookie headers to client", async () => {
+        startSocketIo();
+        await promise;
+      },
+    );
+
+    // Bun: the proxy's 101 Switching Protocols response (including the
+    // Set-Cookie headers) is silently dropped by bun's upgrade socket, so
+    // the client never opens and the `'upgrade'` event never fires.
+    it.skipIf(isBun)("should pass all set-cookie headers to client", async () => {
       const { resolve, promise } = Promise.withResolvers<void>();
 
       const destiny = new ws.WebSocketServer({ port: 0 });
@@ -731,7 +777,10 @@ describe("http-proxy", () => {
       await promise;
     });
 
-    it("should detect a proxyReq event and modify headers", async () => {
+    // Bun: the proxy's 101 Switching Protocols response is silently dropped
+    // by bun's upgrade socket, so the WS client never opens and the exchange
+    // that would assert on the forwarded `x-special-proxy-header` can't run.
+    it.skipIf(isBun)("should detect a proxyReq event and modify headers", async () => {
       const { promise, resolve } = Promise.withResolvers<void>();
 
       const destiny = new ws.WebSocketServer({ port: 0 });
@@ -775,81 +824,91 @@ describe("http-proxy", () => {
       await promise;
     });
 
-    it("should forward frames with single frame payload (including on node 4.x)", async () => {
-      const { resolve, promise } = await Promise.withResolvers<void>();
-      const payload = Array.from({ length: 65_529 }).join("0");
+    // Bun: the proxy's 101 Switching Protocols response is silently dropped
+    // by bun's upgrade socket, so no frames can be exchanged through the proxy.
+    it.skipIf(isBun)(
+      "should forward frames with single frame payload (including on node 4.x)",
+      async () => {
+        const { resolve, promise } = await Promise.withResolvers<void>();
+        const payload = Array.from({ length: 65_529 }).join("0");
 
-      const destiny = new ws.WebSocketServer({ port: 0 });
-      await new Promise<void>((r) => destiny.on("listening", r));
-      const sourcePort = (destiny.address() as AddressInfo).port;
+        const destiny = new ws.WebSocketServer({ port: 0 });
+        await new Promise<void>((r) => destiny.on("listening", r));
+        const sourcePort = (destiny.address() as AddressInfo).port;
 
-      const proxy = httpProxy.createProxyServer({
-        target: "ws://127.0.0.1:" + sourcePort,
-        ws: true,
-      });
-      const proxyPort = await proxyListen(proxy);
-      const proxyServer = proxy;
-
-      const client = new ws.WebSocket("ws://127.0.0.1:" + proxyPort);
-
-      client.on("open", () => {
-        client.send(payload);
-      });
-
-      client.on("message", (msg) => {
-        expect(msg.toString("utf8")).toBe("Hello over websockets");
-        client.close();
-        destiny.close();
-        proxyServer.close(resolve);
-      });
-
-      destiny.on("connection", (socket) => {
-        socket.on("message", (msg) => {
-          expect(msg.toString("utf8")).toBe(payload);
-          socket.send("Hello over websockets");
+        const proxy = httpProxy.createProxyServer({
+          target: "ws://127.0.0.1:" + sourcePort,
+          ws: true,
         });
-      });
+        const proxyPort = await proxyListen(proxy);
+        const proxyServer = proxy;
 
-      await promise;
-    });
+        const client = new ws.WebSocket("ws://127.0.0.1:" + proxyPort);
 
-    it("should forward continuation frames with big payload (including on node 4.x)", async () => {
-      const { promise, resolve } = Promise.withResolvers<void>();
-      const payload = Array.from({ length: 65_530 }).join("0");
-
-      const destiny = new ws.WebSocketServer({ port: 0 });
-      await new Promise<void>((r) => destiny.on("listening", r));
-      const sourcePort = (destiny.address() as AddressInfo).port;
-
-      const proxy = httpProxy.createProxyServer({
-        target: "ws://127.0.0.1:" + sourcePort,
-        ws: true,
-      });
-      const proxyPort = await proxyListen(proxy);
-      const proxyServer = proxy;
-
-      const client = new ws.WebSocket("ws://127.0.0.1:" + proxyPort);
-
-      client.on("open", () => {
-        client.send(payload);
-      });
-
-      client.on("message", (msg) => {
-        expect(msg.toString("utf8")).toBe("Hello over websockets");
-        client.close();
-        destiny.close();
-        proxyServer.close(resolve);
-      });
-
-      destiny.on("connection", (socket) => {
-        socket.on("message", (msg) => {
-          expect(msg.toString("utf8")).toBe(payload);
-          socket.send("Hello over websockets");
+        client.on("open", () => {
+          client.send(payload);
         });
-      });
 
-      await promise;
-    });
+        client.on("message", (msg) => {
+          expect(msg.toString("utf8")).toBe("Hello over websockets");
+          client.close();
+          destiny.close();
+          proxyServer.close(resolve);
+        });
+
+        destiny.on("connection", (socket) => {
+          socket.on("message", (msg) => {
+            expect(msg.toString("utf8")).toBe(payload);
+            socket.send("Hello over websockets");
+          });
+        });
+
+        await promise;
+      },
+    );
+
+    // Bun: the proxy's 101 Switching Protocols response is silently dropped
+    // by bun's upgrade socket, so no frames can be exchanged through the proxy.
+    it.skipIf(isBun)(
+      "should forward continuation frames with big payload (including on node 4.x)",
+      async () => {
+        const { promise, resolve } = Promise.withResolvers<void>();
+        const payload = Array.from({ length: 65_530 }).join("0");
+
+        const destiny = new ws.WebSocketServer({ port: 0 });
+        await new Promise<void>((r) => destiny.on("listening", r));
+        const sourcePort = (destiny.address() as AddressInfo).port;
+
+        const proxy = httpProxy.createProxyServer({
+          target: "ws://127.0.0.1:" + sourcePort,
+          ws: true,
+        });
+        const proxyPort = await proxyListen(proxy);
+        const proxyServer = proxy;
+
+        const client = new ws.WebSocket("ws://127.0.0.1:" + proxyPort);
+
+        client.on("open", () => {
+          client.send(payload);
+        });
+
+        client.on("message", (msg) => {
+          expect(msg.toString("utf8")).toBe("Hello over websockets");
+          client.close();
+          destiny.close();
+          proxyServer.close(resolve);
+        });
+
+        destiny.on("connection", (socket) => {
+          socket.on("message", (msg) => {
+            expect(msg.toString("utf8")).toBe(payload);
+            socket.send("Hello over websockets");
+          });
+        });
+
+        await promise;
+      },
+    );
 
     it("should not crash when client socket errors before upstream upgrade (issue #79)", async () => {
       const { promise, resolve } = Promise.withResolvers<void>();

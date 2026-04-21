@@ -2,6 +2,7 @@ node_modules
 coverage
 dist
 types
+deno.lock
 .vscode
 .DS_Store
 .eslintcache
