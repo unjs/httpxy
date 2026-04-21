@@ -196,6 +196,21 @@ describe("lib/http-proxy/common.js", () => {
       expect(outgoing.agent).to.eql(false);
     });
 
+    it("should not use keep-alive agent for websocket upgrade requests", () => {
+      const outgoing = createOutgoing();
+      common.setupOutgoing(
+        outgoing,
+        { target: "http://localhost" },
+        stubIncomingMessage({
+          url: "/",
+          headers: { connection: "Upgrade", upgrade: "websocket" },
+        }),
+      );
+      // WebSocket upgrades take ownership of the socket after 101,
+      // so a keep-alive agent must not be used.
+      expect(outgoing.agent).to.eql(false);
+    });
+
     it("set the port according to the protocol", () => {
       const outgoing = createOutgoing();
       common.setupOutgoing(
