@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import http from "node:http";
 import type { AddressInfo } from "node:net";
 import { createProxyServer, ProxyServer } from "../src/index.ts";
@@ -23,10 +23,17 @@ describe("ProxyServer", () => {
       const sourcePort = (source.address() as AddressInfo).port;
 
       proxy = createProxyServer({ target: `http://127.0.0.1:${sourcePort}` });
-      proxy.listen(0, "127.0.0.1");
+
+      const cb = vi.fn();
+
+      proxy.listen(0, "127.0.0.1", cb);
 
       // Wait for the server to be ready
       await new Promise<void>((r) => setTimeout(r, 50));
+
+      expect(cb).toHaveBeenCalledOnce();
+      expect(cb).toHaveBeenCalledWith();
+
       const proxyPort = ((proxy as any)._server.address() as AddressInfo).port;
 
       const res = await fetch(`http://127.0.0.1:${proxyPort}/`);
