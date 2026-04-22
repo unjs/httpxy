@@ -1,5 +1,29 @@
 # Changelog
 
+## v0.5.1
+
+[compare changes](https://github.com/unjs/httpxy/compare/v0.5.0...v0.5.1)
+
+### 🚀 Enhancements
+
+- **server:** `listeningCallback` ([#127](https://github.com/unjs/httpxy/pull/127))
+
+### 🩹 Fixes
+
+- Use `agents: false` for ws upgrade ([#129](https://github.com/unjs/httpxy/pull/129))
+- Do not set undefined values for headers ([#130](https://github.com/unjs/httpxy/pull/130))
+
+### 🏡 Chore
+
+- Apply automated updates ([b227f65](https://github.com/unjs/httpxy/commit/b227f65))
+- Update deps ([6f5ef12](https://github.com/unjs/httpxy/commit/6f5ef12))
+
+### ❤️ Contributors
+
+- Sukka <isukkaw@gmail.com>
+- Daniel Roe ([@danielroe](https://github.com/danielroe))
+- Pooya Parsa ([@pi0](https://github.com/pi0))
+
 ## v0.5.0
 
 [compare changes](https://github.com/unjs/httpxy/compare/v0.4.0...v0.5.0)
