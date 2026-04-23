@@ -235,12 +235,31 @@ function _toNodeStream(body: BodyInit | null | undefined): Readable | Buffer | u
     return Buffer.from(body as ArrayBuffer);
   }
   if (body instanceof ReadableStream) {
-    return Readable.fromWeb(body as import("node:stream/web").ReadableStream);
+    return Readable.from(_webStreamToAsyncIterator(body));
   }
   if (body instanceof Blob) {
-    return Readable.fromWeb(body.stream() as import("node:stream/web").ReadableStream);
+    return Readable.from(_webStreamToAsyncIterator(body.stream()));
   }
   return Buffer.from(String(body));
+}
+
+// `Readable.fromWeb()` does not forward a `ReadableStream` controller error as
+// an `'error'` event on the wrapped Node `Readable` under bun, so we drive
+// the reader ourselves and let `Readable.from()` surface async-iterator
+// exceptions as standard `'error'` events.
+async function* _webStreamToAsyncIterator(
+  stream: ReadableStream<Uint8Array>,
+): AsyncGenerator<Uint8Array> {
+  const reader = stream.getReader();
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) return;
+      yield value;
+    }
+  } finally {
+    reader.releaseLock();
+  }
 }
 
 /** Normalize any body type to Buffer (or undefined) for redirect replay. */
@@ -304,8 +323,12 @@ function _sendRequest(
       reqOpts.port = addr.port;
     }
 
-    if (opts.signal) {
-      reqOpts.signal = opts.signal;
+    // Bun's `http.request({ signal })` silently ignores both pre-aborted and
+    // in-flight aborts — we drive the abort ourselves on all runtimes for
+    // consistent behavior.
+    if (opts.signal?.aborted) {
+      reject(opts.signal.reason ?? new DOMException("aborted", "AbortError"));
+      return;
     }
 
     if (opts.ssl) {
@@ -366,9 +389,23 @@ function _sendRequest(
 
     req.on("error", reject);
 
+    if (opts.signal) {
+      const onAbort = () => {
+        const err = opts.signal!.reason ?? new DOMException("aborted", "AbortError");
+        req.destroy(err);
+        reject(err);
+      };
+      opts.signal.addEventListener("abort", onAbort, { once: true });
+      req.on("close", () => opts.signal!.removeEventListener("abort", onAbort));
+    }
+
     if (opts.timeout) {
       req.setTimeout(opts.timeout, () => {
-        req.destroy(new Error("Proxy request timed out"));
+        // Also reject directly — `req.destroy(err)` does not emit `'error'`
+        // on bun, so relying on `req.on("error", reject)` alone hangs.
+        const err = new Error("Proxy request timed out");
+        req.destroy(err);
+        reject(err);
       });
     }
 
