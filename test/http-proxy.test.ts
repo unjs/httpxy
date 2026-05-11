@@ -333,6 +333,34 @@ describe("http-proxy", () => {
 
       await promise.catch(() => {});
     });
+
+    it("should forward the target URL as the 4th argument of the error event", async () => {
+      const target = "http://127.0.0.1:1";
+      const proxy = httpProxy.createProxyServer({ target });
+
+      const { promise, resolve } = Promise.withResolvers<URL | undefined>();
+      proxy.on("error", (_err, _req, _res, url) => {
+        proxy.close(() => {});
+        resolve(url as URL | undefined);
+      });
+
+      const proxyPort = await proxyListen(proxy);
+
+      http
+        .request(
+          {
+            hostname: "127.0.0.1",
+            port: proxyPort,
+            method: "GET",
+          },
+          () => {},
+        )
+        .end();
+
+      const url = await promise;
+      expect(url).toBeInstanceOf(URL);
+      expect((url as URL).href).toBe(new URL(target).href);
+    });
   });
 
   describe("#createProxyServer setting the correct timeout value", () => {

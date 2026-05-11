@@ -182,6 +182,76 @@ describe("middleware pass exceptions", () => {
     }
   });
 
+  it("should forward the target URL as the 4th argument when a pass throws", async () => {
+    const target = await new Promise<{
+      close: () => Promise<void>;
+      url: string;
+    }>((resolve, reject) => {
+      const server = http.createServer((_req, res) => {
+        res.end("ok");
+      });
+      server.once("error", reject);
+      server.listen(0, "127.0.0.1", () => {
+        const { port } = server.address() as AddressInfo;
+        resolve({
+          close: () =>
+            new Promise<void>((r, j) => {
+              server.close((e) => (e ? j(e) : r()));
+            }),
+          url: `http://127.0.0.1:${port}/`,
+        });
+      });
+    });
+
+    const proxy = createProxyServer({ target: target.url });
+
+    proxy.before("web", "", () => {
+      throw new TypeError("Invalid character in header");
+    });
+
+    const proxyServer = await new Promise<{
+      close: () => Promise<void>;
+      url: string;
+    }>((resolve, reject) => {
+      const server = http.createServer((req, res) => {
+        void proxy.web(req, res);
+      });
+      server.once("error", reject);
+      server.listen(0, "127.0.0.1", () => {
+        const { port } = server.address() as AddressInfo;
+        resolve({
+          close: () =>
+            new Promise<void>((r, j) => {
+              server.close((e) => (e ? j(e) : r()));
+            }),
+          url: `http://127.0.0.1:${port}/`,
+        });
+      });
+    });
+
+    try {
+      const urlPromise = new Promise<URL | undefined>((resolve) => {
+        proxy.on("error", (_err, _req, res, url) => {
+          resolve(url as URL | undefined);
+          if (res && "writeHead" in res && !res.headersSent) {
+            res.writeHead(502);
+            res.end();
+          }
+        });
+      });
+
+      await $fetch(proxyServer.url, { ignoreResponseError: true }).catch(() => {});
+
+      const url = await urlPromise;
+      expect(url).toBeInstanceOf(URL);
+      expect((url as URL).href).toBe(new URL(target.url).href);
+    } finally {
+      proxy.close();
+      await proxyServer.close();
+      await target.close();
+    }
+  });
+
   it("should reject promise when no error listener and pass throws", async () => {
     const target = await new Promise<{
       close: () => Promise<void>;
