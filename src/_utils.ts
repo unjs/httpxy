@@ -80,6 +80,17 @@ export function setupOutgoing(
     }
   }
 
+  // Derive `host` from `hostname` (+ port) when the target was provided as a
+  // plain object without `host`. IPv6 literals must be bracketed in URI host
+  // syntax (RFC 3986 3.2.2), otherwise the `changeOrigin` branch below would
+  // produce a malformed `Host` header like `undefined:<port>`.
+  if (outgoing.host === undefined && typeof outgoing.hostname === "string") {
+    const isIPv6Literal =
+      outgoing.hostname.includes(":") && !outgoing.hostname.startsWith("[");
+    const bracketedHost = isIPv6Literal ? `[${outgoing.hostname}]` : outgoing.hostname;
+    outgoing.host = outgoing.port ? `${bracketedHost}:${outgoing.port}` : bracketedHost;
+  }
+
   outgoing.method = options.method || req.method;
   outgoing.headers = { ...req.headers };
 

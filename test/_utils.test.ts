@@ -507,6 +507,40 @@ describe("lib/http-proxy/common.js", () => {
         );
         expect(outgoing.headers!.host).to.eql("mycouch.com:6984");
       });
+
+      it("should derive host from hostname when target is a plain object without host", () => {
+        const outgoing = createOutgoing();
+        common.setupOutgoing(
+          outgoing,
+          {
+            target: {
+              protocol: "http:",
+              hostname: "example.com",
+              port: 8080,
+            },
+            changeOrigin: true,
+          },
+          stubIncomingMessage({ url: "/" }),
+        );
+        expect(outgoing.headers!.host).to.eql("example.com:8080");
+      });
+
+      it("should bracket IPv6 hostname when target is a plain object without host (RFC 3986 §3.2.2)", () => {
+        const outgoing = createOutgoing();
+        common.setupOutgoing(
+          outgoing,
+          {
+            target: {
+              protocol: "http:",
+              hostname: "::1",
+              port: 8080,
+            },
+            changeOrigin: true,
+          },
+          stubIncomingMessage({ url: "/" }),
+        );
+        expect(outgoing.headers!.host).to.eql("[::1]:8080");
+      });
     });
 
     it("should pass through https client parameters", () => {
