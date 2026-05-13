@@ -609,6 +609,14 @@ describe("lib/http-proxy/common.js", () => {
     it("should concat when base has trailing slash and path has no leading slash", () => {
       expect(common.joinURL("/base/", "path")).to.eql("/base/path");
     });
+
+    it("should preserve trailing slash when path is exactly /", () => {
+      expect(common.joinURL("/maildev", "/")).to.eql("/maildev/");
+    });
+
+    it("should keep a single trailing slash when both base ends and path is /", () => {
+      expect(common.joinURL("/maildev/", "/")).to.eql("/maildev/");
+    });
   });
 
   describe("#rewriteCookieProperty", () => {

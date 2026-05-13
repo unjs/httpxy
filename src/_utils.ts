@@ -184,8 +184,8 @@ export function joinURL(base: string | undefined, path: string | undefined): str
   if (!base || base === "/") {
     return path || "/";
   }
-  if (!path || path === "/") {
-    return base || "/";
+  if (!path) {
+    return base;
   }
   // eslint-disable-next-line unicorn/prefer-at
   const baseHasTrailing = base[base.length - 1] === "/";
