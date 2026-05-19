@@ -541,6 +541,56 @@ describe("lib/http-proxy/common.js", () => {
         );
         expect(outgoing.headers!.host).to.eql("[::1]:8080");
       });
+
+      it("should not double-bracket an already-bracketed IPv6 hostname", () => {
+        const outgoing = createOutgoing();
+        common.setupOutgoing(
+          outgoing,
+          {
+            target: {
+              protocol: "http:",
+              hostname: "[::1]",
+              port: 8080,
+            },
+            changeOrigin: true,
+          },
+          stubIncomingMessage({ url: "/" }),
+        );
+        expect(outgoing.headers!.host).to.eql("[::1]:8080");
+      });
+
+      it("should derive host from hostname using the default port when port is omitted", () => {
+        const outgoing = createOutgoing();
+        common.setupOutgoing(
+          outgoing,
+          {
+            target: {
+              protocol: "http:",
+              hostname: "example.com",
+            },
+            changeOrigin: true,
+          },
+          stubIncomingMessage({ url: "/" }),
+        );
+        expect(outgoing.host).to.eql("example.com:80");
+      });
+
+      it("should not override the incoming host header when changeOrigin is false", () => {
+        const outgoing = createOutgoing();
+        common.setupOutgoing(
+          outgoing,
+          {
+            target: {
+              protocol: "http:",
+              hostname: "example.com",
+              port: 8080,
+            },
+          },
+          stubIncomingMessage({ url: "/", headers: { host: "client.example" } }),
+        );
+        expect(outgoing.headers!.host).to.eql("client.example");
+        expect(outgoing.host).to.eql("example.com:8080");
+      });
     });
 
     it("should pass through https client parameters", () => {
