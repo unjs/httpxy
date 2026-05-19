@@ -250,7 +250,7 @@ function _createProxyFn<
             error as Error,
             req,
             res as ProxyServerRes | net.Socket,
-            requestOptions.target,
+            requestOptions.target || requestOptions.forward,
           );
           _resolve();
         } else {
