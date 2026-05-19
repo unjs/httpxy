@@ -1,5 +1,28 @@
 # Changelog
 
+## v0.5.2
+
+[compare changes](https://github.com/unjs/httpxy/compare/v0.5.1...v0.5.2)
+
+### 🚀 Enhancements
+
+- Derive host from hostname for plain object targets and bracket IPv6 literals ([#136](https://github.com/unjs/httpxy/pull/136))
+- Forward target URL as the 4th argument in error events ([#135](https://github.com/unjs/httpxy/pull/135))
+
+### 🩹 Fixes
+
+- Preserve trailing slash when proxying root path to a sub-path target ([#137](https://github.com/unjs/httpxy/pull/137))
+
+### 🏡 Chore
+
+- Update deps ([7736dc9](https://github.com/unjs/httpxy/commit/7736dc9))
+
+### ❤️ Contributors
+
+- Sai Asish Y ([@SAY-5](https://github.com/SAY-5))
+- Sebastian Beltran ([@bjohansebas](https://github.com/bjohansebas))
+- Pooya Parsa ([@pi0](https://github.com/pi0))
+
 ## v0.5.1
 
 [compare changes](https://github.com/unjs/httpxy/compare/v0.5.0...v0.5.1)
