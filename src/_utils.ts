@@ -194,7 +194,7 @@ export function joinURL(base: string | undefined, path: string | undefined): str
   if (!base || base === "/") {
     return path || "/";
   }
-  if (!path) {
+  if (!path || path === "/") {
     return base;
   }
   // eslint-disable-next-line unicorn/prefer-at

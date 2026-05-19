@@ -377,6 +377,19 @@ describe("lib/http-proxy/common.js", () => {
       expect(outgoing.path).to.eql("/?project=example&path=");
     });
 
+    it("should not add trailing slash when target has base path and request path is root", () => {
+      const outgoing = createOutgoing();
+      common.setupOutgoing(
+        outgoing,
+        {
+          target: URL.parse("http://localhost/api")!,
+        },
+        stubIncomingMessage({ url: "/" }),
+      );
+
+      expect(outgoing.path).to.eql("/api");
+    });
+
     it("should not modify the query string", () => {
       const outgoing = createOutgoing();
       common.setupOutgoing(
@@ -694,12 +707,24 @@ describe("lib/http-proxy/common.js", () => {
       expect(common.joinURL("/base/", "path")).to.eql("/base/path");
     });
 
-    it("should preserve trailing slash when path is exactly /", () => {
-      expect(common.joinURL("/maildev", "/")).to.eql("/maildev/");
+    it("should return base when path is exactly /", () => {
+      expect(common.joinURL("/maildev", "/")).to.eql("/maildev");
     });
 
-    it("should keep a single trailing slash when both base ends and path is /", () => {
+    it("should return base when base ends with slash and path is /", () => {
       expect(common.joinURL("/maildev/", "/")).to.eql("/maildev/");
+    });
+
+    it("should return base when path is empty", () => {
+      expect(common.joinURL("/api", "")).to.eql("/api");
+    });
+
+    it("should join base and nested path", () => {
+      expect(common.joinURL("/api", "/users")).to.eql("/api/users");
+    });
+
+    it("should join base with trailing slash and nested path", () => {
+      expect(common.joinURL("/api/", "/users")).to.eql("/api/users");
     });
   });
 
