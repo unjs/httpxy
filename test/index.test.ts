@@ -183,7 +183,9 @@ describe("middleware pass exceptions", () => {
   });
 
   it("should forward the target URL as the 4th argument when a pass throws", async () => {
-    const target = await listen((_req, res) => res.end("ok"));
+    const target = await listen((_req, res) => {
+      res.end("ok");
+    });
 
     const proxy = createProxyServer({ target: target.url });
     proxy.before("web", "", () => {
