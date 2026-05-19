@@ -234,9 +234,9 @@ function _createProxyFn<
             http.ServerResponse | http2.Http2ServerResponse
           >,
           head,
-          (error) => {
+          (error, _req, _res, url) => {
             if (server.listenerCount("error") > 0) {
-              server.emit("error", error, req, res as ProxyServerRes | net.Socket);
+              server.emit("error", error, req, res as ProxyServerRes | net.Socket, url);
               _resolve();
             } else {
               _reject(error);
@@ -245,7 +245,13 @@ function _createProxyFn<
         );
       } catch (error) {
         if (server.listenerCount("error") > 0) {
-          server.emit("error", error as Error, req, res as ProxyServerRes | net.Socket);
+          server.emit(
+            "error",
+            error as Error,
+            req,
+            res as ProxyServerRes | net.Socket,
+            requestOptions.target || requestOptions.forward,
+          );
           _resolve();
         } else {
           _reject(error);

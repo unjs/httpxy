@@ -182,6 +182,41 @@ describe("middleware pass exceptions", () => {
     }
   });
 
+  it("should forward the target URL as the 4th argument when a pass throws", async () => {
+    const target = await listen((_req, res) => {
+      res.end("ok");
+    });
+
+    const proxy = createProxyServer({ target: target.url });
+    proxy.before("web", "", () => {
+      throw new TypeError("Invalid character in header");
+    });
+
+    const proxyServer = await listen((req, res) => proxy.web(req, res));
+
+    try {
+      const urlPromise = new Promise<URL | undefined>((resolve) => {
+        proxy.on("error", (_err, _req, res, url) => {
+          resolve(url as URL | undefined);
+          if (res && "writeHead" in res && !res.headersSent) {
+            res.writeHead(502);
+            res.end();
+          }
+        });
+      });
+
+      await $fetch(proxyServer.url, { ignoreResponseError: true }).catch(() => {});
+
+      const url = await urlPromise;
+      expect(url).toBeInstanceOf(URL);
+      expect((url as URL).href).toBe(new URL(target.url).href);
+    } finally {
+      proxy.close();
+      await proxyServer.close();
+      await target.close();
+    }
+  });
+
   it("should reject promise when no error listener and pass throws", async () => {
     const target = await new Promise<{
       close: () => Promise<void>;
