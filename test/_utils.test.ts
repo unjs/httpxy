@@ -316,6 +316,19 @@ describe("lib/http-proxy/common.js", () => {
       expect(outgoing.path).to.eql("/forward/static/path");
     });
 
+    it("should not add trailing slash when target has base path and request path is root", () => {
+      const outgoing = createOutgoing();
+      common.setupOutgoing(
+        outgoing,
+        {
+          target: URL.parse("http://localhost/api")!,
+        },
+        stubIncomingMessage({ url: "/" }),
+      );
+
+      expect(outgoing.path).to.eql("/api");
+    });
+
     it("should preserve multiple consecutive slashes in path (#80)", () => {
       const outgoing = createOutgoing();
       common.setupOutgoing(
@@ -692,14 +705,6 @@ describe("lib/http-proxy/common.js", () => {
 
     it("should concat when base has trailing slash and path has no leading slash", () => {
       expect(common.joinURL("/base/", "path")).to.eql("/base/path");
-    });
-
-    it("should preserve trailing slash when path is exactly /", () => {
-      expect(common.joinURL("/maildev", "/")).to.eql("/maildev/");
-    });
-
-    it("should keep a single trailing slash when both base ends and path is /", () => {
-      expect(common.joinURL("/maildev/", "/")).to.eql("/maildev/");
     });
   });
 
