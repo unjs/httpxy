@@ -1,5 +1,21 @@
 # Changelog
 
+## v0.5.3
+
+[compare changes](https://github.com/unjs/httpxy/compare/v0.5.2...v0.5.3)
+
+### 🩹 Fixes
+
+- **utils:** Revert trailing slash preservation in `joinURL` ([3b5f8b0](https://github.com/unjs/httpxy/commit/3b5f8b0))
+
+### 🏡 Chore
+
+- Fix lintignore typo ([92bdf2f](https://github.com/unjs/httpxy/commit/92bdf2f))
+
+### ❤️ Contributors
+
+- Pooya Parsa ([@pi0](https://github.com/pi0))
+
 ## v0.5.2
 
 [compare changes](https://github.com/unjs/httpxy/compare/v0.5.1...v0.5.2)
