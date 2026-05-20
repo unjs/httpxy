@@ -651,7 +651,7 @@ describe("middleware:web-outgoing", () => {
       const res = {
         setHeader(k: string, v: string | string[]) {
           // Simulate Node.js ERR_INVALID_CHAR for control characters
-          // eslint-disable-next-line no-control-regex)
+          // eslint-disable-next-line no-control-regex
           if (typeof v === "string" && /[\u0000-\u001F]/.test(v)) {
             throw new TypeError(`Invalid character in header content ["${k}"]`);
           }
