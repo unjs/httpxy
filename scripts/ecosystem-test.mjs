@@ -14,13 +14,7 @@
 //   REF=<ref>   Git ref to check out from the upstream repo (branch/tag/sha).
 
 import { execSync } from "node:child_process";
-import {
-  mkdtempSync,
-  readFileSync,
-  readdirSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs";
+import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -92,7 +86,7 @@ const pkg = JSON.parse(readFileSync(pkgPath, "utf8"));
 const fileSpec = `file:${tarballPath}`;
 if (pkg.dependencies?.httpxy) pkg.dependencies.httpxy = fileSpec;
 if (pkg.devDependencies?.httpxy) pkg.devDependencies.httpxy = fileSpec;
-pkg.resolutions = { ...(pkg.resolutions || {}), httpxy: fileSpec };
+pkg.resolutions = { ...pkg.resolutions, httpxy: fileSpec };
 writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + "\n");
 console.log(`\nPatched ${pkgPath} to use ${fileSpec}`);
 

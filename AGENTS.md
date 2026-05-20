@@ -169,14 +169,14 @@ pnpm test                         # Lint + typecheck + tests with coverage
 
 ## Tooling
 
-| Tool      | Command          | Notes                                         |
-| --------- | ---------------- | --------------------------------------------- |
-| Build     | `pnpm build`     | Uses `unbuild` → CJS + ESM + types in `dist/` |
-| Dev       | `pnpm dev`       | Vitest watch mode                             |
-| Lint      | `pnpm lint`      | `oxlint` + `oxfmt --check`                    |
-| Format    | `pnpm fmt`       | `oxlint --fix` + `oxfmt`                      |
-| Typecheck | `pnpm typecheck` | `tsgo --noEmit` (native TS preview)           |
-| Test      | `pnpm test`      | Full: lint + typecheck + vitest with coverage |
+| Tool      | Command                        | Notes                                                                                                                                                                                                                                                                                                                                |
+| --------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Build     | `pnpm build`                   | Uses `unbuild` → CJS + ESM + types in `dist/`                                                                                                                                                                                                                                                                                        |
+| Dev       | `pnpm dev`                     | Vitest watch mode                                                                                                                                                                                                                                                                                                                    |
+| Lint      | `pnpm lint`                    | `oxlint` + `oxfmt --check`                                                                                                                                                                                                                                                                                                           |
+| Format    | `pnpm fmt`                     | `oxlint --fix` + `oxfmt`                                                                                                                                                                                                                                                                                                             |
+| Typecheck | `pnpm typecheck`               | `tsgo --noEmit` (native TS preview)                                                                                                                                                                                                                                                                                                  |
+| Test      | `pnpm test`                    | Full: lint + typecheck + vitest with coverage                                                                                                                                                                                                                                                                                        |
 | Ecosystem | `pnpm test:ecosystem [target]` | Builds + `npm pack`s httpxy, clones an upstream consumer in a temp dir, overrides its httpxy dep with the local tarball, and runs its tests. Default target: `http-proxy-middleware`. Env: `KEEP=1` retains temp dirs; `REF=<git-ref>` pins the upstream checkout. Script: [scripts/ecosystem-test.mjs](scripts/ecosystem-test.mjs). |
 
 ## Key Types
