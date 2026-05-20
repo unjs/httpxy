@@ -16,6 +16,7 @@
   "scripts": {
     "build": "obuild",
     "dev": "vitest",
+    "test:ecosystem": "node scripts/ecosystem-test.mjs",
     "lint": "oxlint . && oxfmt --check",
     "fmt": "oxlint . --fix && oxfmt",
     "prepack": "pnpm run build",
