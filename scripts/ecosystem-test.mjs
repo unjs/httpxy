@@ -25,7 +25,7 @@ const TARGETS = {
   "http-proxy-middleware": {
     repo: "https://github.com/chimurai/http-proxy-middleware.git",
     // TODO: revert to default branch once `httpxy-0.5.2` is merged upstream.
-    ref: "httpxy-0.5.2",
+    ref: "master",
     install: "yarn install --ignore-scripts",
     steps: ["yarn build", "yarn test"],
   },
