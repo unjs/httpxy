@@ -1,0 +1,15 @@
+name: ecosystem
+on:
+  push:
+    branches: [main, ci/hpm]
+  workflow_dispatch:
+jobs:
+  http-proxy-middleware:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - run: npm i -fg corepack && corepack enable
+      - uses: actions/setup-node@v6
+        with: { node-version: lts/*, cache: "pnpm" }
+      - run: pnpm install
+      - run: pnpm test:ecosystem http-proxy-middleware
