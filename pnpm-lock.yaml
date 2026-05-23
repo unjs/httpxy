@@ -9,61 +9,61 @@ importers:
   .:
     devDependencies:
       '@types/async':
-        specifier: ^3.2.25
+        specifier: 3.2.25
         version: 3.2.25
       '@types/concat-stream':
-        specifier: ^2.0.3
+        specifier: 2.0.3
         version: 2.0.3
       '@types/express':
-        specifier: ^5.0.6
+        specifier: 5.0.6
         version: 5.0.6
       '@types/node':
-        specifier: ^25.9.0
+        specifier: 25.9.0
         version: 25.9.0
       '@types/semver':
-        specifier: ^7.7.1
+        specifier: 7.7.1
         version: 7.7.1
       '@types/sse':
-        specifier: ^0.0.0
+        specifier: 0.0.0
         version: 0.0.0
       '@types/ws':
-        specifier: ^8.18.1
+        specifier: 8.18.1
         version: 8.18.1
       '@typescript/native-preview':
-        specifier: ^7.0.0-dev.20260518.1
+        specifier: 7.0.0-dev.20260518.1
         version: 7.0.0-dev.20260518.1
       '@vitest/coverage-v8':
-        specifier: ^4.1.6
+        specifier: 4.1.6
         version: 4.1.6(vitest@4.1.6)
       async:
-        specifier: ^3.2.6
+        specifier: 3.2.6
         version: 3.2.6
       changelogen:
-        specifier: ^0.6.2
+        specifier: 0.6.2
         version: 0.6.2(magicast@0.5.3)
       concat-stream:
-        specifier: ^2.0.0
+        specifier: 2.0.0
         version: 2.0.0
       eslint-config-unjs:
-        specifier: ^0.6.2
+        specifier: 0.6.2
         version: 0.6.2(eslint@10.4.0(jiti@2.7.0))(typescript@6.0.3)
       expect.js:
-        specifier: ^0.3.1
+        specifier: 0.3.1
         version: 0.3.1
       obuild:
-        specifier: ^0.4.35
+        specifier: 0.4.35
         version: 0.4.35(@typescript/native-preview@7.0.0-dev.20260518.1)(chokidar@5.0.0)(dotenv@17.4.2)(giget@3.2.0)(jiti@2.7.0)(magicast@0.5.3)(typescript@6.0.3)
       ofetch:
-        specifier: ^1.5.1
+        specifier: 1.5.1
         version: 1.5.1
       oxfmt:
-        specifier: ^0.50.0
+        specifier: 0.50.0
         version: 0.50.0
       oxlint:
-        specifier: ^1.65.0
+        specifier: 1.65.0
         version: 1.65.0
       semver:
-        specifier: ^7.8.0
+        specifier: 7.8.0
         version: 7.8.0
       socket.io:
         specifier: ^4.8.3
@@ -72,43 +72,43 @@ importers:
         specifier: ^4.8.3
         version: 4.8.3
       sse:
-        specifier: ^0.0.8
+        specifier: 0.0.8
         version: 0.0.8
       typescript:
-        specifier: ^6.0.3
+        specifier: 6.0.3
         version: 6.0.3
       undici:
-        specifier: ^8.3.0
+        specifier: 8.3.0
         version: 8.3.0
       vitest:
-        specifier: ^4.1.6
+        specifier: 4.1.6
         version: 4.1.6(@types/node@25.9.0)(@vitest/coverage-v8@4.1.6)(vite@8.0.13(@types/node@25.9.0)(jiti@2.7.0))
       ws:
-        specifier: ^8.20.1
+        specifier: 8.20.1
         version: 8.20.1
 
   bench:
     devDependencies:
       '@fastify/http-proxy':
-        specifier: ^11.4.2
+        specifier: 11.4.4
         version: 11.4.4
       '@types/http-proxy':
-        specifier: ^1.17.17
+        specifier: 1.17.17
         version: 1.17.17
       fast-proxy:
-        specifier: ^2.2.0
+        specifier: 2.2.0
         version: 2.2.0
       fastify:
-        specifier: ^5.8.4
+        specifier: 5.8.5
         version: 5.8.5
       http-proxy:
-        specifier: ^1.18.1
+        specifier: 1.18.1
         version: 1.18.1
       http-proxy-3:
-        specifier: ^1.23.2
+        specifier: 1.23.2
         version: 1.23.2
       mitata:
-        specifier: ^1.0.34
+        specifier: 1.0.34
         version: 1.0.34
 
 packages:
@@ -2907,7 +2907,7 @@ snapshots:
 
   ast-kit@3.0.0-beta.1:
     dependencies:
-      '@babel/parser': 8.0.0-rc.4
+      '@babel/parser': 8.0.0-rc.5
       estree-walker: 3.0.3
       pathe: 2.0.3
 

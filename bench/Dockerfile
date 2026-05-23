@@ -1,6 +1,6 @@
 FROM node:lts
 
-COPY --from=alpine/bombardier /usr/bin/bombardier /usr/local/bin/bombardier
+COPY --from=alpine/bombardier@sha256:7be639b288fce624fee54e2ef95c35685f90fc9ed1399812cf856b4b7c6c55ab /usr/bin/bombardier /usr/local/bin/bombardier
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
 WORKDIR /app
