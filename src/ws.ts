@@ -5,6 +5,7 @@ import type { Duplex } from "node:stream";
 import type { Socket } from "node:net";
 import type { ProxyAddr } from "./types.ts";
 import {
+  buildTargetURL,
   getPort,
   hasEncryptedConnection,
   isSSL,
@@ -120,7 +121,7 @@ export function proxyUpgrade(
   }
 
   // Build target URL for setupOutgoing
-  const target = _buildTargetURL(resolvedAddr, useSSL);
+  const target = buildTargetURL(resolvedAddr, useSSL);
   const requestOptions: ProxyUpgradeOptions & { target: URL } = {
     ...opts,
     target,
@@ -218,16 +219,6 @@ export function proxyUpgrade(
 }
 
 // --- Internal ---
-
-function _buildTargetURL(addr: ProxyAddr, useSSL = false): URL {
-  const protocol = useSSL ? "https" : "http";
-  if (addr.socketPath) {
-    const url = new URL(`${protocol}://unix`);
-    (url as any).socketPath = addr.socketPath;
-    return url;
-  }
-  return new URL(`${protocol}://${addr.host || "localhost"}${addr.port ? `:${addr.port}` : ""}`);
-}
 
 function _createHttpHeader(
   line: string,

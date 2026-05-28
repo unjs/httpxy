@@ -317,6 +317,23 @@ export function rewriteCookieProperty(
 }
 
 /**
+ * Build a target URL for setupOutgoing from a parsed proxy address. Shared
+ * between {@link proxyUpgrade} (h1) and {@link proxyH2Upgrade} (h2) so the
+ * outgoing-request shape stays in lock-step.
+ *
+ * @api private
+ */
+export function buildTargetURL(addr: ProxyAddr, useSSL = false): URL {
+  const protocol = useSSL ? "https" : "http";
+  if (addr.socketPath) {
+    const url = new URL(`${protocol}://unix`);
+    (url as URL & { socketPath?: string }).socketPath = addr.socketPath;
+    return url;
+  }
+  return new URL(`${protocol}://${addr.host || "localhost"}${addr.port ? `:${addr.port}` : ""}`);
+}
+
+/**
  * Parse and validate a proxy address.
  *
  * @param addr - URL string (`http://host:port`, `ws://host:port`, `unix:/path`) or a `ProxyAddr` object.
