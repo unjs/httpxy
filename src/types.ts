@@ -5,6 +5,7 @@ export interface ProxyTargetDetailed {
   port?: number | string;
   protocol?: string;
   hostname?: string;
+  pathname?: string;
   socketPath?: string;
   key?: string;
   passphrase?: string;
