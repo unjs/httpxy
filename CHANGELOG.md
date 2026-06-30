@@ -1,5 +1,28 @@
 # Changelog
 
+## v0.5.4
+
+[compare changes](https://github.com/unjs/httpxy/compare/v0.5.3...v0.5.4)
+
+### 🩹 Fixes
+
+- **types:** Declare pathname on `ProxyTargetDetailed` ([#152](https://github.com/unjs/httpxy/pull/152))
+- Preserve `transfer-encoding` on chunked DELETE/OPTIONS ([#153](https://github.com/unjs/httpxy/pull/153))
+
+### 🏡 Chore
+
+- **release:** V0.5.3 ([77dcc78](https://github.com/unjs/httpxy/commit/77dcc78))
+- Update deps ([00ee40a](https://github.com/unjs/httpxy/commit/00ee40a))
+
+### 🤖 CI
+
+- Add ecosystem test for `http-proxy-middleware` ([#142](https://github.com/unjs/httpxy/pull/142))
+
+### ❤️ Contributors
+
+- Pooya Parsa ([@pi0](https://github.com/pi0))
+- Armin Kramer ([@Rand0mF](https://github.com/Rand0mF))
+
 ## v0.5.3
 
 [compare changes](https://github.com/unjs/httpxy/compare/v0.5.2...v0.5.3)
