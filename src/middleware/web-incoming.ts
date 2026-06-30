@@ -10,12 +10,18 @@ const nativeAgents = { http: nodeHTTP, https: nodeHTTPS };
 const redirectStatuses = new Set([301, 302, 303, 307, 308]);
 
 /**
- * Sets `content-length` to '0' if request is of DELETE type.
+ * Sets `content-length` to '0' for bodyless DELETE/OPTIONS requests.
+ * Only applies when the request carries neither `content-length` nor `transfer-encoding`.
+ * A chunked request (`transfer-encoding` present) has a body that is still streamed
+ * downstream, so rewriting it to `content-length: 0` would desync the proxy.
  */
 export const deleteLength = defineProxyMiddleware((req) => {
-  if ((req.method === "DELETE" || req.method === "OPTIONS") && !req.headers["content-length"]) {
+  if (
+    (req.method === "DELETE" || req.method === "OPTIONS") &&
+    !req.headers["content-length"] &&
+    !req.headers["transfer-encoding"]
+  ) {
     req.headers["content-length"] = "0";
-    delete req.headers["transfer-encoding"];
   }
 });
 

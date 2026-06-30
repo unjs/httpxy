@@ -44,7 +44,7 @@ describe("middleware:web-incoming", () => {
       expect(stubRequest.headers["content-length"]).to.eql("0");
     });
 
-    it("should remove `transfer-encoding` from empty DELETE requests", () => {
+    it("should preserve `transfer-encoding` on chunked DELETE requests", () => {
       const stubRequest = stubIncomingMessage({
         method: "DELETE",
         headers: {
@@ -57,8 +57,8 @@ describe("middleware:web-incoming", () => {
         stubMiddlewareOptions(),
         stubProxyServer(),
       );
-      expect(stubRequest.headers["content-length"]).to.eql("0");
-      expect(stubRequest.headers).to.not.have.key("transfer-encoding");
+      expect(stubRequest.headers["transfer-encoding"]).to.eql("chunked");
+      expect(stubRequest.headers).to.not.have.key("content-length");
     });
   });
 
@@ -1030,6 +1030,104 @@ describe("#req-aborted-memory-leak", () => {
         }, 100);
       });
     });
+
+    await promise;
+  });
+});
+
+// A chunked OPTIONS/DELETE request must be forwarded with its body intact
+// instead of being rewritten to `content-length: 0`.
+//
+// A raw socket is required because Node's own http client silently drops the body of an OPTIONS request,
+// so it cannot send the chunked payload the exploit relies on.
+describe("#chunked-body-smuggling", () => {
+  it("should forward a chunked OPTIONS body intact instead of desyncing to content-length: 0", async () => {
+    const net = await import("node:net");
+    const { resolve, reject, promise } = Promise.withResolvers<void>();
+
+    const smuggled = "GET /smuggling HTTP/1.1\r\nX-Ignore: ";
+    // 0x23 = 35 = smuggled.length, framed as a single HTTP/1.1 chunk.
+    const chunkSize = smuggled.length.toString(16);
+
+    // Record every request the backend actually parses. With the bug, the
+    // backend sees an empty `content-length: 0` OPTIONS and then re-parses the
+    // forwarded body as a second, smuggled `GET /smuggling` request.
+    const received: Array<{
+      method?: string;
+      url?: string;
+      te?: string;
+      cl?: string;
+      body: string;
+    }> = [];
+
+    const source = http.createServer((req, res) => {
+      let body = "";
+      req.on("data", (chunk: Buffer) => (body += chunk));
+      req.on("end", () => {
+        received.push({
+          method: req.method,
+          url: req.url,
+          te: req.headers["transfer-encoding"] as string | undefined,
+          cl: req.headers["content-length"] as string | undefined,
+          body,
+        });
+        res.writeHead(200, { "Content-Type": "text/plain" });
+        res.end("ok");
+      });
+    });
+    const sourcePort = await listenOn(source);
+
+    const proxy = httpProxy.createProxyServer({
+      target: `http://127.0.0.1:${sourcePort}`,
+    });
+    const proxyServer = http.createServer((req, res) => proxy.web(req, res));
+    const proxyPort = await listenOn(proxyServer);
+
+    const rawRequest =
+      "OPTIONS / HTTP/1.1\r\n" +
+      `Host: 127.0.0.1:${proxyPort}\r\n` +
+      "Connection: keep-alive\r\n" +
+      "Content-Type: application/x-www-form-urlencoded\r\n" +
+      "Transfer-Encoding: chunked\r\n" +
+      "\r\n" +
+      `${chunkSize}\r\n` +
+      `${smuggled}\r\n` +
+      "0\r\n" +
+      "\r\n";
+
+    const socket = net.connect(proxyPort, "127.0.0.1", () => {
+      socket.write(rawRequest);
+    });
+
+    const finish = (fn: () => void) => {
+      socket.destroy();
+      source.close();
+      proxyServer.close();
+      fn();
+    };
+
+    socket.once("data", () => {
+      // First (legitimate) response received. Allow a grace window for any
+      // smuggled request to reach the backend, then assert what it parsed.
+      setTimeout(() => {
+        try {
+          // Exactly one request must reach the backend: the OPTIONS carrying
+          // the chunked body. No empty CL:0 request, no smuggled GET.
+          expect(received).to.have.length(1);
+          const first = received[0]!;
+          expect(first.method).to.eql("OPTIONS");
+          expect(first.url).to.eql("/");
+          expect(first.te).to.eql("chunked");
+          expect(first.cl).to.eql(undefined);
+          expect(first.body).to.eql(smuggled);
+          expect(received.some((r) => r.url === "/smuggling")).to.eql(false);
+          finish(resolve);
+        } catch (error) {
+          finish(() => reject(error as Error));
+        }
+      }, 200);
+    });
+    socket.on("error", (error) => finish(() => reject(error)));
 
     await promise;
   });
