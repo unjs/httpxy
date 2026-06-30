@@ -4,7 +4,7 @@ jobs:
   checks:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
       - run: npm i -fg corepack && corepack enable
       - uses: actions/setup-node@v6
         with: { node-version: lts/*, cache: "pnpm" }
@@ -12,5 +12,5 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm vitest --coverage
       - run: pnpm run lint
-      - uses: codecov/codecov-action@v6
+      - uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7
         with: { token: "${{ secrets.CODECOV_TOKEN }}" }
