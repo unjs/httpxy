@@ -45,6 +45,10 @@ export const setRedirectHostRewrite = defineProxyOutgoingMiddleware(
       redirectRegex.test(String(proxyRes.statusCode))
     ) {
       const target = _toURL(options.target!);
+      // Protocol-relative URLs (RFC 3986 §4.2 network-path reference) must stay
+      // protocol-relative after rewriting; WHATWG URL serialization would
+      // otherwise absolutize them with the target's protocol.
+      const isProtocolRelative = proxyRes.headers.location.startsWith("//");
       const u = new URL(proxyRes.headers.location, target);
 
       // Make sure the redirected host matches the target host before rewriting
@@ -65,7 +69,9 @@ export const setRedirectHostRewrite = defineProxyOutgoingMiddleware(
         u.protocol = options.protocolRewrite;
       }
 
-      proxyRes.headers.location = u.toString();
+      proxyRes.headers.location = isProtocolRelative
+        ? u.href.slice(u.protocol.length)
+        : u.href;
     }
   },
 );
