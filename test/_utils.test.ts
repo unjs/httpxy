@@ -455,6 +455,20 @@ describe("lib/http-proxy/common.js", () => {
       expect(outgoing.path).to.eql("/" + google);
     });
 
+    // Ported from https://github.com/http-party/node-http-proxy/pull/1487
+    it("should preserve multiple http:// and https:// occurrences in the path", () => {
+      const outgoing = createOutgoing();
+      common.setupOutgoing(
+        outgoing,
+        { target: URL.parse("http://localhost/")! },
+        stubIncomingMessage({
+          url: "/xyz/http://foobar.com/http://foobar.com/https://foobar.com",
+        }),
+      );
+
+      expect(outgoing.path).to.eql("/xyz/http://foobar.com/http://foobar.com/https://foobar.com");
+    });
+
     describe("when using ignorePath", () => {
       it("should ignore the path of the `req.url` passed in but use the target path", () => {
         const outgoing = createOutgoing();
