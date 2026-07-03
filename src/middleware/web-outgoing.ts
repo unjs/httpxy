@@ -69,9 +69,7 @@ export const setRedirectHostRewrite = defineProxyOutgoingMiddleware(
         u.protocol = options.protocolRewrite;
       }
 
-      proxyRes.headers.location = isProtocolRelative
-        ? u.href.slice(u.protocol.length)
-        : u.href;
+      proxyRes.headers.location = isProtocolRelative ? u.href.slice(u.protocol.length) : u.href;
     }
   },
 );
