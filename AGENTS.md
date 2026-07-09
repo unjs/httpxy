@@ -156,6 +156,7 @@ test/
 ├── http-proxy.test.ts             — Forward, target, WebSocket, socket.io, SSE, timeouts, error events
 ├── https-proxy.test.ts            — HTTPS targets, SSL certs, certificate validation
 ├── _utils.test.ts                 — setupOutgoing, setupSocket, path joining, auth, changeOrigin
+├── request-smuggling.test.ts      — End-to-end GHSA-ggv3-7p47-pfv8 reproduction (chunked payload hiding a smuggled request; asserts it never reaches a lenient upstream), ported from vercel/next.js
 ├── types.test-d.ts                — TypeScript type assertions (vitest typecheck)
 └── middleware/
     ├── web-incoming.test.ts       — deleteLength, timeout, XHeaders
