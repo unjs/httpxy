@@ -21,6 +21,40 @@ export const defaultAgents = {
 export const isSSL = /^https|wss/;
 
 /**
+ * Request-smuggling hardening (GHSA-ggv3-7p47-pfv8).
+ *
+ * A chunked (`transfer-encoding`) request is exactly where proxy<->upstream framing
+ * disagreements arise. If a desync ever occurs on a reused keep-alive socket, an
+ * attacker's leftover body bytes could be read as a pipelined next request and poison
+ * another user's response. Force `connection: close` on any request that carries
+ * `transfer-encoding` — or that marks `transfer-encoding` as hop-by-hop via its
+ * `Connection` header — so the upstream socket is torn down after use and can never be
+ * reused. This is independent of the agent and also closes the `Connection: upgrade` +
+ * chunked-body bypass vector.
+ *
+ * Shared by every outgoing-request path (`setupOutgoing`, `proxyFetch`) so keep-alive
+ * socket reuse after a chunked request is impossible regardless of how the request is
+ * built.
+ */
+export function forceConnectionCloseForTransferEncoding(
+  headers: Record<string, string | string[] | number | undefined>,
+): void {
+  let carriesTransferEncoding = false;
+  for (const key in headers) {
+    if (headers[key] !== undefined && key.toLowerCase() === "transfer-encoding") {
+      carriesTransferEncoding = true;
+      break;
+    }
+  }
+  const connection = headers.connection;
+  const connectionMarksTransferEncoding =
+    typeof connection === "string" && transferEncodingConnectionToken.test(connection);
+  if (carriesTransferEncoding || connectionMarksTransferEncoding) {
+    headers.connection = "close";
+  }
+}
+
+/**
  * Node.js HTTP/2 accepts pseudo headers and it may conflict
  * with request options.
  *
@@ -152,27 +186,11 @@ export function setupOutgoing(
     }
   }
 
-  // Request smuggling hardening (GHSA-ggv3-7p47-pfv8).
-  //
-  // A chunked (`transfer-encoding`) request is exactly where proxy<->upstream
-  // framing disagreements arise. If a desync ever occurs on a reused keep-alive
-  // socket, an attacker's leftover body bytes could be read as a pipelined next
-  // request and poison another user's response. Since httpxy reuses upstream
-  // sockets by default (keep-alive agents), force `connection: close` on any
-  // request that carries `transfer-encoding` — or that marks `transfer-encoding`
-  // as hop-by-hop via its `Connection` header — so the upstream socket is torn
-  // down after use and can never be reused. This is independent of the agent
-  // and also closes the `Connection: upgrade` + chunked-body bypass vector.
+  // Request smuggling hardening (GHSA-ggv3-7p47-pfv8): tear down the upstream
+  // socket after any chunked request so it can never be reused. See
+  // `forceConnectionCloseForTransferEncoding` for rationale.
   outgoing.headers = outgoing.headers || {};
-  const carriesTransferEncoding = Object.entries(outgoing.headers).some(
-    ([header, value]) => header.toLowerCase() === "transfer-encoding" && value !== undefined,
-  );
-  const connectionMarksTransferEncoding =
-    typeof outgoing.headers.connection === "string" &&
-    transferEncodingConnectionToken.test(outgoing.headers.connection);
-  if (carriesTransferEncoding || connectionMarksTransferEncoding) {
-    outgoing.headers.connection = "close";
-  }
+  forceConnectionCloseForTransferEncoding(outgoing.headers);
 
   // the final path is target path + relative path requested by user:
   const target = options[forward || "target"];

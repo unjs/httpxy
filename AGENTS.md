@@ -102,6 +102,10 @@ Returns Promise<Socket> (the upstream proxy socket)
 - Defaults to shared keep-alive agents (`defaultAgents.http` / `.https`) for upstream connection reuse. WebSocket upgrades and HTTP/2 incoming requests use `agent: false` instead (agents conflict with the socket lifecycle). A caller-provided `agent` (including `false`) always wins.
 - When there is no agent (`agent: false`) and the request is not an upgrade, `connection: close` is forced (stock http-proxy behavior).
 - **Request-smuggling hardening (GHSA-ggv3-7p47-pfv8):** `connection: close` is additionally forced — _regardless of agent_ — whenever the outgoing request carries a `transfer-encoding` header, or its `Connection` header lists `transfer-encoding` as hop-by-hop. This prevents an upstream keep-alive socket from being reused after a chunked request, so a desync at a lenient upstream cannot poison a later user's response. It also closes the `Connection: upgrade` + chunked-body bypass. Genuine WebSocket upgrades (no `transfer-encoding`) keep their `Connection` header intact.
+- The hardening lives in the shared helper `forceConnectionCloseForTransferEncoding()` (`src/_utils.ts`) and is applied on **every** outgoing-request path, so no path can leak a reusable chunked socket:
+  - `setupOutgoing` — ProxyServer `web`/`ws` initial requests.
+  - `proxyFetch`'s `_sendRequest` — re-runs the helper on each recursion, covering both the initial request and every `followRedirects` 307/308 replay hop.
+  - `web-incoming`'s `followRedirects` 307/308 replay (`src/middleware/web-incoming.ts`) — this replay builds its `redirectReq` options by hand rather than via `setupOutgoing`, so it calls the helper directly on `redirectHeaders` before building the request options.
 
 ### URL/path handling invariants
 

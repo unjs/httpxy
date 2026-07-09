@@ -3,7 +3,13 @@ import { request as httpRequest } from "node:http";
 import { request as httpsRequest } from "node:https";
 import { Readable } from "node:stream";
 import type { ProxyAddr } from "./types.ts";
-import { defaultAgents, isSSL, joinURL, parseAddr } from "./_utils.ts";
+import {
+  defaultAgents,
+  forceConnectionCloseForTransferEncoding,
+  isSSL,
+  joinURL,
+  parseAddr,
+} from "./_utils.ts";
 
 /**
  * Options for {@link proxyFetch}.
@@ -289,6 +295,12 @@ function _sendRequest(
   body: Buffer | Readable | undefined,
   opts: _RequestOpts,
 ): Promise<IncomingMessage> {
+  // Request smuggling hardening (GHSA-ggv3-7p47-pfv8): proxyFetch defaults to a shared
+  // keep-alive agent, so a chunked request must force `connection: close` to prevent the
+  // upstream socket from being reused. Applied here — the single chokepoint for both the
+  // initial request and every redirect hop.
+  forceConnectionCloseForTransferEncoding(headers);
+
   return new Promise<IncomingMessage>((resolve, reject) => {
     const reqOpts: RequestOptions = {
       method,

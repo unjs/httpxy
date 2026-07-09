@@ -482,6 +482,71 @@ describe("proxyFetch", () => {
     });
   });
 
+  describe("request smuggling hardening (GHSA-ggv3-7p47-pfv8)", () => {
+    it("forces connection: close on a chunked request over a keep-alive agent", async () => {
+      const { Agent } = await import("node:http");
+      const agent = new Agent({ keepAlive: true });
+      try {
+        const res = await proxyFetch(
+          { host: "127.0.0.1", port: tcpPort },
+          `http://localhost/headers`,
+          { headers: { "transfer-encoding": "chunked" } },
+          { agent },
+        );
+        const body = (await res.json()) as { headers: Record<string, string> };
+        expect(body.headers.connection).toBe("close");
+      } finally {
+        agent.destroy();
+      }
+    });
+
+    it("forces connection: close when Connection marks transfer-encoding hop-by-hop", async () => {
+      const res = await proxyFetch(
+        { host: "127.0.0.1", port: tcpPort },
+        `http://localhost/headers`,
+        { headers: { connection: "keep-alive, transfer-encoding" } },
+      );
+      const body = (await res.json()) as { headers: Record<string, string> };
+      expect(body.headers.connection).toBe("close");
+    });
+
+    it("forces connection: close on the 307 replay of a chunked request", async () => {
+      const { Agent } = await import("node:http");
+      const agent = new Agent({ keepAlive: true });
+      try {
+        const res = await proxyFetch(
+          { host: "127.0.0.1", port: tcpPort },
+          `http://localhost/redirect-307`,
+          { method: "POST", body: "chunked-body", headers: { "transfer-encoding": "chunked" } },
+          { agent, followRedirects: true },
+        );
+        // /redirect-307 → /echo; echo replies with the request body, and the
+        // replayed request must have been sent with connection: close.
+        expect(res.status).toBe(200);
+        expect(await res.text()).toBe("chunked-body");
+      } finally {
+        agent.destroy();
+      }
+    });
+
+    it("leaves connection intact for a non-chunked request", async () => {
+      const { Agent } = await import("node:http");
+      const agent = new Agent({ keepAlive: true });
+      try {
+        const res = await proxyFetch(
+          { host: "127.0.0.1", port: tcpPort },
+          `http://localhost/headers`,
+          undefined,
+          { agent },
+        );
+        const body = (await res.json()) as { headers: Record<string, string> };
+        expect(body.headers.connection).not.toBe("close");
+      } finally {
+        agent.destroy();
+      }
+    });
+  });
+
   describe("body types", () => {
     it("sends ArrayBuffer body", async () => {
       const buf = new TextEncoder().encode("arraybuffer-body");

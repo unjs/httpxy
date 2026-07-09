@@ -2,7 +2,13 @@ import type { ClientRequest, IncomingMessage, ServerResponse } from "node:http";
 import type { ProxyTargetDetailed } from "../types.ts";
 import nodeHTTP from "node:http";
 import nodeHTTPS from "node:https";
-import { getPort, hasEncryptedConnection, isSSL, setupOutgoing } from "../_utils.ts";
+import {
+  forceConnectionCloseForTransferEncoding,
+  getPort,
+  hasEncryptedConnection,
+  isSSL,
+  setupOutgoing,
+} from "../_utils.ts";
 import { webOutgoingMiddleware } from "./web-outgoing.ts";
 import { type ProxyMiddleware, defineProxyMiddleware } from "./_utils.ts";
 
@@ -214,6 +220,11 @@ export const stream = defineProxyMiddleware((req, res, options, server, head, ca
         delete redirectHeaders["content-type"];
         delete redirectHeaders["transfer-encoding"];
       }
+
+      // Request smuggling hardening (GHSA-ggv3-7p47-pfv8): this replay bypasses
+      // setupOutgoing, so force `connection: close` on a chunked 307/308 replay to
+      // stop a caller-supplied keep-alive agent from reusing the upstream socket.
+      forceConnectionCloseForTransferEncoding(redirectHeaders);
 
       const redirectOpts: nodeHTTP.RequestOptions = {
         hostname: location.hostname,
