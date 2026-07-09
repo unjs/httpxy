@@ -6,7 +6,7 @@
     "@fastify/http-proxy": "^11.5.0",
     "@types/http-proxy": "^1.17.17",
     "fast-proxy": "^2.2.0",
-    "fastify": "^5.9.0",
+    "fastify": "^5.10.0",
     "http-proxy": "^1.18.1",
     "http-proxy-3": "^1.23.3",
     "mitata": "^1.0.34"
