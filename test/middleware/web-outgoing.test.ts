@@ -282,6 +282,19 @@ describe("middleware:web-outgoing", () => {
         expect(ctx.proxyRes.headers.location).to.eql("http://backend.com/");
       });
 
+      // protocolRewrite is a no-op for protocol-relative URLs: the value stays
+      // protocol-relative so the client resolves the scheme itself.
+      it("is a no-op when a protocol relative URL is used", () => {
+        ctx.proxyRes.headers.location = "//backend.com";
+        webOutgoing.setRedirectHostRewrite(
+          ctx.req,
+          stubServerResponse(),
+          ctx.proxyRes,
+          ctx.options,
+        );
+        expect(ctx.proxyRes.headers.location).to.eql("//backend.com/");
+      });
+
       // Ported from https://github.com/http-party/node-http-proxy/pull/1298
       it("not when protocol relative URL is used", () => {
         ctx.proxyRes.headers.location = "//backend.com";

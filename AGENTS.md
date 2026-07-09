@@ -94,6 +94,7 @@ Returns Promise<Socket> (the upstream proxy socket)
 - Outgoing pass order is fixed: `removeChunked -> setConnection -> setRedirectHostRewrite -> writeHeaders -> writeStatusCode`.
 - Redirect rewrite applies on `201`, `301`, `302`, `303`, `307`, `308` only, and only when `Location` host matches `target.host`.
 - `hostRewrite` takes precedence over `autoRewrite`; `protocolRewrite` composes with either.
+- Protocol-relative `Location` values (`//host/path`) are preserved as protocol-relative after rewriting (WHATWG `URL` would otherwise absolutize them with the target protocol). Consequently `protocolRewrite` is a no-op for protocol-relative locations — the client resolves the scheme itself. Ported from node-http-proxy#1298.
 - Cookie rewriting supports string or mapping config (including wildcard `"*"` and empty string for removal).
 - `preserveHeaderKeyCase` uses `rawHeaders` when available.
 

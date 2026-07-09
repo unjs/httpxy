@@ -134,6 +134,9 @@ server.listen(3000, () => {
 | `followRedirects`       | `boolean \| number`                    | `false`    | Follow HTTP redirects from target. `true` = max 5 hops; number = custom max |
 | `buffer`                | `stream.Stream`                        | —          | Stream to use as request body instead of the incoming request               |
 
+> [!NOTE]
+> Redirect rewriting (`hostRewrite`, `autoRewrite`, `protocolRewrite`) only applies when the `Location` header host matches the target host, so cross-origin redirects are never altered. A protocol-relative `Location` (`//host/path`) is kept protocol-relative after rewriting — the client resolves it against its own scheme — which means `protocolRewrite` has no effect on such values.
+
 ## Events
 
 | Event        | Arguments                                | Description                                            |
