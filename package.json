@@ -14,6 +14,8 @@
     ".": "./dist/index.mjs"
   },
   "scripts": {
+    "bench": "node bench/bench.ts",
+    "bench:standalone": "node bench/standalone.ts",
     "build": "obuild",
     "dev": "vitest",
     "test:ecosystem": "node scripts/ecosystem-test.mjs",

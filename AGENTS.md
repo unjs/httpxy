@@ -178,6 +178,26 @@ pnpm test                         # Lint + typecheck + tests with coverage
 | Typecheck | `pnpm typecheck`               | `tsgo --noEmit` (native TS preview)                                                                                                                                                                                                                                                                                                  |
 | Test      | `pnpm test`                    | Full: lint + typecheck + vitest with coverage                                                                                                                                                                                                                                                                                        |
 | Ecosystem | `pnpm test:ecosystem [target]` | Builds + `npm pack`s httpxy, clones an upstream consumer in a temp dir, overrides its httpxy dep with the local tarball, and runs its tests. Default target: `http-proxy-middleware`. Env: `KEEP=1` retains temp dirs; `REF=<git-ref>` pins the upstream checkout. Script: [scripts/ecosystem-test.mjs](scripts/ecosystem-test.mjs). |
+| Bench (docker) | `pnpm bench` | Compares httpxy against other proxies. Builds a Docker image and runs the target + each proxy in isolated `--cpus=1 --memory=256m` containers, driving them with `bombardier`. Flags: `-d <dur>` (default `1s`), `-c <conns>` (default `128`), `-s` (sequential). Requires Docker. Script: [bench/bench.ts](bench/bench.ts). |
+| Bench (standalone) | `pnpm bench:standalone` | Same comparison **without Docker** — spawns the target + proxies as local Node child processes and drives them with a built-in, zero-dependency, multi-threaded HTTP load generator (`worker_threads`). Flags: `-d <dur>` (default `10s`), `-c <conns>` (default `50`), `-w <warmup>` (default `1s`), `-t <threads>` (default = driver core count), `-s` (sequential). On Linux with `taskset` (≥4 cores) it pins the target + each proxy to a dedicated core and the driver threads to a disjoint core set, approximating Docker's `--cpus=1`; elsewhere it falls back to no pinning (noisier). No `--memory` cap. Numbers are only meaningful relative to each other on the same host. Script: [bench/run.ts](bench/run.ts). |
+
+## Benchmarks (`bench/`)
+
+```
+bench/
+├── bench.ts            — Docker-based runner (bombardier in containers)
+├── run.ts       — Standalone runner (child processes + multi-threaded load generator, no Docker)
+├── _load-worker.ts     — worker_threads entry: one driver thread's share of the load
+├── _report.ts          — Shared result types + formatting + markdown table output
+├── _config.ts          — Shared config: PROXIES list, TARGET_PORT, POST_BODY
+├── test.ts             — Validation harness (asserts every proxy echoes correctly) — both runners run this first
+├── target.ts / src/*   — Echo target + one small entry per proxy under comparison
+└── Dockerfile          — Image used only by the Docker runner
+```
+
+- Both runners share `_report.ts` (formatting) and `_config.ts` (proxy list / ports), so adding a proxy means editing `_config.ts` + adding a `bench/src/*.ts` entry once.
+- The standalone load generator (no `bombardier`) splits the `-c` connection pool across `-t` `worker_threads`, each on its own libuv loop in `_load-worker.ts`; workers post raw latency samples (transferred `Float64Array`) back to `standalone.ts`, which merges them into rps / avg / p50 / p99 / throughput. Body-only bytes are counted (headers excluded), so throughput is approximate. rps/throughput use the mean of the workers' self-measured elapsed windows.
+- **Isolation parity**: both runners share the host network (Docker uses `--network host`), so networking is not a differentiator. Docker's fairness comes from `--cpus=1` + `--memory=256m` per container. Standalone reproduces the CPU cap via `taskset` core-pinning on Linux (see the `spawnServer` / CPU-plan block) but has **no memory cap**. The driver is multi-threaded so a single JS thread is no longer the ceiling; worker threads inherit the process affinity mask and the kernel spreads them across the driver cores. Off Linux (no taskset) the driver, target, and proxy contend for the same cores and results are noisier.
 
 ## Key Types
 
