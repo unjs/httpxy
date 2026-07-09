@@ -1132,3 +1132,66 @@ describe("#chunked-body-smuggling", () => {
     await promise;
   });
 });
+
+// Request smuggling hardening (GHSA-ggv3-7p47-pfv8): even though the proxy no
+// longer creates a desync, a chunked request must not reuse an upstream
+// keep-alive socket. If a lenient upstream ever desynced, socket reuse is what
+// makes it exploitable (leftover bytes read as another user's request). The
+// proxy therefore sends `Connection: close` upstream for any chunked request,
+// so the socket is torn down after use even though httpxy defaults to
+// keep-alive agents.
+describe("#chunked-connection-teardown", () => {
+  it("should send `connection: close` upstream for a chunked request despite default keep-alive agents", async () => {
+    const net = await import("node:net");
+    const { resolve, reject, promise } = Promise.withResolvers<void>();
+
+    let upstreamConnection: string | undefined;
+    const source = http.createServer((req, res) => {
+      upstreamConnection = req.headers.connection as string | undefined;
+      req.resume();
+      req.on("end", () => {
+        res.writeHead(200, { "Content-Type": "text/plain" });
+        res.end("ok");
+      });
+    });
+    const sourcePort = await listenOn(source);
+
+    const proxy = httpProxy.createProxyServer({
+      target: `http://127.0.0.1:${sourcePort}`,
+    });
+    const proxyServer = http.createServer((req, res) => proxy.web(req, res));
+    const proxyPort = await listenOn(proxyServer);
+
+    const rawRequest =
+      "OPTIONS / HTTP/1.1\r\n" +
+      `Host: 127.0.0.1:${proxyPort}\r\n` +
+      "Connection: keep-alive\r\n" +
+      "Transfer-Encoding: chunked\r\n" +
+      "\r\n" +
+      "0\r\n" +
+      "\r\n";
+
+    const socket = net.connect(proxyPort, "127.0.0.1", () => socket.write(rawRequest));
+
+    const finish = (fn: () => void) => {
+      socket.destroy();
+      source.close();
+      proxyServer.close();
+      fn();
+    };
+
+    socket.once("data", () => {
+      setTimeout(() => {
+        try {
+          expect(upstreamConnection).to.eql("close");
+          finish(resolve);
+        } catch (error) {
+          finish(() => reject(error as Error));
+        }
+      }, 100);
+    });
+    socket.on("error", (error) => finish(() => reject(error)));
+
+    await promise;
+  });
+});

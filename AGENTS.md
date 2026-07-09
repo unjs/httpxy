@@ -71,7 +71,7 @@ Returns Promise<Socket> (the upstream proxy socket)
 ### HTTP middleware semantics
 
 - Incoming pass order is fixed: `deleteLength -> timeout -> XHeaders -> stream`.
-- `deleteLength` applies to both `DELETE` and `OPTIONS` without content length; it sets `content-length: 0` and removes `transfer-encoding`.
+- `deleteLength` applies to both `DELETE` and `OPTIONS`; it sets `content-length: 0` **only when the request carries neither `content-length` nor `transfer-encoding`**. It never strips `transfer-encoding` — a chunked request keeps its body and framing (request-smuggling fix, GHSA-ggv3-7p47-pfv8).
 - `proxyReq` event is intentionally skipped when request has `expect` header (`100-continue` advisory coverage).
 - `selfHandleResponse: true` skips outgoing passes and auto-pipe; callers must finish the response in `proxyRes`.
 - `proxyTimeout` aborts upstream request and surfaces timeout errors (tested as `ECONNRESET`).
@@ -96,6 +96,12 @@ Returns Promise<Socket> (the upstream proxy socket)
 - `hostRewrite` takes precedence over `autoRewrite`; `protocolRewrite` composes with either.
 - Cookie rewriting supports string or mapping config (including wildcard `"*"` and empty string for removal).
 - `preserveHeaderKeyCase` uses `rawHeaders` when available.
+
+### Outgoing request / connection semantics (`setupOutgoing`, `src/_utils.ts`)
+
+- Defaults to shared keep-alive agents (`defaultAgents.http` / `.https`) for upstream connection reuse. WebSocket upgrades and HTTP/2 incoming requests use `agent: false` instead (agents conflict with the socket lifecycle). A caller-provided `agent` (including `false`) always wins.
+- When there is no agent (`agent: false`) and the request is not an upgrade, `connection: close` is forced (stock http-proxy behavior).
+- **Request-smuggling hardening (GHSA-ggv3-7p47-pfv8):** `connection: close` is additionally forced — _regardless of agent_ — whenever the outgoing request carries a `transfer-encoding` header, or its `Connection` header lists `transfer-encoding` as hop-by-hop. This prevents an upstream keep-alive socket from being reused after a chunked request, so a desync at a lenient upstream cannot poison a later user's response. It also closes the `Connection: upgrade` + chunked-body bypass. Genuine WebSocket upgrades (no `transfer-encoding`) keep their `Connection` header intact.
 
 ### URL/path handling invariants
 
