@@ -71,7 +71,7 @@ Returns Promise<Socket> (the upstream proxy socket)
 ### HTTP middleware semantics
 
 - Incoming pass order is fixed: `deleteLength -> timeout -> XHeaders -> stream`.
-- `deleteLength` applies to both `DELETE` and `OPTIONS` without content length; it sets `content-length: 0` and removes `transfer-encoding`.
+- `deleteLength` applies to both `DELETE` and `OPTIONS`; it sets `content-length: 0` **only when the request carries neither `content-length` nor `transfer-encoding`**. It never strips `transfer-encoding` — a chunked request keeps its body and framing (request-smuggling fix, GHSA-ggv3-7p47-pfv8).
 - `proxyReq` event is intentionally skipped when request has `expect` header (`100-continue` advisory coverage).
 - `selfHandleResponse: true` skips outgoing passes and auto-pipe; callers must finish the response in `proxyRes`.
 - `proxyTimeout` aborts upstream request and surfaces timeout errors (tested as `ECONNRESET`).
@@ -97,6 +97,16 @@ Returns Promise<Socket> (the upstream proxy socket)
 - Protocol-relative `Location` values (`//host/path`) stay protocol-relative when only the host is rewritten (`hostRewrite`/`autoRewrite`), so the client resolves the scheme itself (WHATWG `URL` would otherwise absolutize them with the target protocol). An explicit `protocolRewrite` opts into a concrete scheme and wins, absolutizing the value (e.g. `//host` → `https://host/`). The protocol-relative preservation is ported from node-http-proxy#1298; the `protocolRewrite`-wins interaction is httpxy-specific.
 - Cookie rewriting supports string or mapping config (including wildcard `"*"` and empty string for removal).
 - `preserveHeaderKeyCase` uses `rawHeaders` when available.
+
+### Outgoing request / connection semantics (`setupOutgoing`, `src/_utils.ts`)
+
+- Defaults to shared keep-alive agents (`defaultAgents.http` / `.https`) for upstream connection reuse. WebSocket upgrades and HTTP/2 incoming requests use `agent: false` instead (agents conflict with the socket lifecycle). A caller-provided `agent` (including `false`) always wins.
+- When there is no agent (`agent: false`) and the request is not an upgrade, `connection: close` is forced (stock http-proxy behavior).
+- **Request-smuggling hardening (GHSA-ggv3-7p47-pfv8):** `connection: close` is additionally forced — _regardless of agent_ — whenever the outgoing request carries a `transfer-encoding` header, or its `Connection` header lists `transfer-encoding` as hop-by-hop. This prevents an upstream keep-alive socket from being reused after a chunked request, so a desync at a lenient upstream cannot poison a later user's response. It also closes the `Connection: upgrade` + chunked-body bypass. Genuine WebSocket upgrades (no `transfer-encoding`) keep their `Connection` header intact.
+- The hardening lives in the shared helper `forceConnectionCloseForTransferEncoding()` (`src/_utils.ts`) and is applied on **every** outgoing-request path, so no path can leak a reusable chunked socket:
+  - `setupOutgoing` — ProxyServer `web`/`ws` initial requests.
+  - `proxyFetch`'s `_sendRequest` — re-runs the helper on each recursion, covering both the initial request and every `followRedirects` 307/308 replay hop.
+  - `web-incoming`'s `followRedirects` 307/308 replay (`src/middleware/web-incoming.ts`) — this replay builds its `redirectReq` options by hand rather than via `setupOutgoing`, so it calls the helper directly on `redirectHeaders` before building the request options.
 
 ### URL/path handling invariants
 
@@ -147,6 +157,7 @@ test/
 ├── http-proxy.test.ts             — Forward, target, WebSocket, socket.io, SSE, timeouts, error events
 ├── https-proxy.test.ts            — HTTPS targets, SSL certs, certificate validation
 ├── _utils.test.ts                 — setupOutgoing, setupSocket, path joining, auth, changeOrigin
+├── request-smuggling.test.ts      — End-to-end GHSA-ggv3-7p47-pfv8 reproduction (chunked payload hiding a smuggled request; asserts it never reaches a lenient upstream), ported from vercel/next.js
 ├── types.test-d.ts                — TypeScript type assertions (vitest typecheck)
 └── middleware/
     ├── web-incoming.test.ts       — deleteLength, timeout, XHeaders

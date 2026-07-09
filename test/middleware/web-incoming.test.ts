@@ -960,6 +960,64 @@ describe("#followRedirects", () => {
       .end();
     await promise;
   });
+
+  // Regression: GHSA-ggv3-7p47-pfv8. The 307/308 replay bypasses setupOutgoing, so
+  // it must independently force `connection: close` on a chunked request — otherwise a
+  // caller-supplied keep-alive agent could reuse the upstream socket after a desync.
+  it("forces connection: close on the 307 replay of a chunked request", async () => {
+    const { resolve, promise } = Promise.withResolvers<void>();
+    const keepAliveAgent = new http.Agent({ keepAlive: true });
+
+    let replayConnection: string | undefined;
+    const source = http.createServer(function (req: any, res: any) {
+      if (new URL(req.url, "http://localhost").pathname === "/dest") {
+        replayConnection = req.headers.connection;
+        let body = "";
+        req.on("data", (chunk: Buffer) => (body += chunk));
+        req.on("end", () => {
+          res.writeHead(200, { "Content-Type": "text/plain" });
+          res.end(body);
+        });
+        return;
+      }
+      res.writeHead(307, { Location: "/dest" });
+      res.end();
+    });
+    const sourcePort = await listenOn(source);
+
+    const proxy = httpProxy.createProxyServer({
+      target: `http://127.0.0.1:${sourcePort}`,
+      followRedirects: true,
+      agent: keepAliveAgent,
+    });
+
+    const proxyServer = http.createServer((req, res) => proxy.web(req, res));
+    const proxyPort = await listenOn(proxyServer);
+
+    const proxyReq = http.request(
+      `http://127.0.0.1:${proxyPort}`,
+      // `connection: keep-alive` + no content-length → Node frames the body as
+      // `transfer-encoding: chunked`; without the fix the replay would inherit
+      // `connection: keep-alive` from the original request headers.
+      { method: "POST", headers: { connection: "keep-alive" } },
+      function (res) {
+        let body = "";
+        res.on("data", (chunk: Buffer) => (body += chunk));
+        res.on("end", () => {
+          source.close();
+          proxyServer.close();
+          keepAliveAgent.destroy();
+          expect(res.statusCode).to.eql(200);
+          expect(body).to.eql("chunk-body");
+          expect(replayConnection).to.eql("close");
+          resolve();
+        });
+      },
+    );
+    proxyReq.write("chunk-body");
+    proxyReq.end();
+    await promise;
+  });
 });
 
 // Regression: upstream http-party/node-http-proxy#1559
@@ -1126,6 +1184,69 @@ describe("#chunked-body-smuggling", () => {
           finish(() => reject(error as Error));
         }
       }, 200);
+    });
+    socket.on("error", (error) => finish(() => reject(error)));
+
+    await promise;
+  });
+});
+
+// Request smuggling hardening (GHSA-ggv3-7p47-pfv8): even though the proxy no
+// longer creates a desync, a chunked request must not reuse an upstream
+// keep-alive socket. If a lenient upstream ever desynced, socket reuse is what
+// makes it exploitable (leftover bytes read as another user's request). The
+// proxy therefore sends `Connection: close` upstream for any chunked request,
+// so the socket is torn down after use even though httpxy defaults to
+// keep-alive agents.
+describe("#chunked-connection-teardown", () => {
+  it("should send `connection: close` upstream for a chunked request despite default keep-alive agents", async () => {
+    const net = await import("node:net");
+    const { resolve, reject, promise } = Promise.withResolvers<void>();
+
+    let upstreamConnection: string | undefined;
+    const source = http.createServer((req, res) => {
+      upstreamConnection = req.headers.connection as string | undefined;
+      req.resume();
+      req.on("end", () => {
+        res.writeHead(200, { "Content-Type": "text/plain" });
+        res.end("ok");
+      });
+    });
+    const sourcePort = await listenOn(source);
+
+    const proxy = httpProxy.createProxyServer({
+      target: `http://127.0.0.1:${sourcePort}`,
+    });
+    const proxyServer = http.createServer((req, res) => proxy.web(req, res));
+    const proxyPort = await listenOn(proxyServer);
+
+    const rawRequest =
+      "OPTIONS / HTTP/1.1\r\n" +
+      `Host: 127.0.0.1:${proxyPort}\r\n` +
+      "Connection: keep-alive\r\n" +
+      "Transfer-Encoding: chunked\r\n" +
+      "\r\n" +
+      "0\r\n" +
+      "\r\n";
+
+    const socket = net.connect(proxyPort, "127.0.0.1", () => socket.write(rawRequest));
+
+    const finish = (fn: () => void) => {
+      socket.destroy();
+      source.close();
+      proxyServer.close();
+      fn();
+    };
+
+    socket.once("data", () => {
+      setTimeout(() => {
+        try {
+          expect(upstreamConnection).to.eql("close");
+          finish(resolve);
+        } catch (error) {
+          finish(() => reject(error as Error));
+        }
+      }, 100);
     });
     socket.on("error", (error) => finish(() => reject(error)));
 

@@ -211,6 +211,68 @@ describe("lib/http-proxy/common.js", () => {
       expect(outgoing.agent).to.eql(false);
     });
 
+    // Request smuggling hardening (GHSA-ggv3-7p47-pfv8): a request carrying
+    // `transfer-encoding` must not reuse an upstream keep-alive socket, so its
+    // outgoing `connection` header is forced to `close` regardless of agent.
+    it("should force connection: close on chunked (transfer-encoding) requests even with a keep-alive agent", () => {
+      const outgoing = createOutgoing();
+      common.setupOutgoing(
+        outgoing,
+        { target: "http://localhost" },
+        stubIncomingMessage({
+          method: "OPTIONS",
+          url: "/",
+          headers: { "transfer-encoding": "chunked" },
+        }),
+      );
+      // Default keep-alive agent is still selected...
+      expect(outgoing.agent).to.eql(common.defaultAgents.http);
+      // ...but the socket must be torn down after this request.
+      expect(outgoing.headers!.connection).to.eql("close");
+      expect(outgoing.headers!["transfer-encoding"]).to.eql("chunked");
+    });
+
+    it("should force connection: close when Connection marks transfer-encoding as hop-by-hop", () => {
+      const outgoing = createOutgoing();
+      common.setupOutgoing(
+        outgoing,
+        { target: "http://localhost" },
+        stubIncomingMessage({
+          url: "/",
+          headers: { connection: "keep-alive, transfer-encoding" },
+        }),
+      );
+      expect(outgoing.headers!.connection).to.eql("close");
+    });
+
+    it("should force connection: close on transfer-encoding even when Connection is upgrade (bypass vector)", () => {
+      const outgoing = createOutgoing();
+      common.setupOutgoing(
+        outgoing,
+        { target: "http://localhost" },
+        stubIncomingMessage({
+          method: "OPTIONS",
+          url: "/",
+          headers: { connection: "upgrade", "transfer-encoding": "chunked" },
+        }),
+      );
+      expect(outgoing.headers!.connection).to.eql("close");
+    });
+
+    it("should not force connection: close on genuine websocket upgrades (no transfer-encoding)", () => {
+      const outgoing = createOutgoing();
+      common.setupOutgoing(
+        outgoing,
+        { target: "http://localhost" },
+        stubIncomingMessage({
+          url: "/",
+          headers: { connection: "keep-alive, upgrade", upgrade: "websocket" },
+        }),
+      );
+      // Upgrade requests must keep their Connection header intact.
+      expect(outgoing.headers!.connection).to.eql("keep-alive, upgrade");
+    });
+
     it("set the port according to the protocol", () => {
       const outgoing = createOutgoing();
       common.setupOutgoing(
