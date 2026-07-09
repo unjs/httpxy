@@ -1,5 +1,29 @@
 # Changelog
 
+## v0.5.5
+
+[compare changes](https://github.com/unjs/httpxy/compare/v0.5.4...v0.5.5)
+
+### 🩹 Fixes
+
+- Retain relative protocol in redirect location header ([#156](https://github.com/unjs/httpxy/pull/156))
+- Force `connection: close` on chunked upstream requests ([#158](https://github.com/unjs/httpxy/pull/158))
+
+### 🏡 Chore
+
+- Apply automated updates ([0b03efd](https://github.com/unjs/httpxy/commit/0b03efd))
+- Update deps ([6821255](https://github.com/unjs/httpxy/commit/6821255))
+
+### ✅ Tests
+
+- Add regression test to ensure url embed preservation ([#155](https://github.com/unjs/httpxy/pull/155))
+
+### ❤️ Contributors
+
+- Pooya Parsa ([@pi0](https://github.com/pi0))
+- Pi0x <x@pi0.io>
+- Sukka <isukkaw@gmail.com>
+
 ## v0.5.4
 
 [compare changes](https://github.com/unjs/httpxy/compare/v0.5.3...v0.5.4)
