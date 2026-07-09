@@ -282,9 +282,9 @@ describe("middleware:web-outgoing", () => {
         expect(ctx.proxyRes.headers.location).to.eql("http://backend.com/");
       });
 
-      // protocolRewrite is a no-op for protocol-relative URLs: the value stays
-      // protocol-relative so the client resolves the scheme itself.
-      it("is a no-op when a protocol relative URL is used", () => {
+      // An explicit protocolRewrite opts into a concrete scheme, so it wins over
+      // protocol-relative preservation: the URL is absolutized to that scheme.
+      it("absolutizes a protocol relative URL to the rewritten protocol", () => {
         ctx.proxyRes.headers.location = "//backend.com";
         webOutgoing.setRedirectHostRewrite(
           ctx.req,
@@ -292,19 +292,7 @@ describe("middleware:web-outgoing", () => {
           ctx.proxyRes,
           ctx.options,
         );
-        expect(ctx.proxyRes.headers.location).to.eql("//backend.com/");
-      });
-
-      // Ported from https://github.com/http-party/node-http-proxy/pull/1298
-      it("not when protocol relative URL is used", () => {
-        ctx.proxyRes.headers.location = "//backend.com";
-        webOutgoing.setRedirectHostRewrite(
-          ctx.req,
-          stubServerResponse(),
-          ctx.proxyRes,
-          ctx.options,
-        );
-        expect(ctx.proxyRes.headers.location).to.eql("//backend.com/");
+        expect(ctx.proxyRes.headers.location).to.eql("https://backend.com/");
       });
 
       it("works together with hostRewrite", () => {
@@ -318,8 +306,8 @@ describe("middleware:web-outgoing", () => {
         expect(ctx.proxyRes.headers.location).to.eql("https://ext-manual.com/");
       });
 
-      // Ported from https://github.com/http-party/node-http-proxy/pull/1298
-      it("not with hostRewrite when a protocol relative URL is used", () => {
+      // protocolRewrite wins even when combined with hostRewrite.
+      it("absolutizes a protocol relative URL together with hostRewrite", () => {
         ctx.options.hostRewrite = "ext-manual.com";
         ctx.proxyRes.headers.location = "//backend.com";
         webOutgoing.setRedirectHostRewrite(
@@ -328,7 +316,7 @@ describe("middleware:web-outgoing", () => {
           ctx.proxyRes,
           ctx.options,
         );
-        expect(ctx.proxyRes.headers.location).to.eql("//ext-manual.com/");
+        expect(ctx.proxyRes.headers.location).to.eql("https://ext-manual.com/");
       });
 
       it("works together with autoRewrite", () => {
@@ -342,8 +330,8 @@ describe("middleware:web-outgoing", () => {
         expect(ctx.proxyRes.headers.location).to.eql("https://ext-auto.com/");
       });
 
-      // Ported from https://github.com/http-party/node-http-proxy/pull/1298
-      it("not with autoRewrite when a protocol relative URL is used", () => {
+      // protocolRewrite wins even when combined with autoRewrite.
+      it("absolutizes a protocol relative URL together with autoRewrite", () => {
         ctx.options.autoRewrite = true;
         ctx.proxyRes.headers.location = "//backend.com/";
         webOutgoing.setRedirectHostRewrite(
@@ -352,7 +340,7 @@ describe("middleware:web-outgoing", () => {
           ctx.proxyRes,
           ctx.options,
         );
-        expect(ctx.proxyRes.headers.location).to.eql("//ext-auto.com/");
+        expect(ctx.proxyRes.headers.location).to.eql("https://ext-auto.com/");
       });
     });
   });

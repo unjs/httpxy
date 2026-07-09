@@ -135,7 +135,7 @@ server.listen(3000, () => {
 | `buffer`                | `stream.Stream`                        | —          | Stream to use as request body instead of the incoming request               |
 
 > [!NOTE]
-> Redirect rewriting (`hostRewrite`, `autoRewrite`, `protocolRewrite`) only applies when the `Location` header host matches the target host, so cross-origin redirects are never altered. A protocol-relative `Location` (`//host/path`) is kept protocol-relative after rewriting — the client resolves it against its own scheme — which means `protocolRewrite` has no effect on such values.
+> Redirect rewriting (`hostRewrite`, `autoRewrite`, `protocolRewrite`) only applies when the `Location` header host matches the target host, so cross-origin redirects are never altered. A protocol-relative `Location` (`//host/path`) is kept protocol-relative when only the host is rewritten (`hostRewrite`/`autoRewrite`), so the client resolves the scheme itself. Setting `protocolRewrite` explicitly opts into a concrete scheme and absolutizes such values (e.g. `//host/path` → `https://host/path`).
 
 ## Events
 
