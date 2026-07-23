@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "devDependencies": {
-    "@fastify/http-proxy": "^11.5.0",
+    "@fastify/http-proxy": "^11.6.0",
     "@types/http-proxy": "^1.17.17",
     "fast-proxy": "^2.2.0",
     "fastify": "^5.10.0",
