@@ -30,12 +30,12 @@
     "@types/async": "^3.2.25",
     "@types/concat-stream": "^2.0.3",
     "@types/express": "^5.0.6",
-    "@types/node": "^26.1.1",
-    "@types/semver": "^7.7.1",
+    "@types/node": "^26.4.0",
+    "@types/semver": "^7.8.0",
     "@types/sse": "^0.0.0",
     "@types/ws": "^8.18.1",
     "@typescript/native-preview": "latest",
-    "@vitest/coverage-v8": "^4.1.10",
+    "@vitest/coverage-v8": "^4.1.11",
     "async": "^3.2.6",
     "changelogen": "^0.6.2",
     "concat-stream": "^2.0.0",
@@ -43,16 +43,16 @@
     "expect.js": "^0.3.1",
     "obuild": "^0.4.38",
     "ofetch": "^1.5.1",
-    "oxfmt": ">=0.58.0",
-    "oxlint": "^1.73.0",
+    "oxfmt": ">=0.65.0",
+    "oxlint": "^1.80.0",
     "semver": "^7.8.5",
     "socket.io": "^4.8.3",
     "socket.io-client": "^4.8.3",
     "sse": "^0.0.8",
     "typescript": "^6.0.3",
-    "undici": "^8.7.0",
-    "vitest": "^4.1.10",
-    "ws": "^8.21.0"
+    "undici": "^8.10.1",
+    "vitest": "^4.1.11",
+    "ws": "^8.21.3"
   },
-  "packageManager": "pnpm@11.12.0"
+  "packageManager": "pnpm@11.25.0"
 }
