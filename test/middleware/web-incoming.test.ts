@@ -4,6 +4,7 @@ import * as webPasses from "../../src/middleware/web-incoming.ts";
 import * as httpProxy from "../../src/index.ts";
 import concat from "concat-stream";
 import http from "node:http";
+import net from "node:net";
 import {
   stubIncomingMessage,
   stubServerResponse,
@@ -1251,5 +1252,88 @@ describe("#chunked-connection-teardown", () => {
     socket.on("error", (error) => finish(() => reject(error)));
 
     await promise;
+  });
+});
+
+// https://github.com/unjs/httpxy/issues/166
+describe("#stream with mocked sockets", () => {
+  /**
+   * Mimics the socket used by request interceptors such as msw
+   * (`@mswjs/interceptors`) and nock: it stays `pending` and only emits
+   * "connect" *after* the outgoing request has been fully written, since that is
+   * when the interceptor decides how to respond.
+   */
+  class MockSocket extends net.Socket {
+    #received = "";
+
+    override connect() {
+      return this; // never connects on its own
+    }
+
+    override write(chunk: any, encoding?: any, callback?: any) {
+      this.#received += chunk.toString();
+      const [head = "", body = ""] = this.#received.split("\r\n\r\n");
+      const contentLength = Number(/content-length: (\d+)/i.exec(head)?.[1] ?? 0);
+      if (this.#received.includes("\r\n\r\n") && body.length >= contentLength) {
+        // Request fully received: only now the interceptor "connects" and replies
+        queueMicrotask(() => {
+          (this as { connecting: boolean }).connecting = false;
+          this.emit("connect");
+          this.push(`HTTP/1.1 200 OK\r\ncontent-length: ${Buffer.byteLength(body)}\r\n\r\n${body}`);
+        });
+      }
+      if (typeof encoding === "function") {
+        encoding();
+      } else if (typeof callback === "function") {
+        callback();
+      }
+      return true;
+    }
+
+    override _read() {}
+
+    override end() {
+      return this;
+    }
+  }
+
+  class MockAgent extends http.Agent {
+    override createConnection() {
+      return new MockSocket();
+    }
+  }
+
+  async function proxyThroughMockSocket(method: string, body?: string) {
+    const proxy = httpProxy.createProxyServer({
+      target: "http://upstream.test",
+      agent: new MockAgent(),
+    });
+    const proxyServer = http.createServer((req, res) => {
+      proxy.web(req, res);
+    });
+    const proxyPort = await listenOn(proxyServer);
+
+    const { resolve, reject, promise } = Promise.withResolvers<string>();
+    const req = http.request(`http://127.0.0.1:${proxyPort}/ping`, { method }, (res) => {
+      let received = "";
+      res.on("data", (chunk: Buffer) => (received += chunk));
+      res.on("end", () => resolve(received));
+    });
+    req.on("error", reject);
+    req.end(body);
+
+    try {
+      return await promise;
+    } finally {
+      proxyServer.close();
+    }
+  }
+
+  it("should not hang when the socket connects only after the request is sent", async () => {
+    expect(await proxyThroughMockSocket("GET")).to.eql("");
+  });
+
+  it("should deliver the request body to a socket that connects late", async () => {
+    expect(await proxyThroughMockSocket("POST", "x".repeat(8192))).to.eql("x".repeat(8192));
   });
 });

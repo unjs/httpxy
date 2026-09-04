@@ -171,13 +171,12 @@ export const stream = defineProxyMiddleware((req, res, options, server, head, ca
       proxyReq.destroy(err);
     });
   } else {
-    proxyReq.on("socket", (socket) => {
-      if (socket.pending) {
-        socket.on("connect", () => (options.buffer || req).pipe(proxyReq));
-      } else {
-        (options.buffer || req).pipe(proxyReq);
-      }
-    });
+    // Pipe immediately, without waiting for the upstream socket to connect.
+    // `ClientRequest` buffers writes issued before the socket is connected, and
+    // deferring deadlocks with mocked sockets (msw / @mswjs/interceptors, nock),
+    // which only emit "connect" *after* the outgoing request has been fully
+    // written (unjs/httpxy#166).
+    (options.buffer || req).pipe(proxyReq);
   }
 
   function handleResponse(proxyRes: IncomingMessage, redirectCount: number, currentUrl: URL) {

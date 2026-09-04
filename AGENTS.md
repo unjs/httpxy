@@ -81,6 +81,7 @@ Returns Promise<Socket> (the upstream proxy socket)
 - `proxyRes` event fires only for the final (non-redirect) response; `proxyReq` fires for each request including redirects.
 - Sensitive headers (`authorization`, `cookie`) are stripped on cross-origin redirects.
 - When `followRedirects` is enabled, the request body is tee'd (written to proxy request and buffered simultaneously) rather than piped.
+- Without `followRedirects`, the incoming request is piped into the outgoing request **immediately**, without waiting for the upstream socket to emit `connect`. `ClientRequest` buffers writes issued before the socket connects, so the deferral is unnecessary — and it deadlocks with mocked sockets from request interceptors (msw/`@mswjs/interceptors`, nock), which only emit `connect` *after* the outgoing request has been fully written (unjs/httpxy#166). Regression coverage: `#stream with mocked sockets` in `test/middleware/web-incoming.test.ts`.
 
 ### WebSocket middleware semantics
 
