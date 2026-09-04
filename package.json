@@ -24,7 +24,7 @@
     "prepack": "pnpm run build",
     "release": "pnpm test && pnpm build && changelogen --release && npm publish && git push --follow-tags",
     "test": "pnpm lint && pnpm typecheck && vitest run --coverage",
-    "typecheck": "tsgo --noEmit"
+    "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
     "@types/async": "^3.2.25",
@@ -34,8 +34,7 @@
     "@types/semver": "^7.7.1",
     "@types/sse": "^0.0.0",
     "@types/ws": "^8.18.1",
-    "@typescript/native-preview": "latest",
-    "@vitest/coverage-v8": "^4.1.10",
+    "@vitest/coverage-v8": "^5.0.0",
     "async": "^3.2.6",
     "changelogen": "^0.6.2",
     "concat-stream": "^2.0.0",
@@ -49,10 +48,10 @@
     "socket.io": "^4.8.3",
     "socket.io-client": "^4.8.3",
     "sse": "^0.0.8",
-    "typescript": "^6.0.3",
+    "typescript": "^7",
     "undici": "^8.7.0",
-    "vitest": "^4.1.10",
+    "vitest": "^5.0.0",
     "ws": "^8.21.0"
   },
-  "packageManager": "pnpm@11.12.0"
+  "packageManager": "pnpm@11.25.0"
 }
