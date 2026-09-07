@@ -69,10 +69,16 @@ It accepts the same `addr` formats as `proxyFetch` (`"http://host:port"`, `"unix
 server.on("upgrade", (req, socket, head) => {
   proxyUpgrade({ host: "127.0.0.1", port: 8080 }, req, socket, head, {
     // changeOrigin: true, // rewrite Host header
-    // xfwd: false, // disable x-forwarded-* headers (enabled by default)
+    // xfwd: "replace", // replace forwarding metadata instead of appending
   });
 });
 ```
+
+`xfwd` defaults to `true`, appending to `x-forwarded-for`, `x-forwarded-port`, and `x-forwarded-proto`. Setting it to `false` preserves existing forwarding headers without adding values. Neither mode changes the incoming `req.headers`.
+
+Use `xfwd: "replace"` to discard the existing forwarding chain. It removes `Forwarded` and all `X-Forwarded-*` headers, including values supplied through `headers`, then sets only `x-forwarded-for`, `x-forwarded-port`, and `x-forwarded-proto`. The incoming request is unchanged.
+
+The generated address comes from `req.socket.remoteAddress`, and the protocol is `ws` or `wss` according to the incoming socket's encryption. The port comes from the incoming `Host` header, falling back to `80` or `443`. It is not the socket's local or remote port.
 
 ## Proxy Server
 
