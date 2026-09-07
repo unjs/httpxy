@@ -5,6 +5,7 @@ import { Readable } from "node:stream";
 import type { ProxyAddr } from "./types.ts";
 import {
   defaultAgents,
+  drainAfterEarlyResponse,
   forceConnectionCloseForTransferEncoding,
   isSSL,
   joinURL,
@@ -326,6 +327,7 @@ function _sendRequest(
 
     const req = doRequest(reqOpts, (res) => {
       const statusCode = res.statusCode!;
+      drainAfterEarlyResponse(req, res, body instanceof Readable ? body : undefined);
 
       if (
         opts.maxRedirects > 0 &&
