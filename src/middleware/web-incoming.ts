@@ -2,7 +2,9 @@ import type { ClientRequest, IncomingMessage, ServerResponse } from "node:http";
 import type { ProxyTargetDetailed } from "../types.ts";
 import nodeHTTP from "node:http";
 import nodeHTTPS from "node:https";
+import type { Readable } from "node:stream";
 import {
+  drainAfterEarlyResponse,
   forceConnectionCloseForTransferEncoding,
   getPort,
   hasEncryptedConnection,
@@ -314,6 +316,7 @@ export const stream = defineProxyMiddleware((req, res, options, server, head, ca
   }
 
   proxyReq.on("response", function (proxyRes) {
+    drainAfterEarlyResponse(proxyReq, proxyRes, (options.buffer as Readable) || req);
     handleResponse(proxyRes, 0, options.target as URL);
   });
 });
