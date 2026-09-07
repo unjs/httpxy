@@ -70,9 +70,16 @@ server.on("upgrade", (req, socket, head) => {
   proxyUpgrade({ host: "127.0.0.1", port: 8080 }, req, socket, head, {
     // changeOrigin: true, // rewrite Host header
     // xfwd: false, // disable x-forwarded-* headers (enabled by default)
+    // establishmentTimeout: 5000, // wait up to 5 seconds for upstream response headers
   });
 });
 ```
+
+`establishmentTimeout` is an optional deadline in milliseconds for receiving the upstream upgrade or a final HTTP response's headers. It starts before the request is sent and includes connection setup. Informational responses and partial headers do not reset it. Omitted, non-positive, and non-finite values disable the deadline; values above `2147483647` are capped at that limit.
+
+On expiry, the proxy destroys its upstream request and the client socket, and reports an error with `code: "ERR_UPSTREAM_UPGRADE_TIMEOUT"` and `statusCode: 504`. It does not write an HTTP 504 response. With the deadline enabled, closing the client socket also cancels the pending upstream request. The timer stops on an upstream error, final response headers, or upgrade, so it does not limit the lifetime of an established WebSocket or a non-upgrade response body.
+
+Timeout, cancellation, and downstream socket errors are reported even while a custom agent is waiting for a socket. With the deadline active, `ProxyServer.ws()` emits the error and resolves if an error listener handles it; otherwise it rejects. The agent may retain the destroyed request in its queue until capacity becomes available; the proxy does not modify the agent's queue.
 
 ## Proxy Server
 
@@ -129,6 +136,7 @@ server.listen(3000, () => {
 | `cookiePathRewrite`     | `false \| string \| object`            | `false`    | Rewrite path of `Set-Cookie` headers                                        |
 | `headers`               | `object`                               | —          | Extra headers to add to target requests                                     |
 | `proxyTimeout`          | `number`                               | `120000`   | Timeout (ms) for the proxy request to the target                            |
+| `establishmentTimeout`  | `number`                               | —          | Deadline (ms) for WebSocket upstream response headers; see Proxy Upgrade    |
 | `timeout`               | `number`                               | —          | Timeout (ms) for the incoming request                                       |
 | `selfHandleResponse`    | `boolean`                              | `false`    | Disable automatic response piping (handle `proxyRes` yourself)              |
 | `followRedirects`       | `boolean \| number`                    | `false`    | Follow HTTP redirects from target. `true` = max 5 hops; number = custom max |
