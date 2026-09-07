@@ -81,6 +81,7 @@ Returns Promise<Socket> (the upstream proxy socket)
 - `proxyRes` event fires only for the final (non-redirect) response; `proxyReq` fires for each request including redirects.
 - Sensitive headers (`authorization`, `cookie`) are stripped on cross-origin redirects.
 - When `followRedirects` is enabled, the request body is tee'd (written to proxy request and buffered simultaneously) rather than piped.
+- When the upstream responds before the request body is fully written, `drainAfterEarlyResponse()` (`src/_utils.ts`, called on every `response` in `proxy.web` and `proxyFetch`) unpipes and dumps the rest of the incoming body so the client connection stays usable, and destroys the upstream request once its response closes. Coverage: `test/early-response.test.ts`.
 - The request body is wired into the outgoing request on the `ClientRequest` `"socket"` event (after `proxyReq` listeners run), **not** immediately and **not** on the socket's `"connect"`. Wiring immediately lets a bodyless request call `proxyReq.end()` while queued behind a saturated agent (`maxSockets`), flushing headers before `proxyReq` fires so `setHeader` throws `ERR_HTTP_HEADERS_SENT` (chimurai/http-proxy-middleware#472; caught by `pnpm test:ecosystem`). Waiting for `"connect"` deadlocks with mocked sockets from request interceptors (msw/`@mswjs/interceptors`, nock), which only emit `connect` _after_ the outgoing request has been fully written (unjs/httpxy#166). `ClientRequest` buffers writes until the socket connects, so no further deferral is needed. Regression coverage: `#stream with mocked sockets` and `#stream proxyReq header mutation under socket contention` in `test/middleware/web-incoming.test.ts`.
 
 ### WebSocket middleware semantics
@@ -159,6 +160,7 @@ test/
 ├── http-proxy.test.ts             — Forward, target, WebSocket, socket.io, SSE, timeouts, error events
 ├── https-proxy.test.ts            — HTTPS targets, SSL certs, certificate validation
 ├── _utils.test.ts                 — setupOutgoing, setupSocket, path joining, auth, changeOrigin
+├── early-response.test.ts         — Upstream replies before the request body is fully written (proxyFetch + proxy.web)
 ├── request-smuggling.test.ts      — End-to-end GHSA-ggv3-7p47-pfv8 reproduction (chunked payload hiding a smuggled request; asserts it never reaches a lenient upstream), ported from vercel/next.js
 ├── types.test-d.ts                — TypeScript type assertions (vitest typecheck)
 └── middleware/
