@@ -3,6 +3,7 @@ import nodeHTTPS from "node:https";
 import type { Socket } from "node:net";
 import { type ProxyMiddleware, defineProxyMiddleware } from "./_utils.ts";
 import { getPort, hasEncryptedConnection, isSSL, setupOutgoing, setupSocket } from "../_utils.ts";
+import { pipeNonUpgradeResponse } from "../_ws-response.ts";
 
 /**
  * WebSocket requests must have the `GET` method and
@@ -100,14 +101,7 @@ export const stream = defineProxyMiddleware<Socket>(
       // (https://github.com/http-party/node-http-proxy/pull/1433)
       if (!(res as any).upgrade) {
         if (!socket.destroyed && socket.writable) {
-          socket.write(
-            createHttpHeader(
-              "HTTP/" + res.httpVersion + " " + res.statusCode + " " + res.statusMessage,
-              res.headers,
-            ),
-          );
-          res.on("error", onOutgoingError);
-          res.pipe(socket);
+          pipeNonUpgradeResponse(res, socket, onOutgoingError);
         } else {
           // Socket already gone — consume response to avoid unhandled stream errors
           res.resume();
