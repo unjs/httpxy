@@ -70,6 +70,8 @@ export interface ProxyServerOptions {
   headers?: { [header: string]: string };
   /** Timeout (in milliseconds) when proxy receives no response from target. Default: 120000 (2 minutes) */
   proxyTimeout?: number;
+  /** Total time in milliseconds to receive upstream WebSocket response headers or an upgrade. Omitted, non-positive, and non-finite values disable the deadline. */
+  establishmentTimeout?: number;
   /** Timeout (in milliseconds) for incoming requests */
   timeout?: number;
   /** If set to true, none of the webOutgoing passes are called and it's your responsibility to appropriately return the response by listening and acting on the proxyRes event */
