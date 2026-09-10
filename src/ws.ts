@@ -18,10 +18,13 @@ import {
  */
 export interface ProxyUpgradeOptions {
   /**
-   * Add `x-forwarded-for`, `x-forwarded-port`, and `x-forwarded-proto` headers.
+   * Append `x-forwarded-for`, `x-forwarded-port`, and `x-forwarded-proto` headers.
+   * `"replace"` removes `Forwarded` and all `X-Forwarded-*` headers, including
+   * `headers` overrides, before setting new values for this request.
+   * `false` preserves existing headers without adding forwarding values.
    * Default: `true`.
    */
-  xfwd?: boolean;
+  xfwd?: boolean | "replace";
   /**
    * Rewrite the `Host` header to match the target.
    * Default: `false` (original host is kept).
@@ -108,15 +111,23 @@ export function proxyUpgrade(
     return Promise.reject(new Error("Not a valid WebSocket upgrade request"));
   }
 
-  // Set x-forwarded-* headers (enabled by default)
-  if (opts?.xfwd !== false) {
-    const xfFor = req.headers["x-forwarded-for"];
-    const xfPort = req.headers["x-forwarded-port"];
-    const xfProto = req.headers["x-forwarded-proto"];
-    req.headers["x-forwarded-for"] = `${xfFor ? `${xfFor},` : ""}${req.socket?.remoteAddress}`;
-    req.headers["x-forwarded-port"] = `${xfPort ? `${xfPort},` : ""}${getPort(req)}`;
-    req.headers["x-forwarded-proto"] =
-      `${xfProto ? `${xfProto},` : ""}${hasEncryptedConnection(req) ? "wss" : "ws"}`;
+  const forwardedHeaders =
+    opts?.xfwd === false
+      ? undefined
+      : {
+          "x-forwarded-for": `${req.socket?.remoteAddress}`,
+          "x-forwarded-port": getPort(req),
+          "x-forwarded-proto": hasEncryptedConnection(req) ? "wss" : "ws",
+        };
+  let outgoingReq = req;
+  if (forwardedHeaders && opts?.xfwd !== "replace") {
+    outgoingReq = Object.create(req, {
+      headers: { value: { ...req.headers } },
+    }) as IncomingMessage;
+    for (const [name, value] of Object.entries(forwardedHeaders)) {
+      const previous = req.headers[name];
+      outgoingReq.headers[name] = `${previous ? `${previous},` : ""}${value}`;
+    }
   }
 
   // Build target URL for setupOutgoing
@@ -130,8 +141,19 @@ export function proxyUpgrade(
   const outgoing = setupOutgoing(
     requestOptions.ssl || {},
     requestOptions as Parameters<typeof setupOutgoing>[1],
-    req,
+    outgoingReq,
   );
+
+  if (opts?.xfwd === "replace") {
+    const headers = outgoing.headers as Record<string, string | string[] | undefined>;
+    for (const name of Object.keys(headers)) {
+      const lowerName = name.toLowerCase();
+      if (lowerName === "forwarded" || lowerName.startsWith("x-forwarded-")) {
+        delete headers[name];
+      }
+    }
+    Object.assign(headers, forwardedHeaders);
+  }
 
   const sock = socket as Socket;
 

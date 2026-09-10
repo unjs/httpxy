@@ -142,7 +142,9 @@ Returns Promise<Socket> (the upstream proxy socket)
 - Standalone WebSocket upgrade proxy — no `ProxyServer` instance or `EventEmitter` needed.
 - `addr` accepts same formats as `proxyFetch`: `http://host:port`, `ws://host:port`, `unix:/path`, or object `{ host, port }` / `{ socketPath }`.
 - Validates that the request is a valid WS upgrade (`GET` + `upgrade: websocket`); rejects with error and destroys socket otherwise.
-- `xfwd` is enabled by default (unlike `ProxyServer` where it defaults to `false`). Pass `xfwd: false` to disable.
+- `xfwd` defaults to `true`, appending forwarding values. `false` leaves existing forwarding metadata unchanged. Both retain `headers` override precedence, and no mode mutates `req.headers` or `req.rawHeaders`.
+- Append mode uses an own data property for the copied headers, leaving caller-defined read-only properties and accessors untouched.
+- Standalone-only `xfwd: "replace"` removes `Forwarded` and every `X-Forwarded-*` field case-insensitively after merging `headers`, then sets `x-forwarded-for`, `x-forwarded-port`, and `x-forwarded-proto`. Address and protocol come from the incoming socket; port comes from the incoming `Host` header, falling back to `80` or `443`.
 - Supports `xfwd`, `changeOrigin`, `headers`, `ssl`, `secure`, `agent`, `auth`, `prependPath`, `ignorePath`, `toProxy` options via `ProxyUpgradeOptions`.
 - Returns `Promise<Socket>` — resolves with the upstream proxy socket on successful upgrade, rejects on connection or socket error.
 - If the upstream responds without upgrading (e.g., 404), the response is relayed to the client socket.

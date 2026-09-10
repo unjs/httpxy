@@ -225,6 +225,152 @@ describe("proxyUpgrade", () => {
     await promise;
   });
 
+  describe("forwarded headers", () => {
+    const clientHeaders = {
+      forwarded: "for=192.0.2.1;proto=https",
+      "x-forwarded-for": "192.0.2.1",
+      "x-forwarded-port": "443",
+      "x-forwarded-proto": "https",
+      "x-forwarded-host": "original.example",
+      "x-forwarded-custom": "custom",
+      cookie: "session=example",
+    };
+
+    async function captureHeaders(
+      opts?: Parameters<typeof proxyUpgrade>[4],
+      requestHeaders: Record<string, string> = clientHeaders,
+      prepareRequest?: (req: IncomingMessage) => void,
+    ) {
+      const received = Promise.withResolvers<IncomingMessage["headers"]>();
+      const target = await createTargetServer((req, socket) => {
+        received.resolve(req.headers);
+        socket.end(
+          "HTTP/1.1 101 Switching Protocols\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n" +
+            "Sec-WebSocket-Accept: s3pPLMBiTxaQ9kYGzzhZRbK+xOo=\r\n\r\n",
+        );
+      });
+      let incoming: IncomingMessage;
+      let headersBefore: IncomingMessage["headers"];
+      let originalHeaders: IncomingMessage["headers"];
+      let rawHeadersBefore: string[];
+      const proxy = createServer();
+      proxy.on("upgrade", (req, socket, head) => {
+        try {
+          prepareRequest?.(req);
+          incoming = req;
+          originalHeaders = req.headers;
+          headersBefore = { ...req.headers };
+          rawHeadersBefore = [...req.rawHeaders];
+          proxyUpgrade({ host: "127.0.0.1", port: target.port }, req, socket, head, opts).catch(
+            received.reject,
+          );
+        } catch (error) {
+          socket.destroy();
+          received.reject(error);
+        }
+      });
+      const port = await listenServer(proxy);
+      const client = connect(port, "127.0.0.1");
+      client.on("error", received.reject);
+      client.resume();
+      client.write(
+        wsUpgradeRequest(port).replace(
+          "\r\n\r\n",
+          Object.entries(requestHeaders)
+            .map(([key, value]) => `\r\n${key}: ${value}`)
+            .join("") + "\r\n\r\n",
+        ),
+      );
+
+      try {
+        const headers = await received.promise;
+        expect.soft(incoming!.headers).toBe(originalHeaders!);
+        expect.soft(incoming!.headers).toEqual(headersBefore!);
+        expect.soft(incoming!.rawHeaders).toEqual(rawHeadersBefore!);
+        return { headers, port };
+      } finally {
+        client.destroy();
+        proxy.close();
+        target.server.close();
+      }
+    }
+
+    it.each([undefined, true, false])(
+      "preserves boolean mode %s without mutating the request",
+      async (xfwd) => {
+        const { headers, port } = await captureHeaders({ xfwd });
+        expect(headers).toMatchObject({
+          ...clientHeaders,
+          "x-forwarded-for": xfwd === false ? "192.0.2.1" : "192.0.2.1,127.0.0.1",
+          "x-forwarded-port": xfwd === false ? "443" : `443,${port}`,
+          "x-forwarded-proto": xfwd === false ? "https" : "https,ws",
+        });
+      },
+    );
+
+    it.each([true, false])("preserves caller header overrides in boolean mode %s", async (xfwd) => {
+      const { headers } = await captureHeaders(
+        {
+          xfwd,
+          headers: { "x-forwarded-for": "caller", "X-Forwarded-Proto": "caller-proto" },
+        },
+        {},
+      );
+      expect(headers["x-forwarded-for"]).toBe("caller");
+      expect(headers["x-forwarded-proto"]).toBe("caller-proto");
+    });
+
+    it.each([undefined, true])("supports read-only headers in append mode %s", async (xfwd) => {
+      const { headers } = await captureHeaders({ xfwd }, clientHeaders, (req) => {
+        Object.defineProperty(req, "headers", { value: req.headers, writable: false });
+      });
+      expect(headers["x-forwarded-for"]).toBe("192.0.2.1,127.0.0.1");
+    });
+
+    it.each([undefined, true])(
+      "does not invoke the headers setter in append mode %s",
+      async (xfwd) => {
+        let writes = 0;
+        const { headers } = await captureHeaders({ xfwd }, clientHeaders, (req) => {
+          let storedHeaders = req.headers;
+          Object.defineProperty(req, "headers", {
+            get: () => storedHeaders,
+            set: (value: IncomingMessage["headers"]) => {
+              writes++;
+              storedHeaders = value;
+            },
+          });
+        });
+        expect(writes).toBe(0);
+        expect(headers["x-forwarded-for"]).toBe("192.0.2.1,127.0.0.1");
+      },
+    );
+
+    it.each([
+      undefined,
+      {
+        fOrWaRdEd: "caller",
+        "X-Forwarded-For": "caller",
+        "x-forwarded-proto": "caller",
+        "X-Forwarded-Custom": "caller",
+      },
+    ])("replaces forwarding metadata after merging caller headers %j", async (extraHeaders) => {
+      const { headers, port } = await captureHeaders({ xfwd: "replace", headers: extraHeaders });
+      expect(
+        Object.fromEntries(
+          Object.entries(headers).filter(
+            ([key]) => key === "forwarded" || key.startsWith("x-forwarded-"),
+          ),
+        ),
+      ).toEqual({
+        "x-forwarded-for": "127.0.0.1",
+        "x-forwarded-port": String(port),
+        "x-forwarded-proto": "ws",
+      });
+      expect(headers.cookie).toBe(clientHeaders.cookie);
+    });
+  });
+
   it("should reject when upstream responds without upgrading", async () => {
     // Target is a plain HTTP server that never upgrades — just returns 404
     const targetServer = createServer((_req, res) => {
