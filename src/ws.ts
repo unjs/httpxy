@@ -4,6 +4,7 @@ import { request as httpsRequest } from "node:https";
 import type { Duplex } from "node:stream";
 import type { Socket } from "node:net";
 import type { ProxyAddr } from "./types.ts";
+import { pipeNonUpgradeResponse } from "./_ws-response.ts";
 import {
   getPort,
   hasEncryptedConnection,
@@ -157,14 +158,7 @@ export function proxyUpgrade(
       // (https://github.com/http-party/node-http-proxy/pull/1433)
       if (!(res as any).upgrade) {
         if (!sock.destroyed && sock.writable) {
-          sock.write(
-            _createHttpHeader(
-              `HTTP/${res.httpVersion} ${res.statusCode} ${res.statusMessage}`,
-              res.headers,
-            ),
-          );
-          res.on("error", onOutgoingError);
-          res.pipe(sock);
+          pipeNonUpgradeResponse(res, sock, onOutgoingError);
         } else {
           // Socket already gone — consume response to avoid unhandled stream errors
           res.resume();

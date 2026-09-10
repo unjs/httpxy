@@ -89,6 +89,7 @@ Returns Promise<Socket> (the upstream proxy socket)
 - WS requests must be `GET` with `upgrade: websocket`; otherwise socket is destroyed and the chain stops.
 - `proxyReqWs`, `open`, `close`, and deprecated `proxySocket` events are part of tested flow.
 - Upgrade response headers preserve repeated headers like multiple `Set-Cookie` values.
+- Non-upgrade responses use `src/_ws-response.ts` to stream the decoded body with valid downstream framing and `Connection: close`. A Transform restores chunk boundaries when the final transfer coding is chunked; other transfer codings and fixed Content-Length bodies are preserved. Response hop-by-hop fields, Connection/Proxy-Connection nominated fields, and unforwarded Trailer declarations are removed. A nominated Content-Length is reconstructed for fixed-length responses, including zero-length bodies and 304 representation-length metadata, so a truncated body is not mistaken for a complete close-delimited response. Upstream errors abort the stream without a final chunk marker, and downstream close cancels the upstream body. There is no complete-body buffer or body-size cap. Coverage: `test/ws-response.test.ts` for both WebSocket APIs.
 
 ### Outgoing response semantics
 
@@ -146,6 +147,7 @@ Returns Promise<Socket> (the upstream proxy socket)
 - Supports `xfwd`, `changeOrigin`, `headers`, `ssl`, `secure`, `agent`, `auth`, `prependPath`, `ignorePath`, `toProxy` options via `ProxyUpgradeOptions`.
 - Returns `Promise<Socket>` — resolves with the upstream proxy socket on successful upgrade, rejects on connection or socket error.
 - If the upstream responds without upgrading (e.g., 404), the response is relayed to the client socket.
+- For a non-upgrade response, the promise still rejects at response headers while the shared relay streams the body. Callers that want to preserve that response must not destroy the client socket merely because of this rejection.
 - Uses `setupOutgoing()` and `setupSocket()` from shared utils, consistent with `ProxyServer.ws()`.
 
 ## Tests (`test/`)
