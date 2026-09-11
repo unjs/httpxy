@@ -53,5 +53,5 @@
     "vitest": "^5.0.0",
     "ws": "^8.21.0"
   },
-  "packageManager": "pnpm@11.25.0"
+  "packageManager": "pnpm@12.4.0"
 }
