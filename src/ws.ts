@@ -19,8 +19,8 @@ import {
 export interface ProxyUpgradeOptions {
   /**
    * Append `x-forwarded-for`, `x-forwarded-port`, and `x-forwarded-proto` headers.
-   * `"replace"` removes `Forwarded` and all `X-Forwarded-*` headers, including
-   * `headers` overrides, before setting new values for this request.
+   * `"replace"` drops incoming `Forwarded` and all `X-Forwarded-*` headers and
+   * sets new values derived from the incoming socket. Caller `headers` still win.
    * `false` preserves existing headers without adding forwarding values.
    * Default: `true`.
    */
@@ -111,31 +111,25 @@ export function proxyUpgrade(
     return Promise.reject(new Error("Not a valid WebSocket upgrade request"));
   }
 
-  const remoteAddress = req.socket?.remoteAddress;
-  const forwardedHeaders: Record<string, string> =
-    opts?.xfwd === false
-      ? {}
-      : {
-          ...(remoteAddress === undefined ? {} : { "x-forwarded-for": remoteAddress }),
-          "x-forwarded-port": getPort(req),
-          "x-forwarded-proto": hasEncryptedConnection(req) ? "wss" : "ws",
-        };
+  const xfwd = opts?.xfwd ?? true;
+  const forwardedHeaders = xfwd === false ? {} : _getForwardedHeaders(req, xfwd === "replace");
 
-  // Append mode: pass forwarding values as header defaults so `opts.headers`
-  // still take precedence and `req.headers` is never mutated.
-  const appendedHeaders: Record<string, string> = {};
-  if (opts?.xfwd !== "replace") {
-    for (const [name, value] of Object.entries(forwardedHeaders)) {
-      const previous = req.headers[name];
-      appendedHeaders[name] = `${previous ? `${previous},` : ""}${value}`;
+  // Forwarding values act as defaults: caller `headers` win (case-insensitively)
+  // and `req.headers` is never mutated.
+  const callerHeaderNames = new Set(Object.keys(opts?.headers || {}).map((k) => k.toLowerCase()));
+  const headers: Record<string, string> = {};
+  for (const [name, value] of Object.entries(forwardedHeaders)) {
+    if (!callerHeaderNames.has(name)) {
+      headers[name] = value;
     }
   }
+  Object.assign(headers, opts?.headers);
 
   // Build target URL for setupOutgoing
   const target = _buildTargetURL(resolvedAddr, useSSL);
   const requestOptions: ProxyUpgradeOptions & { target: URL } = {
     ...opts,
-    headers: { ...appendedHeaders, ...opts?.headers },
+    headers,
     target,
     prependPath: opts?.prependPath !== false,
   };
@@ -146,15 +140,15 @@ export function proxyUpgrade(
     req,
   );
 
-  if (opts?.xfwd === "replace") {
-    const headers = outgoing.headers as Record<string, string | string[] | undefined>;
-    for (const name of Object.keys(headers)) {
-      const lowerName = name.toLowerCase();
-      if (lowerName === "forwarded" || lowerName.startsWith("x-forwarded-")) {
-        delete headers[name];
+  // Replace mode: drop forwarding headers copied from the incoming request
+  // (everything not explicitly set above by us or the caller).
+  if (xfwd === "replace") {
+    const outgoingHeaders = outgoing.headers as Record<string, unknown>;
+    for (const name of Object.keys(outgoingHeaders)) {
+      if (!(name in headers) && _isForwardingHeader(name)) {
+        delete outgoingHeaders[name];
       }
     }
-    Object.assign(headers, forwardedHeaders);
   }
 
   const sock = socket as Socket;
@@ -242,6 +236,32 @@ export function proxyUpgrade(
 }
 
 // --- Internal ---
+
+function _getForwardedHeaders(req: IncomingMessage, replace: boolean): Record<string, string> {
+  const encrypted = hasEncryptedConnection(req);
+  const values: Record<string, string | undefined> = {
+    "x-forwarded-for": req.socket?.remoteAddress,
+    // In replace mode, avoid the client-controlled `Host` header
+    "x-forwarded-port": replace
+      ? String(req.socket?.localPort || (encrypted ? 443 : 80))
+      : getPort(req),
+    "x-forwarded-proto": encrypted ? "wss" : "ws",
+  };
+  const result: Record<string, string> = {};
+  for (const [name, value] of Object.entries(values)) {
+    if (value === undefined) {
+      continue;
+    }
+    const previous = replace ? undefined : req.headers[name];
+    result[name] = previous ? `${previous},${value}` : value;
+  }
+  return result;
+}
+
+function _isForwardingHeader(name: string): boolean {
+  const lowerName = name.toLowerCase();
+  return lowerName === "forwarded" || lowerName.startsWith("x-forwarded-");
+}
 
 function _buildTargetURL(addr: ProxyAddr, useSSL = false): URL {
   const protocol = useSSL ? "https" : "http";

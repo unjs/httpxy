@@ -142,8 +142,9 @@ Returns Promise<Socket> (the upstream proxy socket)
 - Standalone WebSocket upgrade proxy — no `ProxyServer` instance or `EventEmitter` needed.
 - `addr` accepts same formats as `proxyFetch`: `http://host:port`, `ws://host:port`, `unix:/path`, or object `{ host, port }` / `{ socketPath }`.
 - Validates that the request is a valid WS upgrade (`GET` + `upgrade: websocket`); rejects with error and destroys socket otherwise.
-- `xfwd` defaults to `true`, appending forwarding values. `false` leaves existing forwarding metadata unchanged. Both retain `headers` override precedence, and no mode mutates `req.headers` or `req.rawHeaders`.
-- Standalone-only `xfwd: "replace"` removes `Forwarded` and every `X-Forwarded-*` field case-insensitively after merging `headers`, then sets `x-forwarded-for`, `x-forwarded-port`, and `x-forwarded-proto`. Address and protocol come from the incoming socket; port comes from the incoming `Host` header (client-controlled), falling back to `80` or `443`. `x-forwarded-for` is omitted when the socket has no `remoteAddress`.
+- `xfwd` defaults to `true`, appending forwarding values (port derived from `Host`). `false` leaves existing forwarding metadata unchanged. `x-forwarded-for` is omitted (not `"undefined"`) when the socket has no `remoteAddress`. Unlike `ProxyServer`'s `XHeaders` middleware, no mode mutates `req.headers` or `req.rawHeaders` — forwarding values are passed to `setupOutgoing` as `headers` defaults.
+- Caller `headers` always take precedence over generated forwarding values (case-insensitive) in every mode.
+- Standalone-only `xfwd: "replace"` drops incoming `Forwarded` and every `X-Forwarded-*` field (case-insensitive), except keys explicitly set via `headers`, and sets fresh `x-forwarded-for` (socket `remoteAddress`), `x-forwarded-port` (socket `localPort`, falling back to `80`/`443` — never the client-controlled `Host`), and `x-forwarded-proto`.
 - Supports `xfwd`, `changeOrigin`, `headers`, `ssl`, `secure`, `agent`, `auth`, `prependPath`, `ignorePath`, `toProxy` options via `ProxyUpgradeOptions`.
 - Returns `Promise<Socket>` — resolves with the upstream proxy socket on successful upgrade, rejects on connection or socket error.
 - If the upstream responds without upgrading (e.g., 404), the response is relayed to the client socket.

@@ -273,13 +273,16 @@ describe("proxyUpgrade", () => {
       const client = connect(port, "127.0.0.1");
       client.on("error", received.reject);
       client.resume();
+      const { host, ...extraRequestHeaders } = requestHeaders;
       client.write(
-        wsUpgradeRequest(port).replace(
-          "\r\n\r\n",
-          Object.entries(requestHeaders)
-            .map(([key, value]) => `\r\n${key}: ${value}`)
-            .join("") + "\r\n\r\n",
-        ),
+        wsUpgradeRequest(port)
+          .replace(`Host: 127.0.0.1:${port}`, `Host: ${host ?? `127.0.0.1:${port}`}`)
+          .replace(
+            "\r\n\r\n",
+            Object.entries(extraRequestHeaders)
+              .map(([key, value]) => `\r\n${key}: ${value}`)
+              .join("") + "\r\n\r\n",
+          ),
       );
 
       try {
@@ -334,16 +337,8 @@ describe("proxyUpgrade", () => {
       },
     );
 
-    it.each([
-      undefined,
-      {
-        fOrWaRdEd: "caller",
-        "X-Forwarded-For": "caller",
-        "x-forwarded-proto": "caller",
-        "X-Forwarded-Custom": "caller",
-      },
-    ])("replaces forwarding metadata after merging caller headers %j", async (extraHeaders) => {
-      const { headers, port } = await captureHeaders({ xfwd: "replace", headers: extraHeaders });
+    it("replaces forwarding metadata from the incoming request", async () => {
+      const { headers, port } = await captureHeaders({ xfwd: "replace" });
       expect(
         Object.fromEntries(
           Object.entries(headers).filter(
@@ -356,6 +351,40 @@ describe("proxyUpgrade", () => {
         "x-forwarded-proto": "ws",
       });
       expect(headers.cookie).toBe(clientHeaders.cookie);
+    });
+
+    it("derives x-forwarded-port from the socket (not Host) in replace mode", async () => {
+      const { headers, port } = await captureHeaders(
+        { xfwd: "replace" },
+        { ...clientHeaders, host: "spoofed.example:1234" },
+      );
+      expect(headers["x-forwarded-port"]).toBe(String(port));
+      expect(headers.host).toBe("spoofed.example:1234");
+    });
+
+    it("keeps caller header overrides in replace mode", async () => {
+      const { headers, port } = await captureHeaders({
+        xfwd: "replace",
+        headers: {
+          fOrWaRdEd: "caller",
+          "X-Forwarded-For": "caller",
+          "x-forwarded-proto": "caller",
+          "X-Forwarded-Host": "trusted.example",
+        },
+      });
+      expect(
+        Object.fromEntries(
+          Object.entries(headers).filter(
+            ([key]) => key === "forwarded" || key.startsWith("x-forwarded-"),
+          ),
+        ),
+      ).toEqual({
+        forwarded: "caller",
+        "x-forwarded-for": "caller",
+        "x-forwarded-port": String(port),
+        "x-forwarded-proto": "caller",
+        "x-forwarded-host": "trusted.example",
+      });
     });
   });
 

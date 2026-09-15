@@ -76,9 +76,7 @@ server.on("upgrade", (req, socket, head) => {
 
 `xfwd` defaults to `true`, appending to `x-forwarded-for`, `x-forwarded-port`, and `x-forwarded-proto`. Setting it to `false` preserves existing forwarding headers without adding values. Neither mode changes the incoming `req.headers`.
 
-Use `xfwd: "replace"` to discard the existing forwarding chain. It removes `Forwarded` and all `X-Forwarded-*` headers, including values supplied through `headers`, then sets only `x-forwarded-for`, `x-forwarded-port`, and `x-forwarded-proto`. The incoming request is unchanged.
-
-The generated address comes from `req.socket.remoteAddress`, and the protocol is `ws` or `wss` according to the incoming socket's encryption. The port comes from the incoming `Host` header, falling back to `80` or `443`. It is not the socket's local or remote port, and since `Host` is client-controlled, upstreams should not treat `x-forwarded-port` as trusted.
+Use `xfwd: "replace"` to discard the existing forwarding chain. It drops incoming `Forwarded` and all `X-Forwarded-*` headers, then sets `x-forwarded-for` (from `req.socket.remoteAddress`), `x-forwarded-port` (from `req.socket.localPort`, not the client-controlled `Host` header), and `x-forwarded-proto` (`ws` or `wss` according to the incoming socket's encryption). Values passed through `headers` still take precedence, so you can add trusted metadata such as `x-forwarded-host`. The incoming request is unchanged.
 
 ## Proxy Server
 
