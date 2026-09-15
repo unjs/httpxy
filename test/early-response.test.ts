@@ -111,7 +111,7 @@ describe("upstream responds before the request body is fully written", () => {
     const agent = new Agent({ keepAlive: true });
     const proxy = createProxyServer({ target: `http://127.0.0.1:${upstreamPort}`, agent });
     const front = createServer((req, res) => {
-      proxy.web(req, res);
+      proxy.web(req, res).catch((err) => res.destroy(err));
     });
     const port = await listenOn(front);
     try {
@@ -195,7 +195,7 @@ describe("upstream sends headers early and keeps reading the request body", () =
   it("proxy.web forwards the full body", async () => {
     const proxy = createProxyServer({ target: `http://127.0.0.1:${echoPort}` });
     const front = createServer((req, res) => {
-      proxy.web(req, res);
+      proxy.web(req, res).catch((err) => res.destroy(err));
     });
     const port = await listenOn(front);
     try {
