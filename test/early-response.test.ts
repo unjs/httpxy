@@ -1,4 +1,4 @@
-import { Agent, createServer, type Server } from "node:http";
+import { Agent, createServer, request, type Server } from "node:http";
 import { connect } from "node:net";
 import { Readable } from "node:stream";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
@@ -116,6 +116,90 @@ describe("upstream responds before the request body is fully written", () => {
     const port = await listenOn(front);
     try {
       await expectDrained(await uploadThenPipeline(port), agent);
+    } finally {
+      await new Promise<void>((r) => front.close(() => r()));
+    }
+  });
+});
+
+describe("upstream sends headers early and keeps reading the request body", () => {
+  const BODY = 4 * 1024 * 1024;
+  let echo: Server;
+  let echoPort: number;
+
+  beforeAll(async () => {
+    echo = createServer((req, res) => {
+      res.writeHead(200, { "content-type": "text/plain" });
+      res.flushHeaders();
+      let received = 0;
+      req.on("data", (chunk) => (received += chunk.length));
+      req.on("end", () => res.end(String(received)));
+    });
+    echoPort = await listenOn(echo);
+  });
+
+  afterAll(async () => {
+    await new Promise<void>((r) => echo.close(() => r()));
+  });
+
+  function upload(port: number): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const req = request(
+        { host: "127.0.0.1", port, method: "POST", path: "/", headers: { "content-length": BODY } },
+        (res) => {
+          let body = "";
+          res.on("data", (d) => (body += d));
+          res.on("end", () => resolve(body));
+        },
+      );
+      req.on("error", reject);
+      const chunk = Buffer.alloc(64 * 1024, 0x78);
+      let written = 0;
+      const pump = () => {
+        while (written < BODY) {
+          written += chunk.length;
+          if (!req.write(chunk)) {
+            req.once("drain", pump);
+            return;
+          }
+        }
+        req.end();
+      };
+      // Delay the body so upstream headers arrive before it is fully written
+      setTimeout(pump, 50);
+    });
+  }
+
+  it("proxyFetch forwards the full body", async () => {
+    const front = createServer(async (req, res) => {
+      const upstreamRes = await proxyFetch(
+        `http://127.0.0.1:${echoPort}`,
+        `http://localhost${req.url}`,
+        {
+          method: req.method,
+          headers: req.headers as Record<string, string>,
+          body: Readable.toWeb(req) as any,
+        },
+      );
+      res.writeHead(upstreamRes.status);
+      res.end(await upstreamRes.text());
+    });
+    const port = await listenOn(front);
+    try {
+      expect(await upload(port)).toBe(String(BODY));
+    } finally {
+      await new Promise<void>((r) => front.close(() => r()));
+    }
+  });
+
+  it("proxy.web forwards the full body", async () => {
+    const proxy = createProxyServer({ target: `http://127.0.0.1:${echoPort}` });
+    const front = createServer((req, res) => {
+      proxy.web(req, res);
+    });
+    const port = await listenOn(front);
+    try {
+      expect(await upload(port)).toBe(String(BODY));
     } finally {
       await new Promise<void>((r) => front.close(() => r()));
     }
