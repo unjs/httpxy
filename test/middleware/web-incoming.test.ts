@@ -1337,3 +1337,57 @@ describe("#stream with mocked sockets", () => {
     expect(await proxyThroughMockSocket("POST", "x".repeat(8192))).to.eql("x".repeat(8192));
   });
 });
+
+// https://github.com/chimurai/http-proxy-middleware/issues/472
+describe("#stream proxyReq header mutation under socket contention", () => {
+  async function run(followRedirects?: boolean) {
+    const received: (string | string[] | undefined)[] = [];
+    const source = http.createServer((req, res) => {
+      received.push(req.headers["x-added"]);
+      setTimeout(() => res.end("OK"), 10);
+    });
+    const sourcePort = await listenOn(source);
+
+    const agent = new http.Agent({ keepAlive: true, maxSockets: 1 });
+    const proxy = httpProxy.createProxyServer({
+      target: `http://127.0.0.1:${sourcePort}`,
+      agent,
+      followRedirects,
+    });
+    const errors: Error[] = [];
+    proxy.on("error", (err, _req, res) => {
+      errors.push(err);
+      (res as http.ServerResponse).destroy();
+    });
+    proxy.on("proxyReq", (proxyReq) => {
+      proxyReq.setHeader("x-added", "yes");
+    });
+    const proxyServer = http.createServer((req, res) => {
+      proxy.web(req, res);
+    });
+    const proxyPort = await listenOn(proxyServer);
+
+    try {
+      const bodies = await Promise.all(
+        Array.from({ length: 10 }, () =>
+          fetch(`http://127.0.0.1:${proxyPort}/`).then((r) => r.text()),
+        ),
+      );
+      expect(errors).to.eql([]);
+      expect(bodies).to.eql(Array.from({ length: 10 }, () => "OK"));
+      expect(received).to.eql(Array.from({ length: 10 }, () => "yes"));
+    } finally {
+      agent.destroy();
+      source.close();
+      proxyServer.close();
+    }
+  }
+
+  it("should allow setHeader in proxyReq when requests queue for a socket", async () => {
+    await run();
+  });
+
+  it("should allow setHeader in proxyReq when requests queue for a socket (followRedirects)", async () => {
+    await run(true);
+  });
+});
