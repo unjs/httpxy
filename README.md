@@ -64,7 +64,7 @@ server.listen(3000);
 
 It accepts the same `addr` formats as `proxyFetch` (`"http://host:port"`, `"unix:/path"`, or `{ host, port }` / `{ socketPath }`), and returns a `Promise<Socket>` that resolves with the upstream proxy socket once the WebSocket connection is established.
 
-If the upstream returns an ordinary HTTP response, both `proxyUpgrade` and `ProxyServer.ws` stream its status, headers, and body to the client with `Connection: close`. Chunked bodies are re-encoded for the client connection, without buffering the complete response or imposing a body-size limit. Hop-by-hop headers and unforwarded trailer declarations are removed. Fixed-length framing is preserved even when `Connection` or `Proxy-Connection` nominates `Content-Length`, allowing the client to detect truncated bodies. `proxyUpgrade` rejects when the non-upgrade response headers arrive; the body may still be streaming, so destroying the client socket in that rejection handler interrupts the relay.
+If the upstream responds without upgrading (e.g. `401` or `404`), both `proxyUpgrade` and `ProxyServer.ws` stream the status, headers, and body to the client with `Connection: close` and valid framing (chunked bodies are re-encoded, hop-by-hop headers are stripped, nothing is buffered). `proxyUpgrade` rejects as soon as the response headers arrive while the body may still be streaming, so avoid destroying the client socket in that rejection handler.
 
 ```ts
 // With options

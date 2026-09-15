@@ -16,8 +16,9 @@ src/
 ├── types.ts              — ProxyTarget, ProxyServerOptions, ProxyTargetDetailed
 ├── server.ts             — ProxyServer class (EventEmitter), createProxyServer()
 ├── fetch.ts              — proxyFetch() using Node.js http module → Web Response
-├── upgrade.ts            — proxyUpgrade() standalone WebSocket upgrade proxy
+├── ws.ts                 — proxyUpgrade() standalone WebSocket upgrade proxy
 ├── _utils.ts             — setupOutgoing(), setupSocket(), joinURL(), cookie/header helpers
+├── _ws-response.ts       — pipeNonUpgradeResponse(): relays non-upgrade responses with valid framing
 └── middleware/
     ├── _utils.ts          — Middleware type definitions (ProxyMiddleware, ProxyOutgoingMiddleware)
     ├── web-incoming.ts    — HTTP request passes: deleteLength → timeout → XHeaders → stream
@@ -161,6 +162,7 @@ test/
 ├── https-proxy.test.ts            — HTTPS targets, SSL certs, certificate validation
 ├── _utils.test.ts                 — setupOutgoing, setupSocket, path joining, auth, changeOrigin
 ├── request-smuggling.test.ts      — End-to-end GHSA-ggv3-7p47-pfv8 reproduction (chunked payload hiding a smuggled request; asserts it never reaches a lenient upstream), ported from vercel/next.js
+├── ws-response.test.ts            — Non-upgrade WS responses: chunked re-framing, fixed-length/bodyless preservation, hop-by-hop stripping, truncation, cancellation
 ├── types.test-d.ts                — TypeScript type assertions (vitest typecheck)
 └── middleware/
     ├── web-incoming.test.ts       — deleteLength, timeout, XHeaders
