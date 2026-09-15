@@ -78,7 +78,7 @@ server.on("upgrade", (req, socket, head) => {
 
 Use `xfwd: "replace"` to discard the existing forwarding chain. It removes `Forwarded` and all `X-Forwarded-*` headers, including values supplied through `headers`, then sets only `x-forwarded-for`, `x-forwarded-port`, and `x-forwarded-proto`. The incoming request is unchanged.
 
-The generated address comes from `req.socket.remoteAddress`, and the protocol is `ws` or `wss` according to the incoming socket's encryption. The port comes from the incoming `Host` header, falling back to `80` or `443`. It is not the socket's local or remote port.
+The generated address comes from `req.socket.remoteAddress`, and the protocol is `ws` or `wss` according to the incoming socket's encryption. The port comes from the incoming `Host` header, falling back to `80` or `443`. It is not the socket's local or remote port, and since `Host` is client-controlled, upstreams should not treat `x-forwarded-port` as trusted.
 
 ## Proxy Server
 

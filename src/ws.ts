@@ -111,22 +111,23 @@ export function proxyUpgrade(
     return Promise.reject(new Error("Not a valid WebSocket upgrade request"));
   }
 
-  const forwardedHeaders =
+  const remoteAddress = req.socket?.remoteAddress;
+  const forwardedHeaders: Record<string, string> =
     opts?.xfwd === false
-      ? undefined
+      ? {}
       : {
-          "x-forwarded-for": `${req.socket?.remoteAddress}`,
+          ...(remoteAddress === undefined ? {} : { "x-forwarded-for": remoteAddress }),
           "x-forwarded-port": getPort(req),
           "x-forwarded-proto": hasEncryptedConnection(req) ? "wss" : "ws",
         };
-  let outgoingReq = req;
-  if (forwardedHeaders && opts?.xfwd !== "replace") {
-    outgoingReq = Object.create(req, {
-      headers: { value: { ...req.headers } },
-    }) as IncomingMessage;
+
+  // Append mode: pass forwarding values as header defaults so `opts.headers`
+  // still take precedence and `req.headers` is never mutated.
+  const appendedHeaders: Record<string, string> = {};
+  if (opts?.xfwd !== "replace") {
     for (const [name, value] of Object.entries(forwardedHeaders)) {
       const previous = req.headers[name];
-      outgoingReq.headers[name] = `${previous ? `${previous},` : ""}${value}`;
+      appendedHeaders[name] = `${previous ? `${previous},` : ""}${value}`;
     }
   }
 
@@ -134,6 +135,7 @@ export function proxyUpgrade(
   const target = _buildTargetURL(resolvedAddr, useSSL);
   const requestOptions: ProxyUpgradeOptions & { target: URL } = {
     ...opts,
+    headers: { ...appendedHeaders, ...opts?.headers },
     target,
     prependPath: opts?.prependPath !== false,
   };
@@ -141,7 +143,7 @@ export function proxyUpgrade(
   const outgoing = setupOutgoing(
     requestOptions.ssl || {},
     requestOptions as Parameters<typeof setupOutgoing>[1],
-    outgoingReq,
+    req,
   );
 
   if (opts?.xfwd === "replace") {

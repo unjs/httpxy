@@ -320,29 +320,17 @@ describe("proxyUpgrade", () => {
       expect(headers["x-forwarded-proto"]).toBe("caller-proto");
     });
 
-    it.each([undefined, true])("supports read-only headers in append mode %s", async (xfwd) => {
-      const { headers } = await captureHeaders({ xfwd }, clientHeaders, (req) => {
-        Object.defineProperty(req, "headers", { value: req.headers, writable: false });
-      });
-      expect(headers["x-forwarded-for"]).toBe("192.0.2.1,127.0.0.1");
-    });
-
-    it.each([undefined, true])(
-      "does not invoke the headers setter in append mode %s",
+    it.each([true, "replace"] as const)(
+      "omits x-forwarded-for without a remote address in mode %s",
       async (xfwd) => {
-        let writes = 0;
         const { headers } = await captureHeaders({ xfwd }, clientHeaders, (req) => {
-          let storedHeaders = req.headers;
-          Object.defineProperty(req, "headers", {
-            get: () => storedHeaders,
-            set: (value: IncomingMessage["headers"]) => {
-              writes++;
-              storedHeaders = value;
-            },
-          });
+          Object.defineProperty(req.socket, "remoteAddress", { get: () => undefined });
         });
-        expect(writes).toBe(0);
-        expect(headers["x-forwarded-for"]).toBe("192.0.2.1,127.0.0.1");
+        if (xfwd === "replace") {
+          expect(headers).not.toHaveProperty("x-forwarded-for");
+        } else {
+          expect(headers["x-forwarded-for"]).toBe("192.0.2.1");
+        }
       },
     );
 
