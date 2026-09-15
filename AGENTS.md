@@ -81,6 +81,7 @@ Returns Promise<Socket> (the upstream proxy socket)
 - `proxyRes` event fires only for the final (non-redirect) response; `proxyReq` fires for each request including redirects.
 - Sensitive headers (`authorization`, `cookie`) are stripped on cross-origin redirects.
 - When `followRedirects` is enabled, the request body is tee'd (written to proxy request and buffered simultaneously) rather than piped.
+- When the upstream response **completes** before the request body is fully written, `drainAfterEarlyResponse()` (`src/_utils.ts`, attached to the initial upstream `response` in `proxy.web` and every hop in `proxyFetch`) unpipes and dumps the rest of the incoming body so the client connection stays usable, and destroys the upstream request once its response closes. It waits for the response `end` (not just headers) so upstreams that flush headers early and keep reading the body (streaming echo, `flushHeaders()`) still receive the full body. With `followRedirects` in `proxy.web` the body is written via `data` listeners (no backpressure), so the unpipe/resume is a no-op there. Coverage: `test/early-response.test.ts`.
 - Without `followRedirects`, the incoming request is piped into the outgoing request **immediately**, without waiting for the upstream socket to emit `connect`. `ClientRequest` buffers writes issued before the socket connects, so the deferral is unnecessary — and it deadlocks with mocked sockets from request interceptors (msw/`@mswjs/interceptors`, nock), which only emit `connect` _after_ the outgoing request has been fully written (unjs/httpxy#166). Regression coverage: `#stream with mocked sockets` in `test/middleware/web-incoming.test.ts`.
 
 ### WebSocket middleware semantics
@@ -158,6 +159,7 @@ test/
 ├── http-proxy.test.ts             — Forward, target, WebSocket, socket.io, SSE, timeouts, error events
 ├── https-proxy.test.ts            — HTTPS targets, SSL certs, certificate validation
 ├── _utils.test.ts                 — setupOutgoing, setupSocket, path joining, auth, changeOrigin
+├── early-response.test.ts         — Upstream replies before the request body is fully written (proxyFetch + proxy.web)
 ├── request-smuggling.test.ts      — End-to-end GHSA-ggv3-7p47-pfv8 reproduction (chunked payload hiding a smuggled request; asserts it never reaches a lenient upstream), ported from vercel/next.js
 ├── types.test-d.ts                — TypeScript type assertions (vitest typecheck)
 └── middleware/

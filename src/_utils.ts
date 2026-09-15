@@ -1,6 +1,7 @@
 import httpNative from "node:http";
 import httpsNative from "node:https";
 import net from "node:net";
+import type { Readable } from "node:stream";
 import type { ProxyAddr, ProxyServerOptions, ProxyTarget, ProxyTargetDetailed } from "./types.ts";
 import type { Http2ServerRequest } from "node:http2";
 
@@ -52,6 +53,40 @@ export function forceConnectionCloseForTransferEncoding(
   if (carriesTransferEncoding || connectionMarksTransferEncoding) {
     headers.connection = "close";
   }
+}
+
+/**
+ * `ClientRequest` stops flushing body writes once it has a complete response, so a
+ * source still piped into it would never drain. Dump the rest of the source and tear
+ * down the half-written upstream request once its response closes (a keep-alive agent
+ * never returns an unfinished request's socket to the pool).
+ *
+ * Waits for the response to `end`: an upstream may send headers early and keep reading
+ * the body (e.g. streaming echo / `flushHeaders()`), so draining on `response` would
+ * discard body bytes it still needs.
+ */
+export function drainAfterEarlyResponse(
+  proxyReq: httpNative.ClientRequest,
+  proxyRes: httpNative.IncomingMessage,
+  source?: Readable,
+): void {
+  if (proxyReq.writableFinished) {
+    return;
+  }
+  proxyRes.once("end", () => {
+    if (proxyReq.writableFinished) {
+      return;
+    }
+    if (source) {
+      source.unpipe(proxyReq);
+      source.resume();
+    }
+    proxyRes.once("close", () => {
+      if (!proxyReq.writableFinished) {
+        proxyReq.destroy();
+      }
+    });
+  });
 }
 
 /**
