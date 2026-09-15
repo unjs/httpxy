@@ -1,7 +1,7 @@
 import httpNative from "node:http";
 import httpsNative from "node:https";
 import net from "node:net";
-import type { Readable } from "node:stream";
+import { Readable, type Stream } from "node:stream";
 import type { ProxyAddr, ProxyServerOptions, ProxyTarget, ProxyTargetDetailed } from "./types.ts";
 import type { Http2ServerRequest } from "node:http2";
 
@@ -68,7 +68,7 @@ export function forceConnectionCloseForTransferEncoding(
 export function drainAfterEarlyResponse(
   proxyReq: httpNative.ClientRequest,
   proxyRes: httpNative.IncomingMessage,
-  source?: Readable,
+  source?: Stream,
 ): void {
   if (proxyReq.writableFinished) {
     return;
@@ -77,7 +77,8 @@ export function drainAfterEarlyResponse(
     if (proxyReq.writableFinished) {
       return;
     }
-    if (source) {
+    // `options.buffer` is only typed as `Stream`; a non-Readable source cannot be drained.
+    if (source instanceof Readable) {
       source.unpipe(proxyReq);
       source.resume();
     }
