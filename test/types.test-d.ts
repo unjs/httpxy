@@ -24,6 +24,9 @@ describe("httpxy types", () => {
   });
 
   it("ProxyUpgradeOptions type", () => {
+    expectTypeOf<ProxyUpgradeOptions["xfwd"]>().toEqualTypeOf<boolean | "replace" | undefined>();
+    assertType<ProxyUpgradeOptions>({ xfwd: "replace" });
+    assertType<ProxyUpgradeOptions>({ xfwd: false });
     assertType<ProxyUpgradeOptions>({
       xfwd: true,
       changeOrigin: true,

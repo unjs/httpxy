@@ -16,7 +16,7 @@ src/
 ├── types.ts              — ProxyTarget, ProxyServerOptions, ProxyTargetDetailed
 ├── server.ts             — ProxyServer class (EventEmitter), createProxyServer()
 ├── fetch.ts              — proxyFetch() using Node.js http module → Web Response
-├── upgrade.ts            — proxyUpgrade() standalone WebSocket upgrade proxy
+├── ws.ts                 — proxyUpgrade() standalone WebSocket upgrade proxy
 ├── _utils.ts             — setupOutgoing(), setupSocket(), joinURL(), cookie/header helpers
 └── middleware/
     ├── _utils.ts          — Middleware type definitions (ProxyMiddleware, ProxyOutgoingMiddleware)
@@ -142,7 +142,9 @@ Returns Promise<Socket> (the upstream proxy socket)
 - Standalone WebSocket upgrade proxy — no `ProxyServer` instance or `EventEmitter` needed.
 - `addr` accepts same formats as `proxyFetch`: `http://host:port`, `ws://host:port`, `unix:/path`, or object `{ host, port }` / `{ socketPath }`.
 - Validates that the request is a valid WS upgrade (`GET` + `upgrade: websocket`); rejects with error and destroys socket otherwise.
-- `xfwd` is enabled by default (unlike `ProxyServer` where it defaults to `false`). Pass `xfwd: false` to disable.
+- `xfwd` defaults to `true`, appending forwarding values (port derived from `Host`). `false` leaves existing forwarding metadata unchanged. `x-forwarded-for` is omitted (not `"undefined"`) when the socket has no `remoteAddress`. Unlike `ProxyServer`'s `XHeaders` middleware, no mode mutates `req.headers` or `req.rawHeaders` — forwarding values are passed to `setupOutgoing` as `headers` defaults.
+- Caller `headers` always take precedence over generated forwarding values (case-insensitive) in every mode.
+- Standalone-only `xfwd: "replace"` drops incoming `Forwarded` and every `X-Forwarded-*` field (case-insensitive), except keys explicitly set via `headers`, and sets fresh `x-forwarded-for` (socket `remoteAddress`), `x-forwarded-port` (socket `localPort`, falling back to `80`/`443` — never the client-controlled `Host`), and `x-forwarded-proto`.
 - Supports `xfwd`, `changeOrigin`, `headers`, `ssl`, `secure`, `agent`, `auth`, `prependPath`, `ignorePath`, `toProxy` options via `ProxyUpgradeOptions`.
 - Returns `Promise<Socket>` — resolves with the upstream proxy socket on successful upgrade, rejects on connection or socket error.
 - If the upstream responds without upgrading (e.g., 404), the response is relayed to the client socket.
@@ -154,7 +156,7 @@ Returns Promise<Socket> (the upstream proxy socket)
 test/
 ├── index.test.ts                  — Main proxy: paths, headers, changeOrigin, xfwd, WebSocket, errors
 ├── fetch.test.ts                  — proxyFetch: TCP/Unix, GET/POST, redirects, cookies, 204/304, signal, timeout, xfwd, changeOrigin
-├── upgrade.test.ts                — proxyUpgrade: WS proxy, addr formats, xfwd, error handling
+├── ws.test.ts                     — proxyUpgrade: WS proxy, addr formats, xfwd, error handling
 ├── http-proxy.test.ts             — Forward, target, WebSocket, socket.io, SSE, timeouts, error events
 ├── https-proxy.test.ts            — HTTPS targets, SSL certs, certificate validation
 ├── _utils.test.ts                 — setupOutgoing, setupSocket, path joining, auth, changeOrigin

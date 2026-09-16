@@ -225,6 +225,169 @@ describe("proxyUpgrade", () => {
     await promise;
   });
 
+  describe("forwarded headers", () => {
+    const clientHeaders = {
+      forwarded: "for=192.0.2.1;proto=https",
+      "x-forwarded-for": "192.0.2.1",
+      "x-forwarded-port": "443",
+      "x-forwarded-proto": "https",
+      "x-forwarded-host": "original.example",
+      "x-forwarded-custom": "custom",
+      cookie: "session=example",
+    };
+
+    async function captureHeaders(
+      opts?: Parameters<typeof proxyUpgrade>[4],
+      requestHeaders: Record<string, string> = clientHeaders,
+      prepareRequest?: (req: IncomingMessage) => void,
+    ) {
+      const received = Promise.withResolvers<IncomingMessage["headers"]>();
+      const target = await createTargetServer((req, socket) => {
+        received.resolve(req.headers);
+        socket.end(
+          "HTTP/1.1 101 Switching Protocols\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n" +
+            "Sec-WebSocket-Accept: s3pPLMBiTxaQ9kYGzzhZRbK+xOo=\r\n\r\n",
+        );
+      });
+      let incoming: IncomingMessage;
+      let headersBefore: IncomingMessage["headers"];
+      let originalHeaders: IncomingMessage["headers"];
+      let rawHeadersBefore: string[];
+      const proxy = createServer();
+      proxy.on("upgrade", (req, socket, head) => {
+        try {
+          prepareRequest?.(req);
+          incoming = req;
+          originalHeaders = req.headers;
+          headersBefore = { ...req.headers };
+          rawHeadersBefore = [...req.rawHeaders];
+          proxyUpgrade({ host: "127.0.0.1", port: target.port }, req, socket, head, opts).catch(
+            received.reject,
+          );
+        } catch (error) {
+          socket.destroy();
+          received.reject(error);
+        }
+      });
+      const port = await listenServer(proxy);
+      const client = connect(port, "127.0.0.1");
+      client.on("error", received.reject);
+      client.resume();
+      const { host, ...extraRequestHeaders } = requestHeaders;
+      client.write(
+        wsUpgradeRequest(port)
+          .replace(`Host: 127.0.0.1:${port}`, `Host: ${host ?? `127.0.0.1:${port}`}`)
+          .replace(
+            "\r\n\r\n",
+            Object.entries(extraRequestHeaders)
+              .map(([key, value]) => `\r\n${key}: ${value}`)
+              .join("") + "\r\n\r\n",
+          ),
+      );
+
+      try {
+        const headers = await received.promise;
+        expect.soft(incoming!.headers).toBe(originalHeaders!);
+        expect.soft(incoming!.headers).toEqual(headersBefore!);
+        expect.soft(incoming!.rawHeaders).toEqual(rawHeadersBefore!);
+        return { headers, port };
+      } finally {
+        client.destroy();
+        proxy.close();
+        target.server.close();
+      }
+    }
+
+    it.each([undefined, true, false])(
+      "preserves boolean mode %s without mutating the request",
+      async (xfwd) => {
+        const { headers, port } = await captureHeaders({ xfwd });
+        expect(headers).toMatchObject({
+          ...clientHeaders,
+          "x-forwarded-for": xfwd === false ? "192.0.2.1" : "192.0.2.1,127.0.0.1",
+          "x-forwarded-port": xfwd === false ? "443" : `443,${port}`,
+          "x-forwarded-proto": xfwd === false ? "https" : "https,ws",
+        });
+      },
+    );
+
+    it.each([true, false])("preserves caller header overrides in boolean mode %s", async (xfwd) => {
+      const { headers } = await captureHeaders(
+        {
+          xfwd,
+          headers: { "x-forwarded-for": "caller", "X-Forwarded-Proto": "caller-proto" },
+        },
+        {},
+      );
+      expect(headers["x-forwarded-for"]).toBe("caller");
+      expect(headers["x-forwarded-proto"]).toBe("caller-proto");
+    });
+
+    it.each([true, "replace"] as const)(
+      "omits x-forwarded-for without a remote address in mode %s",
+      async (xfwd) => {
+        const { headers } = await captureHeaders({ xfwd }, clientHeaders, (req) => {
+          Object.defineProperty(req.socket, "remoteAddress", { get: () => undefined });
+        });
+        if (xfwd === "replace") {
+          expect(headers).not.toHaveProperty("x-forwarded-for");
+        } else {
+          expect(headers["x-forwarded-for"]).toBe("192.0.2.1");
+        }
+      },
+    );
+
+    it("replaces forwarding metadata from the incoming request", async () => {
+      const { headers, port } = await captureHeaders({ xfwd: "replace" });
+      expect(
+        Object.fromEntries(
+          Object.entries(headers).filter(
+            ([key]) => key === "forwarded" || key.startsWith("x-forwarded-"),
+          ),
+        ),
+      ).toEqual({
+        "x-forwarded-for": "127.0.0.1",
+        "x-forwarded-port": String(port),
+        "x-forwarded-proto": "ws",
+      });
+      expect(headers.cookie).toBe(clientHeaders.cookie);
+    });
+
+    it("derives x-forwarded-port from the socket (not Host) in replace mode", async () => {
+      const { headers, port } = await captureHeaders(
+        { xfwd: "replace" },
+        { ...clientHeaders, host: "spoofed.example:1234" },
+      );
+      expect(headers["x-forwarded-port"]).toBe(String(port));
+      expect(headers.host).toBe("spoofed.example:1234");
+    });
+
+    it("keeps caller header overrides in replace mode", async () => {
+      const { headers, port } = await captureHeaders({
+        xfwd: "replace",
+        headers: {
+          fOrWaRdEd: "caller",
+          "X-Forwarded-For": "caller",
+          "x-forwarded-proto": "caller",
+          "X-Forwarded-Host": "trusted.example",
+        },
+      });
+      expect(
+        Object.fromEntries(
+          Object.entries(headers).filter(
+            ([key]) => key === "forwarded" || key.startsWith("x-forwarded-"),
+          ),
+        ),
+      ).toEqual({
+        forwarded: "caller",
+        "x-forwarded-for": "caller",
+        "x-forwarded-port": String(port),
+        "x-forwarded-proto": "caller",
+        "x-forwarded-host": "trusted.example",
+      });
+    });
+  });
+
   it("should reject when upstream responds without upgrading", async () => {
     // Target is a plain HTTP server that never upgrades — just returns 404
     const targetServer = createServer((_req, res) => {
