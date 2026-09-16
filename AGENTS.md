@@ -89,6 +89,8 @@ Returns Promise<Socket> (the upstream proxy socket)
 - WS requests must be `GET` with `upgrade: websocket`; otherwise socket is destroyed and the chain stops.
 - `proxyReqWs`, `open`, `close`, and deprecated `proxySocket` events are part of tested flow.
 - Upgrade response headers preserve repeated headers like multiple `Set-Cookie` values.
+- `establishmentTimeout` sets an optional total deadline until upstream upgrade or final HTTP response headers, including connection setup. It is shared with `proxyUpgrade`. Omitted, non-positive, and non-finite values disable it; larger finite values are capped at `2147483647` ms. Expiry reports `ERR_UPSTREAM_UPGRADE_TIMEOUT` with `statusCode: 504` and destroys the upstream request and client socket, without writing an HTTP response. The timer and its establishment-only listeners are removed on completion, request error/close, or downstream close. An enabled deadline also cancels the pending upstream request when the downstream socket closes; it does not change post-upgrade socket ownership or limit response bodies.
+- While the deadline is active, timeout, downstream cancellation, and downstream socket errors report failure directly before the wrapper's socket listeners settle `ProxyServer.ws()`, including while a custom agent has no available socket. Later request errors do not repeat an establishment failure. With an error listener, middleware emits the error and resolves; without one, it rejects. Destroyed queued requests remain caller-agent-owned until capacity returns; the proxy does not edit `agent.requests`. Regression coverage includes queued timeout/cancellation/socket error, both error-listener modes, and late agent release without transmitting the canceled upgrade.
 
 ### Outgoing response semantics
 
@@ -147,6 +149,7 @@ Returns Promise<Socket> (the upstream proxy socket)
 - Returns `Promise<Socket>` — resolves with the upstream proxy socket on successful upgrade, rejects on connection or socket error.
 - If the upstream responds without upgrading (e.g., 404), the response is relayed to the client socket.
 - Uses `setupOutgoing()` and `setupSocket()` from shared utils, consistent with `ProxyServer.ws()`.
+- Supports the same opt-in `establishmentTimeout` as `ProxyServer.ws()`, implemented by `src/_ws-timeout.ts` and covered for both APIs in `test/ws-timeout.test.ts`.
 
 ## Tests (`test/`)
 

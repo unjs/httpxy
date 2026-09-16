@@ -34,6 +34,11 @@ describe("httpxy types", () => {
       prependPath: false,
       ignorePath: true,
       toProxy: true,
+      establishmentTimeout: 5000,
     });
+  });
+
+  it("accepts an upgrade establishment deadline on ProxyServer", () => {
+    assertType<ProxyServer>(new ProxyServer({ establishmentTimeout: 5000 }));
   });
 });
