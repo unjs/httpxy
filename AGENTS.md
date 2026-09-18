@@ -91,6 +91,7 @@ Returns Promise<Socket> (the upstream proxy socket)
 - `proxyReqWs`, `open`, `close`, and deprecated `proxySocket` events are part of tested flow.
 - Upgrade response headers preserve repeated headers like multiple `Set-Cookie` values.
 - Non-upgrade responses use `src/_ws-response.ts` to stream the decoded body with valid downstream framing and `Connection: close`. A Transform restores chunk boundaries when the final transfer coding is chunked; other transfer codings and fixed Content-Length bodies are preserved. Response hop-by-hop fields, Connection/Proxy-Connection nominated fields, and unforwarded Trailer declarations are removed. A nominated Content-Length is reconstructed for fixed-length responses, including zero-length bodies and 304 representation-length metadata, so a truncated body is not mistaken for a complete close-delimited response. Upstream errors abort the stream without a final chunk marker, and downstream close cancels the upstream body. There is no complete-body buffer or body-size cap. Coverage: `test/ws-response.test.ts` for both WebSocket APIs.
+- Bodyless response framing removes Content-Length from 1xx/204 and preserves valid 304 representation-length metadata. Status 205 is normalized to Content-Length: 0 with no Transfer-Encoding. Its upstream response is destroyed without piping or waiting for the body, and intentional cancellation does not report a relay error. Raw-wire regression tests cover both APIs, including fixed-length/chunked/close-delimited 205 bodies and a stalled upstream body.
 
 ### Outgoing response semantics
 

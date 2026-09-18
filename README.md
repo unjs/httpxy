@@ -66,6 +66,8 @@ It accepts the same `addr` formats as `proxyFetch` (`"http://host:port"`, `"unix
 
 If the upstream responds without upgrading (e.g. `401` or `404`), both `proxyUpgrade` and `ProxyServer.ws` stream the status, headers, and body to the client with `Connection: close` and valid framing (chunked bodies are re-encoded, hop-by-hop headers are stripped, nothing is buffered). `proxyUpgrade` rejects as soon as the response headers arrive while the body may still be streaming, so avoid destroying the client socket in that rejection handler.
 
+For bodyless responses, `Content-Length` is removed from `204` responses and preserved as representation metadata on `304` responses. A `205` response is sent with `Content-Length: 0` and no transfer encoding; any upstream body is canceled instead of forwarded.
+
 ```ts
 // With options
 server.on("upgrade", (req, socket, head) => {

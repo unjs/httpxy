@@ -1,5 +1,5 @@
 import { createServer, request, type IncomingMessage, type Server } from "node:http";
-import { createServer as createTCPServer, type AddressInfo, type Socket } from "node:net";
+import { connect, createServer as createTCPServer, type AddressInfo, type Socket } from "node:net";
 import { gzipSync } from "node:zlib";
 import { afterEach, describe, expect, it } from "vitest";
 import { createProxyServer, proxyUpgrade } from "../src/index.ts";
@@ -44,6 +44,19 @@ async function readBody(response: IncomingMessage) {
   const chunks: Buffer[] = [];
   for await (const chunk of response) chunks.push(chunk);
   return Buffer.concat(chunks).toString();
+}
+
+function getRawResponse(port: number) {
+  return new Promise<string>((resolve, reject) => {
+    const socket = connect(port, "127.0.0.1");
+    let response = "";
+    socket.on("data", (chunk) => (response += chunk.toString("latin1")));
+    socket.on("error", reject);
+    socket.on("close", () => resolve(response));
+    socket.write(
+      "GET / HTTP/1.1\r\nHost: localhost\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n\r\n",
+    );
+  });
 }
 
 describe.each(["proxyUpgrade", "ProxyServer.ws"] as const)("%s rejection responses", (api) => {
@@ -155,6 +168,56 @@ describe.each(["proxyUpgrade", "ProxyServer.ws"] as const)("%s rejection respons
     expect(response.headers["content-length"]).toBeUndefined();
     expect(response.headers["transfer-encoding"]).toBeUndefined();
     expect(response.complete).toBe(true);
+  });
+
+  it.each([0, 9])("removes Content-Length: %s from a 204 response", async (length) => {
+    const port = await listen(
+      createTCPServer((socket) => {
+        socket.once("data", () =>
+          socket.end(`HTTP/1.1 204 No Content\r\nContent-Length: ${length}\r\n\r\n`),
+        );
+      }),
+    );
+    expect(await getRawResponse(await proxyTo(port))).toBe(
+      "HTTP/1.1 204 No Content\r\nconnection: close\r\n\r\n",
+    );
+  });
+
+  it.each([
+    "Content-Length: 3\r\n\r\nabc",
+    "Transfer-Encoding: chunked\r\n\r\n3\r\nabc\r\n0\r\n\r\n",
+    "Connection: close\r\n\r\nabc",
+    "Content-Length: 0\r\n\r\n",
+    "Transfer-Encoding: chunked\r\n\r\n0\r\n\r\n",
+  ])("normalizes a 205 response to an empty body: %s", async (payload) => {
+    const port = await listen(
+      createTCPServer((socket) => {
+        socket.once("data", () => socket.end("HTTP/1.1 205 Reset Content\r\n" + payload));
+      }),
+    );
+    const raw = await getRawResponse(await proxyTo(port));
+    const [headers, ...body] = raw.split("\r\n\r\n");
+    expect(headers).toContain("HTTP/1.1 205 Reset Content\r\n");
+    expect(headers).toContain("content-length: 0");
+    expect(headers).toContain("connection: close");
+    expect(headers).not.toContain("transfer-encoding:");
+    expect(body.join("\r\n\r\n")).toBe("");
+  });
+
+  it("finishes a 205 response without waiting for the upstream body", async () => {
+    const upstreamClosed = Promise.withResolvers<void>();
+    const port = await listen(
+      createServer((_req, res) => {
+        res.once("close", () => upstreamClosed.resolve());
+        res.writeHead(205, { "Content-Length": "100" });
+        res.flushHeaders();
+      }),
+    );
+    const response = await getResponse(await proxyTo(port));
+    expect(response.headers["content-length"]).toBe("0");
+    expect(await readBody(response)).toBe("");
+    expect(response.complete).toBe(true);
+    await upstreamClosed.promise;
   });
 
   it.each(["Connection", "Proxy-Connection"])(

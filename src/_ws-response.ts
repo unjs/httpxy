@@ -27,13 +27,17 @@ export function pipeNonUpgradeResponse(
   headers.connection = "close";
 
   const status = response.statusCode || 502;
-  const bodyless = status < 200 || status === 204 || status === 304;
+  const bodyless = status < 200 || status === 204 || status === 205 || status === 304;
   const transferEncoding = response.headers["transfer-encoding"];
-  if (transferEncoding && !bodyless) {
+  if (status === 205) {
+    headers["content-length"] = "0";
+  } else if (bodyless && status !== 304) {
+    delete headers["content-length"];
+  } else if (transferEncoding && !bodyless) {
     // IncomingMessage decodes chunk framing, but leaves other transfer codings intact.
     headers["transfer-encoding"] = transferEncoding;
     delete headers["content-length"];
-  } else if ((!bodyless || status === 304) && response.headers["content-length"] !== undefined) {
+  } else if (response.headers["content-length"] !== undefined) {
     headers["content-length"] = response.headers["content-length"];
   }
 
@@ -82,7 +86,10 @@ export function pipeNonUpgradeResponse(
     }
   }
   socket.write(head + "\r\n", "latin1");
-  if (encoder) {
+  if (status === 205) {
+    onClose();
+    socket.end();
+  } else if (encoder) {
     response.pipe(encoder).pipe(socket);
   } else {
     response.pipe(socket);
