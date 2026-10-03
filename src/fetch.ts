@@ -224,6 +224,7 @@ function toInit(init?: RequestInit | Request): RequestInit | undefined {
       headers: init.headers,
       body: init.body,
       duplex: init.body ? "half" : undefined,
+      signal: init.signal,
     } as RequestInit;
   }
   return init;

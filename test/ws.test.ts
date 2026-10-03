@@ -2,6 +2,7 @@ import { createServer, type Server, type IncomingMessage } from "node:http";
 import { createServer as createHTTPSServer } from "node:https";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { Duplex } from "node:stream";
 import { connect, type AddressInfo } from "node:net";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -688,7 +689,7 @@ describe("proxyUpgrade", () => {
   });
 
   describe("wss:// (TLS upstream)", () => {
-    const __dirname = new URL(".", import.meta.url).pathname;
+    const __dirname = fileURLToPath(new URL(".", import.meta.url));
     const sslOpts = {
       key: readFileSync(join(__dirname, "fixtures", "agent2-key.pem")),
       cert: readFileSync(join(__dirname, "fixtures", "agent2-cert.pem")),
