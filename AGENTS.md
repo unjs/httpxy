@@ -102,6 +102,7 @@ Returns Promise<Socket> (the upstream proxy socket)
 ### Outgoing request / connection semantics (`setupOutgoing`, `src/_utils.ts`)
 
 - Defaults to shared keep-alive agents (`defaultAgents.http` / `.https`) for upstream connection reuse. WebSocket upgrades and HTTP/2 incoming requests use `agent: false` instead (agents conflict with the socket lifecycle). A caller-provided `agent` (including `false`) always wins.
+- The default agents (`withIdleDeadline()` in `src/_utils.ts`, also used by `proxyFetch`) do not reuse a pooled socket once the upstream's `Keep-Alive: timeout=N` hint, counted from the request start and minus `agentKeepAliveTimeoutBuffer`, has passed. The deadline is checked by the clock in `addRequest()`, so it holds even after the event loop was blocked (nitrojs/nitro#4693); coverage: `test/keep-alive.test.ts`.
 - When there is no agent (`agent: false`) and the request is not an upgrade, `connection: close` is forced (stock http-proxy behavior).
 - **Request-smuggling hardening (GHSA-ggv3-7p47-pfv8):** `connection: close` is additionally forced — _regardless of agent_ — whenever the outgoing request carries a `transfer-encoding` header, or its `Connection` header lists `transfer-encoding` as hop-by-hop. This prevents an upstream keep-alive socket from being reused after a chunked request, so a desync at a lenient upstream cannot poison a later user's response. It also closes the `Connection: upgrade` + chunked-body bypass. Genuine WebSocket upgrades (no `transfer-encoding`) keep their `Connection` header intact.
 - The hardening lives in the shared helper `forceConnectionCloseForTransferEncoding()` (`src/_utils.ts`) and is applied on **every** outgoing-request path, so no path can leak a reusable chunked socket:
@@ -154,6 +155,7 @@ Returns Promise<Socket> (the upstream proxy socket)
 test/
 ├── index.test.ts                  — Main proxy: paths, headers, changeOrigin, xfwd, WebSocket, errors
 ├── fetch.test.ts                  — proxyFetch: TCP/Unix, GET/POST, redirects, cookies, 204/304, signal, timeout, xfwd, changeOrigin
+├── keep-alive.test.ts             — Default agents: no reuse of a pooled socket past the upstream keep-alive hint after a blocked event loop (proxyFetch, ProxyServer)
 ├── upgrade.test.ts                — proxyUpgrade: WS proxy, addr formats, xfwd, error handling
 ├── http-proxy.test.ts             — Forward, target, WebSocket, socket.io, SSE, timeouts, error events
 ├── https-proxy.test.ts            — HTTPS targets, SSL certs, certificate validation
