@@ -68,6 +68,12 @@ export interface ProxyUpgradeOptions {
    */
   ignorePath?: boolean;
   /**
+   * Rewrite the incoming request path (including its query string) before it is joined with the
+   * target path, e.g. `(path) => path.replace(/^\/api/, "")`.
+   * Default: none.
+   */
+  rewrite?: (path: string) => string;
+  /**
    * Send absolute URL in request path when proxying to another proxy.
    * Default: `false` (path-only request target is used).
    */

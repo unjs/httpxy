@@ -115,6 +115,7 @@ Returns Promise<Socket> (the upstream proxy socket)
 - `joinURL()` always returns a usable path and avoids duplicate slash insertion.
 - `toProxy: true` preserves absolute URL in outgoing path as `"/" + req.url`.
 - `ignorePath` drops request path; with `prependPath: false` the outgoing path becomes `/`.
+- `rewrite(path)` receives the incoming request path including its query string (`req.url`) and its result replaces it before `toProxy` / `ignorePath` / target-path joining (so it applies to `web`, `ws`, `forward` and `proxyUpgrade`). A missing leading `/` is added.
 
 ### `proxyFetch` semantics
 
@@ -126,7 +127,8 @@ Returns Promise<Socket> (the upstream proxy socket)
 - Hop-by-hop response headers `transfer-encoding`, `keep-alive`, `connection` are stripped.
 - Response body is `null` for `204` and `304`.
 - Network and request-body-stream errors reject the Promise.
-- Accepts optional `ProxyFetchOptions` as 4th argument with `timeout`, `xfwd`, `changeOrigin`, `agent`, `followRedirects`, and `ssl`.
+- Accepts optional `ProxyFetchOptions` as 4th argument with `timeout`, `xfwd`, `changeOrigin`, `agent`, `followRedirects`, `ssl`, and `rewrite`.
+- `rewrite` transforms the request path (pathname + search) before it is joined with the `addr` base path; redirect hops are not rewritten.
 - `timeout` sets a deadline on the upstream request; rejects with `"Proxy request timed out"` on expiry.
 - `xfwd` adds `x-forwarded-for`, `x-forwarded-port`, `x-forwarded-proto`, `x-forwarded-host` derived from the input URL (not from a socket, since there is no incoming connection). Existing headers are not overwritten.
 - `changeOrigin` rewrites the `Host` header to match the resolved target address (host:port for TCP, `localhost` for Unix sockets). Accounts for default ports (80 for HTTP, 443 for HTTPS).

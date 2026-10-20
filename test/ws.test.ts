@@ -225,6 +225,31 @@ describe("proxyUpgrade", () => {
     await promise;
   });
 
+  it("should rewrite the upgrade request path", async () => {
+    const { server: targetServer, port: targetPort } = await createTargetServer();
+    const targetWs = new ws.WebSocketServer({ server: targetServer });
+    targetWs.on("connection", (socket, req) => {
+      socket.send(req.url!);
+    });
+
+    const proxy = createProxyServer(
+      { host: "127.0.0.1", port: targetPort },
+      { rewrite: (path) => path.replace(/^\/api/, "") },
+    );
+    const proxyPort = await listenServer(proxy);
+
+    const client = new ws.WebSocket(`ws://127.0.0.1:${proxyPort}/api/socket?x=1`);
+    const upstreamURL = await new Promise<string>((resolve) => {
+      client.on("message", (msg) => resolve(msg.toString("utf8")));
+    });
+    client.close();
+    targetWs.close();
+    targetServer.close();
+    await new Promise((resolve) => proxy.close(resolve));
+
+    expect(upstreamURL).toBe("/socket?x=1");
+  });
+
   it("should reject when upstream responds without upgrading", async () => {
     // Target is a plain HTTP server that never upgrades — just returns 404
     const targetServer = createServer((_req, res) => {

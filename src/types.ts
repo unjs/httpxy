@@ -48,6 +48,12 @@ export interface ProxyServerOptions {
   prependPath?: boolean;
   /** Specify whether you want to ignore the proxy path of the incoming request. */
   ignorePath?: boolean;
+  /**
+   * Rewrite the incoming request path (including its query string) before it is joined with the
+   * target path, e.g. `(path) => path.replace(/^\/api/, "")`.
+   * A leading `/` is added to the result if missing.
+   */
+  rewrite?: (path: string) => string;
   /** Local interface string to bind for outgoing connections. */
   localAddress?: string;
   /** Changes the origin of the host header to the target URL. */

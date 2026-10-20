@@ -48,6 +48,13 @@ export interface ProxyFetchOptions {
    * Default: none.
    */
   ssl?: Record<string, unknown>;
+  /**
+   * Rewrite the request path (including its query string) before it is joined with the
+   * `addr` base path, e.g. `(path) => path.replace(/^\/api/, "")`.
+   * A leading `/` is added to the result if missing.
+   * Default: none.
+   */
+  rewrite?: (path: string) => string;
 }
 
 /**
@@ -102,7 +109,13 @@ export async function proxyFetch(
   }
 
   // Merge addr base path with request path
-  const requestPath = url.pathname + url.search;
+  let requestPath = url.pathname + url.search;
+  if (opts?.rewrite) {
+    requestPath = opts.rewrite(requestPath);
+    if (requestPath[0] !== "/") {
+      requestPath = "/" + requestPath;
+    }
+  }
   const path = addrBasePath ? joinURL(addrBasePath, requestPath) : requestPath;
 
   const reqHeaders: Record<string, string | string[]> = {};

@@ -198,7 +198,7 @@ export function setupOutgoing(
   const targetSearch =
     target instanceof URL && options.prependPath !== false ? target.search || "" : "";
 
-  const reqUrl = req.url || "";
+  const reqUrl = options.rewrite ? options.rewrite(req.url || "/") : req.url || "";
   const qIdx = reqUrl.indexOf("?");
   const reqPath = qIdx === -1 ? reqUrl : reqUrl.slice(0, qIdx);
   const reqSearch = qIdx === -1 ? "" : reqUrl.slice(qIdx);
