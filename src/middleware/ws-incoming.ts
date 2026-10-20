@@ -72,6 +72,15 @@ export const stream = defineProxyMiddleware<Socket>(
       );
     };
 
+    let outgoing: ReturnType<typeof setupOutgoing>;
+    try {
+      outgoing = setupOutgoing(options.ssl || {}, options, req);
+    } catch (error) {
+      // e.g. a throwing `rewrite` callback: close the client socket before reporting it
+      socket.destroy();
+      throw error;
+    }
+
     setupSocket(socket);
 
     if (head && head.length > 0) {
@@ -84,7 +93,7 @@ export const stream = defineProxyMiddleware<Socket>(
     socket.on("error", onSocketError);
 
     const proxyReq = (isSSL.test(options.target.protocol || "http") ? nodeHTTPS : nodeHTTP).request(
-      setupOutgoing(options.ssl || {}, options, req),
+      outgoing,
     );
 
     // Enable developers to modify the proxyReq before headers are sent

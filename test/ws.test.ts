@@ -250,6 +250,28 @@ describe("proxyUpgrade", () => {
     expect(upstreamURL).toBe("/socket?x=1");
   });
 
+  it("should return a rejected promise and destroy the socket when rewrite throws", async () => {
+    const socket = makeDummySocket();
+    const req = {
+      method: "GET",
+      url: "/api/socket",
+      headers: { upgrade: "websocket", connection: "Upgrade" },
+      socket: { remoteAddress: "127.0.0.1" },
+    } as unknown as IncomingMessage;
+
+    let result: Promise<unknown> | undefined;
+    expect(() => {
+      result = proxyUpgrade({ host: "127.0.0.1", port: wsPort }, req, socket, undefined, {
+        rewrite: () => {
+          throw new Error("rewrite failed");
+        },
+      });
+    }).not.toThrow();
+
+    await expect(result).rejects.toThrow("rewrite failed");
+    expect(socket.destroyed).toBe(true);
+  });
+
   it("should reject when upstream responds without upgrading", async () => {
     // Target is a plain HTTP server that never upgrades — just returns 404
     const targetServer = createServer((_req, res) => {

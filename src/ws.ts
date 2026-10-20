@@ -133,11 +133,18 @@ export function proxyUpgrade(
     prependPath: opts?.prependPath !== false,
   };
 
-  const outgoing = setupOutgoing(
-    requestOptions.ssl || {},
-    requestOptions as Parameters<typeof setupOutgoing>[1],
-    req,
-  );
+  let outgoing: ReturnType<typeof setupOutgoing>;
+  try {
+    outgoing = setupOutgoing(
+      requestOptions.ssl || {},
+      requestOptions as Parameters<typeof setupOutgoing>[1],
+      req,
+    );
+  } catch (error) {
+    // e.g. a throwing `rewrite` callback: reject instead of throwing synchronously
+    socket.destroy();
+    return Promise.reject(error);
+  }
 
   const sock = socket as Socket;
 

@@ -251,6 +251,69 @@ describe("ProxyServer", () => {
       socket.destroy();
     });
 
+    it("should destroy the client socket and emit error when rewrite throws on ws", async () => {
+      const net = await import("node:net");
+      proxy = createProxyServer({
+        target: "http://127.0.0.1:1",
+        rewrite: () => {
+          throw new Error("rewrite failed");
+        },
+      });
+      const { resolve, promise } = Promise.withResolvers<Error>();
+      proxy.on("error", (err) => resolve(err));
+
+      const stubReq = {
+        method: "GET",
+        url: "/",
+        headers: { upgrade: "websocket", connection: "Upgrade" },
+        socket: { remoteAddress: "127.0.0.1" },
+      } as any;
+      const socket = new net.Socket();
+
+      await proxy.ws(stubReq, socket, {});
+      expect((await promise).message).toBe("rewrite failed");
+      expect(socket.destroyed).toBe(true);
+    });
+
+    it("should not open a forward request when rewrite throws for the target", async () => {
+      let forwardHits = 0;
+      source = http.createServer((_req, res) => {
+        forwardHits++;
+        res.end();
+      });
+      await new Promise<void>((r) => source.listen(0, "127.0.0.1", r));
+      const sourcePort = (source.address() as AddressInfo).port;
+
+      let calls = 0;
+      proxy = createProxyServer({
+        forward: `http://127.0.0.1:${sourcePort}`,
+        target: "http://127.0.0.1:1",
+        rewrite: (path) => {
+          if (++calls === 2) {
+            throw new Error("rewrite failed");
+          }
+          return path;
+        },
+      });
+      const { resolve, promise } = Promise.withResolvers<Error>();
+      proxy.on("error", (err, _req, res) => {
+        (res as http.ServerResponse).writeHead(502).end();
+        resolve(err);
+      });
+      const proxyServer = http.createServer((req, res) => {
+        proxy.web(req, res);
+      });
+      await new Promise<void>((r) => proxyServer.listen(0, "127.0.0.1", r));
+      const proxyPort = (proxyServer.address() as AddressInfo).port;
+
+      const res = await fetch(`http://127.0.0.1:${proxyPort}/`);
+      expect(res.status).toBe(502);
+      expect((await promise).message).toBe("rewrite failed");
+      await new Promise((r) => setTimeout(r, 50));
+      expect(forwardHits).toBe(0);
+      proxyServer.close();
+    });
+
     it("should convert string forward to URL", async () => {
       source = http.createServer((req, res) => {
         res.end("forward-ok");
