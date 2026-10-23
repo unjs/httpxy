@@ -320,7 +320,11 @@ export const stream = defineProxyMiddleware((req, res, options, server, head, ca
   }
 
   proxyReq.on("response", function (proxyRes) {
-    drainAfterEarlyResponse(proxyReq, proxyRes, options.buffer || req);
+    // Only the piped body can stall; the `followRedirects` tee writes without
+    // backpressure, so destroying the request there would just truncate the body.
+    if (maxRedirects === 0) {
+      drainAfterEarlyResponse(proxyReq, proxyRes, options.buffer || req);
+    }
     handleResponse(proxyRes, 0, options.target as URL);
   });
 });

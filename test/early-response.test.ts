@@ -4,6 +4,7 @@ import { Readable } from "node:stream";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { createProxyServer, proxyFetch } from "../src/index.ts";
+import { defaultAgents } from "../src/_utils.ts";
 import { listenOn } from "./_utils.ts";
 
 const LIMIT = 64 * 1024;
@@ -107,6 +108,29 @@ describe("upstream responds before the request body is fully written", () => {
     }
   });
 
+  it("proxyFetch with the default agent keeps the connection usable", async () => {
+    const front = createServer(async (req, res) => {
+      const body = req.method === "POST" ? Readable.toWeb(req) : undefined;
+      const upstreamRes = await proxyFetch(
+        `http://127.0.0.1:${upstreamPort}`,
+        `http://localhost${req.url}`,
+        { method: req.method, headers: req.headers as Record<string, string>, body: body as any },
+      );
+      res.writeHead(upstreamRes.status, Object.fromEntries(upstreamRes.headers));
+      res.end(await upstreamRes.text());
+    });
+    const port = await listenOn(front);
+    try {
+      const outcome = await uploadThenPipeline(port);
+      expect(outcome.error).toBeUndefined();
+      expect(outcome.written).toBe(TOTAL);
+      expect(outcome.statuses).toEqual(["413", "200"]);
+      await vi.waitFor(() => expect(busySockets(defaultAgents.http)).toBe(0));
+    } finally {
+      await new Promise<void>((r) => front.close(() => r()));
+    }
+  });
+
   it("proxy.web keeps draining the client body and the connection stays usable", async () => {
     const agent = new Agent({ keepAlive: true });
     const proxy = createProxyServer({ target: `http://127.0.0.1:${upstreamPort}`, agent });
@@ -202,6 +226,34 @@ describe("upstream sends headers early and keeps reading the request body", () =
       expect(await upload(port)).toBe(String(BODY));
     } finally {
       await new Promise<void>((r) => front.close(() => r()));
+    }
+  });
+
+  it("proxy.web with followRedirects forwards the full body to an upstream that responds first", async () => {
+    let received = 0;
+    const done = Promise.withResolvers<void>();
+    const ingest = createServer((req, res) => {
+      // Complete the response before consuming the body (fire-and-forget ingest)
+      res.end("accepted");
+      req.on("data", (chunk) => (received += chunk.length));
+      req.on("end", () => done.resolve());
+    });
+    const ingestPort = await listenOn(ingest);
+    const proxy = createProxyServer({
+      target: `http://127.0.0.1:${ingestPort}`,
+      followRedirects: true,
+    });
+    const front = createServer((req, res) => {
+      proxy.web(req, res).catch((err) => res.destroy(err));
+    });
+    const port = await listenOn(front);
+    try {
+      expect(await upload(port)).toBe("accepted");
+      await done.promise;
+      expect(received).toBe(BODY);
+    } finally {
+      await new Promise<void>((r) => front.close(() => r()));
+      await new Promise<void>((r) => ingest.close(() => r()));
     }
   });
 });
