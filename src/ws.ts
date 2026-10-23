@@ -143,12 +143,7 @@ export function proxyUpgrade(
   // Replace mode: drop forwarding headers copied from the incoming request
   // (everything not explicitly set above by us or the caller).
   if (xfwd === "replace") {
-    const outgoingHeaders = outgoing.headers as Record<string, unknown>;
-    for (const name of Object.keys(outgoingHeaders)) {
-      if (!(name in headers) && _isForwardingHeader(name)) {
-        delete outgoingHeaders[name];
-      }
-    }
+    _stripForwardingHeaders(outgoing.headers as Record<string, unknown> | undefined, headers);
   }
 
   const sock = socket as Socket;
@@ -256,6 +251,20 @@ function _getForwardedHeaders(req: IncomingMessage, replace: boolean): Record<st
     result[name] = previous ? `${previous},${value}` : value;
   }
   return result;
+}
+
+function _stripForwardingHeaders(
+  outgoingHeaders: Record<string, unknown> | undefined,
+  keep: Record<string, string>,
+): void {
+  if (!outgoingHeaders) {
+    return;
+  }
+  for (const name of Object.keys(outgoingHeaders)) {
+    if (!Object.hasOwn(keep, name) && _isForwardingHeader(name)) {
+      delete outgoingHeaders[name];
+    }
+  }
 }
 
 function _isForwardingHeader(name: string): boolean {

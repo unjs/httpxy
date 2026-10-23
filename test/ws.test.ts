@@ -287,10 +287,14 @@ describe("proxyUpgrade", () => {
 
       try {
         const headers = await received.promise;
-        expect.soft(incoming!.headers).toBe(originalHeaders!);
-        expect.soft(incoming!.headers).toEqual(headersBefore!);
-        expect.soft(incoming!.rawHeaders).toEqual(rawHeadersBefore!);
-        return { headers, port };
+        return {
+          headers,
+          port,
+          incoming: incoming!,
+          originalHeaders: originalHeaders!,
+          headersBefore: headersBefore!,
+          rawHeadersBefore: rawHeadersBefore!,
+        };
       } finally {
         client.destroy();
         proxy.close();
@@ -298,8 +302,20 @@ describe("proxyUpgrade", () => {
       }
     }
 
+    it.each([undefined, true, false, "replace"] as const)(
+      "does not mutate the incoming request in mode %s",
+      async (xfwd) => {
+        const { incoming, originalHeaders, headersBefore, rawHeadersBefore } = await captureHeaders(
+          { xfwd },
+        );
+        expect(incoming.headers).toBe(originalHeaders);
+        expect(incoming.headers).toEqual(headersBefore);
+        expect(incoming.rawHeaders).toEqual(rawHeadersBefore);
+      },
+    );
+
     it.each([undefined, true, false])(
-      "preserves boolean mode %s without mutating the request",
+      "appends forwarding values in boolean mode %s",
       async (xfwd) => {
         const { headers, port } = await captureHeaders({ xfwd });
         expect(headers).toMatchObject({
@@ -322,6 +338,18 @@ describe("proxyUpgrade", () => {
       expect(headers["x-forwarded-for"]).toBe("caller");
       expect(headers["x-forwarded-proto"]).toBe("caller-proto");
     });
+
+    it.each([true, false])(
+      "caller headers override conflicting incoming headers with different casing in boolean mode %s",
+      async (xfwd) => {
+        const { headers } = await captureHeaders({
+          xfwd,
+          headers: { "X-Forwarded-For": "caller", "X-Forwarded-Proto": "caller-proto" },
+        });
+        expect(headers["x-forwarded-for"]).toBe("caller");
+        expect(headers["x-forwarded-proto"]).toBe("caller-proto");
+      },
+    );
 
     it.each([true, "replace"] as const)(
       "omits x-forwarded-for without a remote address in mode %s",
