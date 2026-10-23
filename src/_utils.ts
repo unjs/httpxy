@@ -248,7 +248,13 @@ export function setupOutgoing(
   const reqPath = qIdx === -1 ? reqUrl : reqUrl.slice(0, qIdx);
   const reqSearch = qIdx === -1 ? "" : reqUrl.slice(qIdx);
   const normalizedPath = reqPath ? (reqPath[0] === "/" ? reqPath : "/" + reqPath) : "/";
-  let outgoingPath = options.toProxy ? "/" + reqUrl : normalizedPath + reqSearch;
+  // `toProxy` sends the absolute URL as the path; keep a path that already starts
+  // with "/" (e.g. from `rewrite`) as is instead of producing "//path".
+  let outgoingPath = options.toProxy
+    ? reqUrl[0] === "/"
+      ? reqUrl
+      : "/" + reqUrl
+    : normalizedPath + reqSearch;
 
   //
   // Remark: ignorePath will just straight up ignore whatever the request's

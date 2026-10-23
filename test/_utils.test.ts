@@ -602,6 +602,32 @@ describe("lib/http-proxy/common.js", () => {
         expect(relative.path).to.eql("/users?id=1");
       });
 
+      it("should not double the leading slash of a rewritten path with toProxy", () => {
+        const outgoing = createOutgoing();
+        common.setupOutgoing(
+          outgoing,
+          {
+            target: URL.parse("http://sometarget.com:80")!,
+            toProxy: true,
+            rewrite: (path) => path.replace(/^\/api/, ""),
+          },
+          stubIncomingMessage({ url: "/api/users?id=1" }),
+        );
+        expect(outgoing.path).to.eql("/users?id=1");
+
+        const absolute = createOutgoing();
+        common.setupOutgoing(
+          absolute,
+          {
+            target: URL.parse("http://sometarget.com:80")!,
+            toProxy: true,
+            rewrite: (path) => path.replace("/old/", "/new/"),
+          },
+          stubIncomingMessage({ url: "https://google.com/old/x" }),
+        );
+        expect(absolute.path).to.eql("/https://google.com/new/x");
+      });
+
       it("should be applied to forward requests", () => {
         const outgoing = createOutgoing();
         common.setupOutgoing(
