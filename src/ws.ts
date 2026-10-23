@@ -6,6 +6,7 @@ import type { Socket } from "node:net";
 import type { ProxyAddr } from "./types.ts";
 import { pipeNonUpgradeResponse } from "./_ws-response.ts";
 import {
+  createHttpHeader,
   getPort,
   hasEncryptedConnection,
   isSSL,
@@ -184,7 +185,7 @@ export function proxyUpgrade(
         proxySocket.unshift(proxyHead);
       }
 
-      sock.write(_createHttpHeader("HTTP/1.1 101 Switching Protocols", proxyRes.headers));
+      sock.write(createHttpHeader("HTTP/1.1 101 Switching Protocols", proxyRes.headers));
       proxySocket.pipe(sock).pipe(proxySocket);
 
       settled = true;
@@ -221,25 +222,4 @@ function _buildTargetURL(addr: ProxyAddr, useSSL = false): URL {
     return url;
   }
   return new URL(`${protocol}://${addr.host || "localhost"}${addr.port ? `:${addr.port}` : ""}`);
-}
-
-function _createHttpHeader(
-  line: string,
-  headers: Record<string, string | string[] | undefined>,
-): string {
-  let result = line;
-  for (const key of Object.keys(headers)) {
-    const value = headers[key];
-    if (value === undefined) {
-      continue;
-    }
-    if (Array.isArray(value)) {
-      for (const element of value) {
-        result += `\r\n${key}: ${element}`;
-      }
-    } else {
-      result += `\r\n${key}: ${value}`;
-    }
-  }
-  return `${result}\r\n\r\n`;
 }

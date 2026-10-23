@@ -306,6 +306,24 @@ describe.each(["proxyUpgrade", "ProxyServer.ws"] as const)("%s rejection respons
     }
   });
 
+  it("strips Upgrade from a 426 response but keeps Sec-WebSocket-Version", async () => {
+    const port = await listen(
+      createServer((_req, res) => {
+        res.writeHead(426, {
+          upgrade: "websocket",
+          "sec-websocket-version": "13",
+          "content-length": "0",
+        });
+        res.end();
+      }),
+    );
+    const response = await getResponse(await proxyTo(port));
+    await readBody(response);
+    expect(response.statusCode).toBe(426);
+    expect(response.headers.upgrade).toBeUndefined();
+    expect(response.headers["sec-websocket-version"]).toBe("13");
+  });
+
   it.each([
     "Content-Length: 20\r\n\r\nshort",
     "Connection: close, Content-Length\r\nContent-Length: 20\r\n\r\nshort",

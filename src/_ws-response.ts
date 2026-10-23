@@ -1,5 +1,18 @@
 import type { IncomingMessage } from "node:http";
 import { Transform, type Duplex } from "node:stream";
+import { createHttpHeader } from "./_utils.ts";
+
+const hopByHopHeaders = [
+  "connection",
+  "proxy-connection",
+  "keep-alive",
+  "te",
+  "trailer",
+  "upgrade",
+  "proxy-authenticate",
+  "proxy-authorization",
+  "transfer-encoding",
+];
 
 export function pipeNonUpgradeResponse(
   response: IncomingMessage,
@@ -7,17 +20,7 @@ export function pipeNonUpgradeResponse(
   onError: (error: Error) => void,
 ): void {
   const headers = { ...response.headers };
-  const hopHeaders = new Set([
-    "connection",
-    "proxy-connection",
-    "keep-alive",
-    "te",
-    "trailer",
-    "upgrade",
-    "proxy-authenticate",
-    "proxy-authorization",
-    "transfer-encoding",
-  ]);
+  const hopHeaders = new Set(hopByHopHeaders);
   for (const name of ["connection", "proxy-connection"]) {
     for (const token of String(headers[name] || "").split(",")) {
       hopHeaders.add(token.trim().toLowerCase());
@@ -26,12 +29,13 @@ export function pipeNonUpgradeResponse(
   for (const name of hopHeaders) delete headers[name];
   headers.connection = "close";
 
+  // 1xx never reaches here: Node emits 100/102/103 as `information` and 101 as `upgrade`.
   const status = response.statusCode || 502;
-  const bodyless = status < 200 || status === 204 || status === 205 || status === 304;
+  const bodyless = status === 204 || status === 205 || status === 304;
   const transferEncoding = response.headers["transfer-encoding"];
   if (status === 205) {
     headers["content-length"] = "0";
-  } else if (bodyless && status !== 304) {
+  } else if (status === 204) {
     delete headers["content-length"];
   } else if (transferEncoding && !bodyless) {
     // IncomingMessage decodes chunk framing, but leaves other transfer codings intact.
@@ -78,14 +82,10 @@ export function pipeNonUpgradeResponse(
   response.once("error", onResponseError);
   encoder?.once("error", onResponseError);
 
-  let head = `HTTP/${response.httpVersion} ${status} ${response.statusMessage}\r\n`;
-  for (const [name, value] of Object.entries(headers)) {
-    if (value === undefined) continue;
-    for (const entry of Array.isArray(value) ? value : [value]) {
-      head += `${name}: ${entry}\r\n`;
-    }
-  }
-  socket.write(head + "\r\n", "latin1");
+  socket.write(
+    createHttpHeader(`HTTP/${response.httpVersion} ${status} ${response.statusMessage}`, headers),
+    "latin1",
+  );
   if (status === 205) {
     onClose();
     socket.end();

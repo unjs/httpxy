@@ -2,7 +2,14 @@ import nodeHTTP from "node:http";
 import nodeHTTPS from "node:https";
 import type { Socket } from "node:net";
 import { type ProxyMiddleware, defineProxyMiddleware } from "./_utils.ts";
-import { getPort, hasEncryptedConnection, isSSL, setupOutgoing, setupSocket } from "../_utils.ts";
+import {
+  createHttpHeader,
+  getPort,
+  hasEncryptedConnection,
+  isSSL,
+  setupOutgoing,
+  setupSocket,
+} from "../_utils.ts";
 import { pipeNonUpgradeResponse } from "../_ws-response.ts";
 
 /**
@@ -49,30 +56,6 @@ export const XHeaders = defineProxyMiddleware<Socket>((req, socket, options) => 
  */
 export const stream = defineProxyMiddleware<Socket>(
   (req, socket, options, server, head, callback) => {
-    const createHttpHeader = function (line: string, headers: nodeHTTP.OutgoingHttpHeaders) {
-      return (
-        Object.keys(headers)
-          // eslint-disable-next-line unicorn/no-array-reduce
-          .reduce(
-            function (head, key) {
-              const value = headers[key];
-
-              if (!Array.isArray(value)) {
-                head.push(key + ": " + value);
-                return head;
-              }
-
-              for (const element of value) {
-                head.push(key + ": " + element);
-              }
-              return head;
-            },
-            [line],
-          )
-          .join("\r\n") + "\r\n\r\n"
-      );
-    };
-
     setupSocket(socket);
 
     if (head && head.length > 0) {
