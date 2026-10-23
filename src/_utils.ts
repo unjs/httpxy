@@ -56,8 +56,8 @@ export function forceConnectionCloseForTransferEncoding(
 }
 
 /**
- * `ClientRequest` stops flushing body writes once it has a complete response, so a
- * source still piped into it would never drain. Dump the rest of the source and tear
+ * Once a `ClientRequest` has a complete response, Node stops relaying its socket's
+ * `drain`, so a source piped into it and paused on backpressure never resumes. Dump the rest of the source and tear
  * down the half-written upstream request once its response closes (a keep-alive agent
  * never returns an unfinished request's socket to the pool).
  *

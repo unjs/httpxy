@@ -54,7 +54,9 @@ function uploadThenPipeline(port: number, path = "/big"): Promise<Outcome> {
     let written = 0;
     let received = "";
     let error: string | undefined;
-    const statuses = () => [...received.matchAll(/^HTTP\/1\.1 (\d{3})/gm)].map((m) => m[1]!);
+    // Not anchored to line start: a `Content-Length` body without a trailing newline
+    // runs straight into the next status line
+    const statuses = () => [...received.matchAll(/HTTP\/1\.1 (\d{3}) /g)].map((m) => m[1]!);
     const finish = () => resolve({ statuses: statuses(), written, error });
     socket.on("data", (d) => {
       received += d.toString("latin1");
@@ -175,6 +177,41 @@ describe("upstream responds before the request body is fully written", () => {
       await new Promise<void>((r) => front.close(() => r()));
     }
   });
+
+  it("proxy.web with followRedirects forwards the full body to an upstream that responds first", async () => {
+    let received = 0;
+    const done = Promise.withResolvers<void>();
+    const ingest = createServer((req, res) => {
+      // Complete the response before consuming the body (fire-and-forget ingest)
+      res.end("accepted");
+      if (req.method === "POST") {
+        req.on("data", (chunk) => (received += chunk.length));
+        req.on("end", () => done.resolve());
+      }
+    });
+    const ingestPort = await listenOn(ingest);
+    const proxy = createProxyServer({
+      target: `http://127.0.0.1:${ingestPort}`,
+      followRedirects: true,
+    });
+    const front = createServer((req, res) => {
+      proxy.web(req, res).catch((err) => res.destroy(err));
+    });
+    const port = await listenOn(front);
+    try {
+      // Raw socket client: a Node `ClientRequest` stops getting `drain` once its response
+      // is complete, so it would stall on its own before the proxy is exercised
+      const outcome = await uploadThenPipeline(port);
+      expect(outcome.error).toBeUndefined();
+      expect(outcome.written).toBe(TOTAL);
+      expect(outcome.statuses).toEqual(["200", "200"]);
+      await done.promise;
+      expect(received).toBe(TOTAL);
+    } finally {
+      await new Promise<void>((r) => front.close(() => r()));
+      await new Promise<void>((r) => ingest.close(() => r()));
+    }
+  });
 });
 
 describe("upstream sends headers early and keeps reading the request body", () => {
@@ -257,34 +294,6 @@ describe("upstream sends headers early and keeps reading the request body", () =
       expect(await upload(port)).toBe(String(BODY));
     } finally {
       await new Promise<void>((r) => front.close(() => r()));
-    }
-  });
-
-  it("proxy.web with followRedirects forwards the full body to an upstream that responds first", async () => {
-    let received = 0;
-    const done = Promise.withResolvers<void>();
-    const ingest = createServer((req, res) => {
-      // Complete the response before consuming the body (fire-and-forget ingest)
-      res.end("accepted");
-      req.on("data", (chunk) => (received += chunk.length));
-      req.on("end", () => done.resolve());
-    });
-    const ingestPort = await listenOn(ingest);
-    const proxy = createProxyServer({
-      target: `http://127.0.0.1:${ingestPort}`,
-      followRedirects: true,
-    });
-    const front = createServer((req, res) => {
-      proxy.web(req, res).catch((err) => res.destroy(err));
-    });
-    const port = await listenOn(front);
-    try {
-      expect(await upload(port)).toBe("accepted");
-      await done.promise;
-      expect(received).toBe(BODY);
-    } finally {
-      await new Promise<void>((r) => front.close(() => r()));
-      await new Promise<void>((r) => ingest.close(() => r()));
     }
   });
 });
