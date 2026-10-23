@@ -131,7 +131,7 @@ Returns Promise<Socket> (the upstream proxy socket)
 - `timeout` sets a deadline on the upstream request; rejects with `"Proxy request timed out"` on expiry.
 - `xfwd` adds `x-forwarded-for`, `x-forwarded-port`, `x-forwarded-proto`, `x-forwarded-host` derived from the input URL (not from a socket, since there is no incoming connection). Existing headers are not overwritten.
 - `changeOrigin` rewrites the `Host` header to match the resolved target address (host:port for TCP, `localhost` for Unix sockets). Accounts for default ports (80 for HTTP, 443 for HTTPS).
-- `agent` enables connection pooling/reuse via a custom `http.Agent`. Defaults to `false` (no agent).
+- `agent` sets the `http.Agent` used for connection pooling/reuse. Defaults to the shared keep-alive `defaultAgents`; `false` disables reuse.
 - `followRedirects` enables automatic redirect following. `true` = max 5 hops; number = custom max. On 301/302/303 method changes to GET and body is dropped. On 307/308 method and body are preserved (body is buffered). Sensitive headers (`authorization`, `cookie`) are stripped on cross-origin redirects.
 - `ssl` passes TLS options to `https.request` (e.g. `{ rejectUnauthorized: false }`).
 - `AbortSignal` support is wired through `init.signal` (standard `RequestInit`), aborting the underlying `http.request`.

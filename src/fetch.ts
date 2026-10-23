@@ -33,7 +33,7 @@ export interface ProxyFetchOptions {
   changeOrigin?: boolean;
   /**
    * HTTP agent for connection pooling / reuse.
-   * Default: `false` (no agent, no keep-alive).
+   * Default: shared keep-alive agent. Set `false` to disable connection reuse.
    */
   agent?: any;
   /**

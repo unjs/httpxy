@@ -12,7 +12,7 @@ const keepAliveTimeoutHint = /^timeout=(\d+)/;
 /**
  * Default keep-alive agents for connection reuse.
  */
-export const defaultAgents = {
+export const defaultAgents: { http: httpNative.Agent; https: httpsNative.Agent } = {
   http: new (withIdleDeadline(httpNative.Agent))({
     keepAlive: true,
     maxSockets: 256,
@@ -41,17 +41,20 @@ export const defaultAgents = {
  *
  * Trade-offs: a socket whose request took longer than the hint minus the buffer (a long poll or
  * a long stream) is not reused; the next request opens a new connection. Upstreams that send no
- * `Keep-Alive` hint are pooled as before, so this does not cover them.
+ * `Keep-Alive` hint are pooled as before, so this does not cover them. A socket freed while
+ * requests are queued (`maxSockets` reached) is handed to the next one directly by Node, without
+ * passing through `addRequest()`, so its deadline is not checked.
  */
 function withIdleDeadline<T extends new (...args: any[]) => httpNative.Agent>(BaseAgent: T) {
   const requestStarts = new WeakMap<object, number>();
   const deadlines = new WeakMap<Duplex, number>();
-  // Earliest deadline among the agent's pooled sockets, so a request scans the pools only when
-  // some socket may have expired.
-  const nextExpiries = new WeakMap<httpNative.Agent, number>();
   const addRequest = (BaseAgent.prototype as unknown as AgentInternals).addRequest;
 
   return class IdleDeadlineAgent extends BaseAgent {
+    // Earliest deadline among the pooled sockets, so a request scans the pools only when some
+    // socket may have expired.
+    #nextExpiry = Infinity;
+
     override keepSocketAlive(socket: Duplex): boolean {
       // Node.js returns whether the socket may be pooled; @types/node declares `void`.
       const keep: unknown = super.keepSocketAlive(socket);
@@ -65,7 +68,7 @@ function withIdleDeadline<T extends new (...args: any[]) => httpNative.Agent>(Ba
         const start = (req && requestStarts.get(req)) ?? performance.now();
         const deadline = start + Number(hint) * 1000 - buffer;
         deadlines.set(socket, deadline);
-        nextExpiries.set(this, Math.min(nextExpiries.get(this) ?? Infinity, deadline));
+        this.#nextExpiry = Math.min(this.#nextExpiry, deadline);
       } else {
         deadlines.delete(socket);
       }
@@ -75,7 +78,7 @@ function withIdleDeadline<T extends new (...args: any[]) => httpNative.Agent>(Ba
     addRequest(req: httpNative.ClientRequest, ...rest: unknown[]): void {
       const now = performance.now();
       requestStarts.set(req, now);
-      if ((nextExpiries.get(this) ?? Infinity) <= now) {
+      if (this.#nextExpiry <= now) {
         let nextExpiry = Infinity;
         for (const name in this.freeSockets) {
           const sockets = this.freeSockets[name] || [];
@@ -94,7 +97,7 @@ function withIdleDeadline<T extends new (...args: any[]) => httpNative.Agent>(Ba
             delete (this.freeSockets as NodeJS.Dict<Duplex[]>)[name];
           }
         }
-        nextExpiries.set(this, nextExpiry);
+        this.#nextExpiry = nextExpiry;
       }
       addRequest.call(this, req, ...rest);
     }
