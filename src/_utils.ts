@@ -63,7 +63,8 @@ export function forceConnectionCloseForTransferEncoding(
  *
  * Waits for the response to `end`: an upstream may send headers early and keep reading
  * the body (e.g. streaming echo / `flushHeaders()`), so draining on `response` would
- * discard body bytes it still needs.
+ * discard body bytes it still needs. A response closed before `end` (e.g. its body was
+ * cancelled) drains and tears down immediately.
  */
 export function drainAfterEarlyResponse(
   proxyReq: httpNative.ClientRequest,
@@ -73,20 +74,28 @@ export function drainAfterEarlyResponse(
   if (proxyReq.writableFinished) {
     return;
   }
-  proxyRes.once("end", () => {
-    if (proxyReq.writableFinished) {
+  let drained = false;
+  const drain = () => {
+    if (drained) {
       return;
     }
+    drained = true;
     // `options.buffer` is only typed as `Stream`; a non-Readable source cannot be drained.
     if (source instanceof Readable) {
       source.unpipe(proxyReq);
       source.resume();
     }
-    proxyRes.once("close", () => {
-      if (!proxyReq.writableFinished) {
-        proxyReq.destroy();
-      }
-    });
+  };
+  proxyRes.once("end", () => {
+    if (!proxyReq.writableFinished) {
+      drain();
+    }
+  });
+  proxyRes.once("close", () => {
+    if (!proxyReq.writableFinished) {
+      drain();
+      proxyReq.destroy();
+    }
   });
 }
 

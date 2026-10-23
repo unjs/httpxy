@@ -17,6 +17,11 @@ beforeAll(async () => {
   upstream = createServer((req, res) => {
     if (Number(req.headers["content-length"]) > LIMIT) {
       res.writeHead(413, { "content-type": "text/plain" });
+      if (req.url === "/big-open") {
+        // Keep the response open so the proxy closes it before `end`
+        res.write("too large");
+        return;
+      }
       res.end("too large");
       return;
     }
@@ -30,6 +35,9 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  // `/big-open` never reads the body or ends its response, so its paused socket
+  // never notices the proxy tearing the connection down
+  upstream.closeAllConnections();
   await new Promise<void>((r) => upstream.close(() => r()));
 });
 
@@ -39,7 +47,7 @@ interface Outcome {
   error?: string;
 }
 
-function uploadThenPipeline(port: number): Promise<Outcome> {
+function uploadThenPipeline(port: number, path = "/big"): Promise<Outcome> {
   return new Promise((resolve) => {
     const chunk = Buffer.alloc(64 * 1024, 0x78);
     const socket = connect(port, "127.0.0.1");
@@ -67,7 +75,7 @@ function uploadThenPipeline(port: number): Promise<Outcome> {
       socket.write("GET /small HTTP/1.1\r\nHost: localhost\r\n\r\n");
     };
     socket.on("connect", () => {
-      socket.write(`POST /big HTTP/1.1\r\nHost: localhost\r\nContent-Length: ${TOTAL}\r\n\r\n`);
+      socket.write(`POST ${path} HTTP/1.1\r\nHost: localhost\r\nContent-Length: ${TOTAL}\r\n\r\n`);
       pump();
     });
     setTimeout(() => socket.destroy(), 10_000).unref();
@@ -126,6 +134,29 @@ describe("upstream responds before the request body is fully written", () => {
       expect(outcome.written).toBe(TOTAL);
       expect(outcome.statuses).toEqual(["413", "200"]);
       await vi.waitFor(() => expect(busySockets(defaultAgents.http)).toBe(0));
+    } finally {
+      await new Promise<void>((r) => front.close(() => r()));
+    }
+  });
+
+  it("proxyFetch keeps draining when the caller cancels the response body", async () => {
+    const agent = new Agent({ keepAlive: true });
+    const front = createServer(async (req, res) => {
+      const body = req.method === "POST" ? Readable.toWeb(req) : undefined;
+      const upstreamRes = await proxyFetch(
+        `http://127.0.0.1:${upstreamPort}`,
+        `http://localhost${req.url}`,
+        { method: req.method, headers: req.headers as Record<string, string>, body: body as any },
+        { agent },
+      );
+      // Discard the upstream body without reading it to the end
+      await upstreamRes.body?.cancel();
+      res.writeHead(upstreamRes.status);
+      res.end();
+    });
+    const port = await listenOn(front);
+    try {
+      await expectDrained(await uploadThenPipeline(port, "/big-open"), agent);
     } finally {
       await new Promise<void>((r) => front.close(() => r()));
     }
