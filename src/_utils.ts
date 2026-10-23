@@ -202,8 +202,12 @@ export function setupOutgoing(
   const qIdx = reqUrl.indexOf("?");
   const reqPath = qIdx === -1 ? reqUrl : reqUrl.slice(0, qIdx);
   const reqSearch = qIdx === -1 ? "" : reqUrl.slice(qIdx);
-  const normalizedPath = reqPath ? (reqPath[0] === "/" ? reqPath : "/" + reqPath) : "/";
-  let outgoingPath = options.toProxy ? "/" + reqUrl : normalizedPath + reqSearch;
+  const normalizedPath = reqPath ? (reqPath[0] === "/" ? reqPath : "/" + reqPath) : "";
+  let outgoingPath = options.toProxy
+    ? "/" + reqUrl
+    : normalizedPath
+      ? normalizedPath + reqSearch
+      : reqSearch || "/";
 
   //
   // Remark: ignorePath will just straight up ignore whatever the request's
@@ -212,7 +216,13 @@ export function setupOutgoing(
   //
   outgoingPath = options.ignorePath ? "" : outgoingPath;
 
-  let fullPath = joinURL(targetPath, outgoingPath);
+  // When the outgoing path is query-only (no path component), append it
+  // directly to the target path instead of using joinURL which would insert
+  // a spurious slash between the target path and the query string.
+  let fullPath =
+    outgoingPath && outgoingPath[0] === "?"
+      ? (targetPath || "/") + outgoingPath
+      : joinURL(targetPath, outgoingPath);
   // Merge target query string into the outgoing path
   if (targetSearch) {
     const hasQuery = fullPath.includes("?");

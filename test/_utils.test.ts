@@ -756,6 +756,30 @@ describe("lib/http-proxy/common.js", () => {
 
       expect(outgoing.path).toBe("/");
     });
+
+    it("should not insert spurious slash when req.url is query-only and target has a path (#175)", () => {
+      const outgoing = createOutgoing();
+      common.setupOutgoing(
+        outgoing,
+        {
+          target: URL.parse("http://localhost/addresses/summary")!,
+        },
+        stubIncomingMessage({ url: "?id=abc" }),
+      );
+
+      expect(outgoing.path).toBe("/addresses/summary?id=abc");
+    });
+
+    it("should produce / when req.url is completely empty and target has no path", () => {
+      const outgoing = createOutgoing();
+      common.setupOutgoing(
+        outgoing,
+        { target: URL.parse("http://localhost")! },
+        stubIncomingMessage({ url: "" }),
+      );
+
+      expect(outgoing.path).toBe("/");
+    });
   });
 
   describe("#joinURL", () => {
