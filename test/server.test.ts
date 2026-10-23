@@ -314,6 +314,42 @@ describe("ProxyServer", () => {
       proxyServer.close();
     });
 
+    it.each([true, false])(
+      "should settle ws() on a pending-upgrade socket error (error listener: %s)",
+      async (withListener) => {
+        const net = await import("node:net");
+        source = http.createServer();
+        source.on("upgrade", (_req, socket) => socket.resume());
+        await new Promise<void>((r) => source.listen(0, "127.0.0.1", r));
+        const sourcePort = (source.address() as AddressInfo).port;
+
+        proxy = createProxyServer({ target: `http://127.0.0.1:${sourcePort}` });
+        const emitted: Error[] = [];
+        if (withListener) proxy.on("error", (err) => emitted.push(err));
+
+        const clientError = new Error("client reset");
+        const proxyServer = http.createServer();
+        const settled = new Promise<string | Error>((resolve) => {
+          proxyServer.on("upgrade", (req, socket, head) => {
+            proxy.ws(req, socket as any, {}, head).then(() => resolve("resolved"), resolve);
+            setTimeout(() => socket.destroy(clientError), 20);
+          });
+        });
+        await new Promise<void>((r) => proxyServer.listen(0, "127.0.0.1", r));
+        const client = net.connect((proxyServer.address() as AddressInfo).port, "127.0.0.1");
+        client.on("error", () => {});
+        client.write(
+          "GET / HTTP/1.1\r\nHost: localhost\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n\r\n",
+        );
+
+        expect(await settled).toBe(withListener ? "resolved" : clientError);
+        expect(emitted).toEqual(withListener ? [clientError] : []);
+        client.destroy();
+        source.closeAllConnections();
+        proxyServer.close();
+      },
+    );
+
     it("should convert string forward to URL", async () => {
       source = http.createServer((req, res) => {
         res.end("forward-ok");

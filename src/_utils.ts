@@ -1,6 +1,7 @@
 import httpNative from "node:http";
 import httpsNative from "node:https";
 import net from "node:net";
+import { Readable, type Stream } from "node:stream";
 import type { ProxyAddr, ProxyServerOptions, ProxyTarget, ProxyTargetDetailed } from "./types.ts";
 import type { Http2ServerRequest } from "node:http2";
 
@@ -52,6 +53,50 @@ export function forceConnectionCloseForTransferEncoding(
   if (carriesTransferEncoding || connectionMarksTransferEncoding) {
     headers.connection = "close";
   }
+}
+
+/**
+ * Once a `ClientRequest` has a complete response, Node stops relaying its socket's
+ * `drain`, so a source piped into it and paused on backpressure never resumes. Dump the rest of the source and tear
+ * down the half-written upstream request once its response closes (a keep-alive agent
+ * never returns an unfinished request's socket to the pool).
+ *
+ * Waits for the response to `end`: an upstream may send headers early and keep reading
+ * the body (e.g. streaming echo / `flushHeaders()`), so draining on `response` would
+ * discard body bytes it still needs. A response closed before `end` (e.g. its body was
+ * cancelled) drains and tears down immediately.
+ */
+export function drainAfterEarlyResponse(
+  proxyReq: httpNative.ClientRequest,
+  proxyRes: httpNative.IncomingMessage,
+  source?: Stream,
+): void {
+  if (proxyReq.writableFinished) {
+    return;
+  }
+  let drained = false;
+  const drain = () => {
+    if (drained) {
+      return;
+    }
+    drained = true;
+    // `options.buffer` is only typed as `Stream`; a non-Readable source cannot be drained.
+    if (source instanceof Readable) {
+      source.unpipe(proxyReq);
+      source.resume();
+    }
+  };
+  proxyRes.once("end", () => {
+    if (!proxyReq.writableFinished) {
+      drain();
+    }
+  });
+  proxyRes.once("close", () => {
+    if (!proxyReq.writableFinished) {
+      drain();
+      proxyReq.destroy();
+    }
+  });
 }
 
 /**
@@ -274,6 +319,28 @@ export function setupSocket(socket: net.Socket): net.Socket {
   socket.setKeepAlive(true, 0);
 
   return socket;
+}
+
+/**
+ * Serialize a status line and headers into a raw HTTP/1.1 response head.
+ *
+ * Array values are written as repeated fields (e.g. multiple `Set-Cookie`)
+ * and `undefined` values are skipped.
+ *
+ * @api private
+ */
+export function createHttpHeader(
+  line: string,
+  headers: Record<string, string | string[] | number | undefined>,
+): string {
+  let head = line;
+  for (const [key, value] of Object.entries(headers)) {
+    if (value === undefined) continue;
+    for (const entry of Array.isArray(value) ? value : [value]) {
+      head += `\r\n${key}: ${entry}`;
+    }
+  }
+  return `${head}\r\n\r\n`;
 }
 
 /**
