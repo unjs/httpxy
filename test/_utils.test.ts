@@ -628,6 +628,19 @@ describe("lib/http-proxy/common.js", () => {
         expect(absolute.path).to.eql("/https://google.com/new/x");
       });
 
+      it("should keep the toProxy path of a relative url unchanged without rewrite", () => {
+        const outgoing = createOutgoing();
+        common.setupOutgoing(
+          outgoing,
+          {
+            target: URL.parse("http://sometarget.com:80")!,
+            toProxy: true,
+          },
+          stubIncomingMessage({ url: "/foo" }),
+        );
+        expect(outgoing.path).to.eql("//foo");
+      });
+
       it("should be applied to forward requests", () => {
         const outgoing = createOutgoing();
         common.setupOutgoing(

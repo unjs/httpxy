@@ -248,10 +248,11 @@ export function setupOutgoing(
   const reqPath = qIdx === -1 ? reqUrl : reqUrl.slice(0, qIdx);
   const reqSearch = qIdx === -1 ? "" : reqUrl.slice(qIdx);
   const normalizedPath = reqPath ? (reqPath[0] === "/" ? reqPath : "/" + reqPath) : "/";
-  // `toProxy` sends the absolute URL as the path; keep a path that already starts
-  // with "/" (e.g. from `rewrite`) as is instead of producing "//path".
+  // `toProxy` sends the absolute URL as the path; keep a path that `rewrite`
+  // returned with a leading "/" as is instead of producing "//path". Without
+  // `rewrite` the existing behaviour is unchanged.
   let outgoingPath = options.toProxy
-    ? reqUrl[0] === "/"
+    ? options.rewrite && reqUrl[0] === "/"
       ? reqUrl
       : "/" + reqUrl
     : normalizedPath + reqSearch;
