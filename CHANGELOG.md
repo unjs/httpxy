@@ -1,5 +1,33 @@
 # Changelog
 
+## v0.5.6
+
+[compare changes](https://github.com/unjs/httpxy/compare/v0.5.5...v0.5.6)
+
+### 🚀 Enhancements
+
+- **fetch:** Support custom `Response` constructor ([#186](https://github.com/unjs/httpxy/pull/186))
+- **ws:** Add `upgradeTimeout` and resolve `ws()` on handled socket errors ([#172](https://github.com/unjs/httpxy/pull/172))
+
+### 🩹 Fixes
+
+- **web-incoming:** Pipe request without waiting for socket connect ([3e68d30](https://github.com/unjs/httpxy/commit/3e68d30))
+- **web-incoming:** Defer body piping until socket is assigned ([10a916b](https://github.com/unjs/httpxy/commit/10a916b))
+- Drain client body when upstream responds before request body ([#170](https://github.com/unjs/httpxy/pull/170))
+- **ws:** Correct non-upgrade response framing ([#173](https://github.com/unjs/httpxy/pull/173))
+
+### 🏡 Chore
+
+- Apply automated updates ([2845a2e](https://github.com/unjs/httpxy/commit/2845a2e))
+- Update deps ([54e4263](https://github.com/unjs/httpxy/commit/54e4263))
+
+### ❤️ Contributors
+
+- David Alexandru Ilie ([@DavidIlie](https://github.com/DavidIlie))
+- Daniel Roe ([@danielroe](https://github.com/danielroe))
+- Pi0x <x@pi0.io>
+- Pooya Parsa ([@pi0](https://github.com/pi0))
+
 ## v0.5.5
 
 [compare changes](https://github.com/unjs/httpxy/compare/v0.5.4...v0.5.5)
