@@ -55,6 +55,15 @@ export interface ProxyFetchOptions {
    * Default: none.
    */
   rewrite?: (path: string) => string;
+  /**
+   * Response constructor used to build the returned response.
+   * When set, the upstream Node.js `IncomingMessage` is passed as the body as-is
+   * (instead of being converted to a web `ReadableStream`), so a constructor that
+   * accepts Node.js streams (e.g. srvx's `FastResponse`) avoids stream conversions
+   * when the response is served by a Node.js server.
+   * Default: global `Response` (body converted with `Readable.toWeb()`).
+   */
+  Response?: typeof Response;
 }
 
 /**
@@ -218,11 +227,16 @@ export async function proxyFetch(
   }
 
   const hasBody = res.statusCode !== 204 && res.statusCode !== 304;
-  return new Response(hasBody ? (Readable.toWeb(res) as ReadableStream) : null, {
+  const resInit: ResponseInit = {
     status: res.statusCode,
     statusText: res.statusMessage,
     headers: resHeaders,
-  });
+  };
+  // Custom constructor: pass the Node.js stream through as-is (no web stream conversion)
+  if (opts?.Response) {
+    return new opts.Response(hasBody ? (res as unknown as BodyInit) : null, resInit);
+  }
+  return new Response(hasBody ? (Readable.toWeb(res) as ReadableStream) : null, resInit);
 }
 
 // --- Internal ---

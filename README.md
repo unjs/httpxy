@@ -43,6 +43,14 @@ const res5 = await proxyFetch("http://127.0.0.1:3000", "http://example.com/api/d
 
 It accepts the same `input` and `init` arguments as the global `fetch`, including `Request` objects and streaming bodies, and returns a standard `Response`. Redirects are handled manually by default.
 
+By default, the upstream body is converted to a web `ReadableStream`. When the response is served by a Node.js server, you can pass a custom `Response` constructor that accepts Node.js streams (such as [srvx](https://srvx.h3.dev)'s `FastResponse`). The upstream Node.js stream is then passed as the body as-is, skipping the stream conversions:
+
+```ts
+import { FastResponse } from "srvx";
+
+const res = await proxyFetch("http://127.0.0.1:3000", req, undefined, { Response: FastResponse });
+```
+
 ## Proxy Upgrade
 
 `proxyUpgrade` is a standalone WebSocket upgrade proxy. It forwards `upgrade` requests to a target server without needing a `ProxyServer` instance — the WebSocket counterpart to `proxyFetch`.

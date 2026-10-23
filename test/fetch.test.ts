@@ -1,4 +1,4 @@
-import { createServer, type Server } from "node:http";
+import { createServer, IncomingMessage, type Server } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -512,6 +512,71 @@ describe("proxyFetch", () => {
       } finally {
         agent.destroy();
       }
+    });
+  });
+
+  describe("Response option", () => {
+    class CustomResponse extends Response {
+      nodeBody: unknown;
+      constructor(body?: BodyInit | null, init?: ResponseInit) {
+        super(null, init);
+        this.nodeBody = body;
+      }
+    }
+
+    it("passes the upstream Node.js stream as body to a custom constructor", async () => {
+      const res = await proxyFetch(
+        { host: "127.0.0.1", port: tcpPort },
+        `http://localhost/json`,
+        undefined,
+        { Response: CustomResponse },
+      );
+      expect(res).toBeInstanceOf(CustomResponse);
+      expect(res.status).toBe(200);
+      expect(res.headers.get("content-type")).toBe("application/json");
+      const body = (res as CustomResponse).nodeBody;
+      expect(body).toBeInstanceOf(IncomingMessage);
+      const chunks: Buffer[] = [];
+      for await (const chunk of body as IncomingMessage) {
+        chunks.push(chunk);
+      }
+      expect(JSON.parse(Buffer.concat(chunks).toString())).toEqual({ ok: true });
+    });
+
+    it("strips hop-by-hop headers and keeps multi-value headers", async () => {
+      const res = await proxyFetch(
+        { host: "127.0.0.1", port: tcpPort },
+        `http://localhost/multi-cookie`,
+        undefined,
+        { Response: CustomResponse },
+      );
+      expect(res.headers.getSetCookie()).toEqual(["a=1; Path=/", "b=2; Path=/", "c=3; Path=/"]);
+      expect(res.headers.has("connection")).toBe(false);
+      expect(res.headers.has("transfer-encoding")).toBe(false);
+      ((res as CustomResponse).nodeBody as IncomingMessage).resume();
+    });
+
+    it("passes a null body for 204", async () => {
+      const res = await proxyFetch(
+        { host: "127.0.0.1", port: tcpPort },
+        `http://localhost/no-content`,
+        undefined,
+        { Response: CustomResponse },
+      );
+      expect(res.status).toBe(204);
+      expect((res as CustomResponse).nodeBody).toBeNull();
+    });
+
+    it("works with a constructor that consumes Node.js streams", async () => {
+      // Node.js' global Response accepts async iterables (such as `IncomingMessage`)
+      const res = await proxyFetch(
+        { host: "127.0.0.1", port: tcpPort },
+        `http://localhost/echo`,
+        { method: "POST", body: "hello" },
+        { Response },
+      );
+      expect(res.status).toBe(200);
+      expect(await res.text()).toBe("hello");
     });
   });
 
