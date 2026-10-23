@@ -132,6 +132,7 @@ export async function proxyFetch(
       }
     }
   }
+  _stripHopByHopHeaders(reqHeaders);
 
   // Add x-forwarded-* headers derived from the input URL
   if (opts?.xfwd) {
@@ -242,6 +243,41 @@ function toInit(init?: RequestInit | Request): RequestInit | undefined {
     } as RequestInit;
   }
   return init;
+}
+
+/**
+ * Hop-by-hop headers describe the client's connection to the proxy, not the upstream one
+ * (RFC 9110 §7.6.1). A forwarded `connection: close` makes the upstream close a socket the
+ * keep-alive agent may still reuse when the response says keep-alive, and the upstream then
+ * answers the next request on it with a 400 (`HPE_CLOSED_CONNECTION`).
+ *
+ * A `Connection` that marks `transfer-encoding` hop-by-hop becomes `connection: close`, so
+ * `forceConnectionCloseForTransferEncoding` still applies (GHSA-ggv3-7p47-pfv8).
+ */
+function _stripHopByHopHeaders(headers: Record<string, string | string[]>): void {
+  const hopByHop = new Set(["connection", "keep-alive", "proxy-connection"]);
+  let marksTransferEncoding = false;
+  for (const key in headers) {
+    if (key.toLowerCase() !== "connection") {
+      continue;
+    }
+    for (const token of String(headers[key]).split(",")) {
+      const name = token.trim().toLowerCase();
+      if (name === "transfer-encoding") {
+        marksTransferEncoding = true;
+      } else if (name) {
+        hopByHop.add(name);
+      }
+    }
+  }
+  for (const key in headers) {
+    if (hopByHop.has(key.toLowerCase())) {
+      delete headers[key];
+    }
+  }
+  if (marksTransferEncoding) {
+    headers.connection = "close";
+  }
 }
 
 /** Convert body to a Node.js Readable or Buffer for streaming without buffering. */

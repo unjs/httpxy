@@ -482,6 +482,65 @@ describe("proxyFetch", () => {
     });
   });
 
+  describe("hop-by-hop request headers", () => {
+    it("does not forward the client's connection headers", async () => {
+      const res = await proxyFetch(
+        { host: "127.0.0.1", port: tcpPort },
+        `http://localhost/headers`,
+        {
+          headers: {
+            Connection: "close, x-hop",
+            "keep-alive": "timeout=5",
+            "proxy-connection": "close",
+            "x-hop": "1",
+            "x-end-to-end": "1",
+          },
+        },
+      );
+      const body = (await res.json()) as { headers: Record<string, string> };
+      expect(body.headers.connection).toBe("keep-alive");
+      expect(body.headers["keep-alive"]).toBeUndefined();
+      expect(body.headers["proxy-connection"]).toBeUndefined();
+      expect(body.headers["x-hop"]).toBeUndefined();
+      expect(body.headers["x-end-to-end"]).toBe("1");
+    });
+
+    it("does not get a 400 on a pooled socket after a client sent connection: close", async () => {
+      // An upstream that answers keep-alive regardless (e.g. a server-sent events response).
+      const upstream = createServer((_req, res) => {
+        res.writeHead(200, { connection: "keep-alive", "content-type": "text/plain" });
+        res.end("ok");
+      });
+      await new Promise<void>((resolve) => upstream.listen(0, "127.0.0.1", resolve));
+      const { port } = upstream.address() as AddressInfo;
+      const { Agent } = await import("node:http");
+      const agent = new Agent({ keepAlive: true });
+      try {
+        const statuses: number[] = [];
+        for (let round = 0; round < 10; round++) {
+          const responses = await Promise.all(
+            Array.from({ length: 20 }, () =>
+              proxyFetch(
+                { host: "127.0.0.1", port },
+                `http://localhost/`,
+                { headers: { connection: "close" } },
+                { agent },
+              ),
+            ),
+          );
+          for (const res of responses) {
+            statuses.push(res.status);
+            await res.arrayBuffer();
+          }
+        }
+        expect(statuses.filter((status) => status !== 200)).toEqual([]);
+      } finally {
+        agent.destroy();
+        upstream.close();
+      }
+    });
+  });
+
   describe("Response option", () => {
     class CustomResponse extends Response {
       nodeBody: unknown;
