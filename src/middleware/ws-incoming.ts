@@ -10,6 +10,7 @@ import {
   setupOutgoing,
   setupSocket,
 } from "../_utils.ts";
+import { setUpgradeTimeout } from "../_upgrade-timeout.ts";
 import { pipeNonUpgradeResponse } from "../_ws-response.ts";
 
 /**
@@ -56,6 +57,8 @@ export const XHeaders = defineProxyMiddleware<Socket>((req, socket, options) => 
  */
 export const stream = defineProxyMiddleware<Socket>(
   (req, socket, options, server, head, callback) => {
+    let upgradeFailed = false;
+
     setupSocket(socket);
 
     if (head && head.length > 0) {
@@ -129,25 +132,29 @@ export const stream = defineProxyMiddleware<Socket>(
       server.emit("proxySocket", proxySocket); // DEPRECATED.
     });
 
+    setUpgradeTimeout(proxyReq, socket, options.upgradeTimeout, (error) => {
+      upgradeFailed = true;
+      reportError(error);
+    });
     proxyReq.end(); // XXX: CHECK IF THIS IS THIS CORRECT
     // return;
 
     function onSocketError(err: Error) {
-      if (callback) {
-        callback(err, req, socket);
-      } else {
-        server.emit("error", err, req, socket);
-      }
+      if (!upgradeFailed) reportError(err);
       proxyReq.destroy();
     }
 
     function onOutgoingError(err: Error) {
+      if (!upgradeFailed) reportError(err);
+      socket.end();
+    }
+
+    function reportError(err: Error) {
       if (callback) {
         callback(err, req, socket);
       } else {
         server.emit("error", err, req, socket);
       }
-      socket.end();
     }
   },
 );

@@ -34,6 +34,11 @@ describe("httpxy types", () => {
       prependPath: false,
       ignorePath: true,
       toProxy: true,
+      upgradeTimeout: 5000,
     });
+  });
+
+  it("accepts an upgrade deadline on ProxyServer", () => {
+    assertType<ProxyServer>(new ProxyServer({ upgradeTimeout: 5000 }));
   });
 });

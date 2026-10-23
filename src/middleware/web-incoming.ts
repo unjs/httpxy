@@ -3,6 +3,7 @@ import type { ProxyTargetDetailed } from "../types.ts";
 import nodeHTTP from "node:http";
 import nodeHTTPS from "node:https";
 import {
+  drainAfterEarlyResponse,
   forceConnectionCloseForTransferEncoding,
   getPort,
   hasEncryptedConnection,
@@ -156,28 +157,33 @@ export const stream = defineProxyMiddleware((req, res, options, server, head, ca
 
   // Buffer request body when following redirects (needed for 307/308 replay)
   let bodyBuffer: Buffer | undefined;
-  if (maxRedirects > 0) {
-    const chunks: Buffer[] = [];
+
+  // Start sending the body once a socket is assigned (right after "proxyReq"
+  // listeners had a chance to mutate headers) but without waiting for it to
+  // connect. Ending the request earlier (e.g. bodyless GET queued behind a busy
+  // agent) flushes headers before "proxyReq" fires (chimurai/http-proxy-middleware#472).
+  // Waiting for "connect" deadlocks with mocked sockets from request interceptors
+  // (msw / @mswjs/interceptors, nock), which only emit "connect" *after* the
+  // outgoing request has been fully written (unjs/httpxy#166).
+  proxyReq.once("socket", () => {
     const source = options.buffer || req;
-    source.on("data", (chunk: Buffer) => {
-      chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk);
-      proxyReq.write(chunk);
-    });
-    source.on("end", () => {
-      bodyBuffer = Buffer.concat(chunks);
-      proxyReq.end();
-    });
-    source.on("error", (err: Error) => {
-      proxyReq.destroy(err);
-    });
-  } else {
-    // Pipe immediately, without waiting for the upstream socket to connect.
-    // `ClientRequest` buffers writes issued before the socket is connected, and
-    // deferring deadlocks with mocked sockets (msw / @mswjs/interceptors, nock),
-    // which only emit "connect" *after* the outgoing request has been fully
-    // written (unjs/httpxy#166).
-    (options.buffer || req).pipe(proxyReq);
-  }
+    if (maxRedirects > 0) {
+      const chunks: Buffer[] = [];
+      source.on("data", (chunk: Buffer) => {
+        chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk);
+        proxyReq.write(chunk);
+      });
+      source.on("end", () => {
+        bodyBuffer = Buffer.concat(chunks);
+        proxyReq.end();
+      });
+      source.on("error", (err: Error) => {
+        proxyReq.destroy(err);
+      });
+    } else {
+      source.pipe(proxyReq);
+    }
+  });
 
   function handleResponse(proxyRes: IncomingMessage, redirectCount: number, currentUrl: URL) {
     const statusCode = proxyRes.statusCode!;
@@ -314,6 +320,11 @@ export const stream = defineProxyMiddleware((req, res, options, server, head, ca
   }
 
   proxyReq.on("response", function (proxyRes) {
+    // Only the piped body can stall; the `followRedirects` tee writes without
+    // backpressure, so destroying the request there would just truncate the body.
+    if (maxRedirects === 0) {
+      drainAfterEarlyResponse(proxyReq, proxyRes, options.buffer || req);
+    }
     handleResponse(proxyRes, 0, options.target as URL);
   });
 });

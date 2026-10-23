@@ -17,6 +17,7 @@ src/
 ├── server.ts             — ProxyServer class (EventEmitter), createProxyServer()
 ├── fetch.ts              — proxyFetch() using Node.js http module → Web Response
 ├── ws.ts                 — proxyUpgrade() standalone WebSocket upgrade proxy
+├── _upgrade-timeout.ts   — setUpgradeTimeout(): opt-in upgrade deadline shared by ws() and proxyUpgrade()
 ├── _utils.ts             — setupOutgoing(), setupSocket(), createHttpHeader(), joinURL(), cookie/header helpers
 ├── _ws-response.ts       — pipeNonUpgradeResponse(): relays non-upgrade responses with valid framing
 └── middleware/
@@ -63,6 +64,7 @@ Returns Promise<Socket> (the upstream proxy socket)
 ## Behavioral Notes (Source + Tests)
 
 - `proxy.web()` / `proxy.ws()` return a Promise and can either reject (no `error` listener, request/response error) or resolve after `res.close`.
+- For `ws()`, client socket errors follow the same rule: with an `error` listener they are emitted and the promise resolves; without one it rejects. The wrapper's socket `error` handler only rejects when there is no listener (pre-upgrade errors are emitted by the `stream` pass; post-upgrade errors resolve via `close` without being emitted). `web()` still rejects on response errors. Regression coverage: `should settle ws() on a pending-upgrade socket error` in `test/server.test.ts`.
 - Per-call options are merged as `{ ...opts, ...server.options }`, so constructor options override per-call options on key conflicts.
 - String `target`/`forward` values are normalized to `URL` objects before middleware execution.
 - Missing both `target` and `forward` emits `error` with message `"Must provide a proper URL as target"`.
@@ -82,7 +84,8 @@ Returns Promise<Socket> (the upstream proxy socket)
 - `proxyRes` event fires only for the final (non-redirect) response; `proxyReq` fires for each request including redirects.
 - Sensitive headers (`authorization`, `cookie`) are stripped on cross-origin redirects.
 - When `followRedirects` is enabled, the request body is tee'd (written to proxy request and buffered simultaneously) rather than piped.
-- Without `followRedirects`, the incoming request is piped into the outgoing request **immediately**, without waiting for the upstream socket to emit `connect`. `ClientRequest` buffers writes issued before the socket connects, so the deferral is unnecessary — and it deadlocks with mocked sockets from request interceptors (msw/`@mswjs/interceptors`, nock), which only emit `connect` _after_ the outgoing request has been fully written (unjs/httpxy#166). Regression coverage: `#stream with mocked sockets` in `test/middleware/web-incoming.test.ts`.
+- When the upstream response **completes** before the request body is fully written, `drainAfterEarlyResponse()` (`src/_utils.ts`, attached to the initial upstream `response` in `proxy.web` and every hop in `proxyFetch`) unpipes and dumps the rest of the incoming body so the client connection stays usable, and destroys the upstream request once its response closes (so an upstream that responds and _then_ reads the body gets a truncated body — previously the client connection stalled instead). It waits for the response `end` (not just headers) so upstreams that flush headers early and keep reading the body (streaming echo, `flushHeaders()`) still receive the full body. A response that closes **before** `end` (e.g. the `proxyFetch` caller cancels the `Response` body) drains and destroys immediately, guarded so the drain runs once. In `proxyFetch` the response `end` only happens once the caller consumes the `Response` body, so a caller that drops it without reading or cancelling does not trigger the drain. In `proxy.web` it is **skipped when `followRedirects` is enabled**: the body is tee'd via `data` listeners (no backpressure, so it never stalls), and destroying the request would only truncate the body for respond-then-read upstreams. Known gap: with `agent: false` (forced `connection: close`), an upstream that closes after an early 413 makes the next body write fail with `EPIPE` before the response is handled. Coverage: `test/early-response.test.ts`. Testing gotcha: a test that uploads to an upstream which responds early must drive the upload with a raw `net` socket (`uploadThenPipeline()`), not `http.request`. A Node `ClientRequest` stops getting `drain` once its own response completes (the same mechanism this helper works around), so the test client stalls by itself — timing-dependent, so it may only show up in CI.
+- The request body is wired into the outgoing request on the `ClientRequest` `"socket"` event (after `proxyReq` listeners run), **not** immediately and **not** on the socket's `"connect"`. Wiring immediately lets a bodyless request call `proxyReq.end()` while queued behind a saturated agent (`maxSockets`), flushing headers before `proxyReq` fires so `setHeader` throws `ERR_HTTP_HEADERS_SENT` (chimurai/http-proxy-middleware#472; caught by `pnpm test:ecosystem`). Waiting for `"connect"` deadlocks with mocked sockets from request interceptors (msw/`@mswjs/interceptors`, nock), which only emit `connect` _after_ the outgoing request has been fully written (unjs/httpxy#166). `ClientRequest` buffers writes until the socket connects, so no further deferral is needed. Regression coverage: `#stream with mocked sockets` and `#stream proxyReq header mutation under socket contention` in `test/middleware/web-incoming.test.ts`.
 
 ### WebSocket middleware semantics
 
@@ -93,6 +96,8 @@ Returns Promise<Socket> (the upstream proxy socket)
 - Non-upgrade responses use `src/_ws-response.ts` to stream the decoded body with valid downstream framing and `Connection: close`. A Transform restores chunk boundaries when the final transfer coding is chunked; other transfer codings and fixed Content-Length bodies are preserved. Response hop-by-hop fields, Connection/Proxy-Connection nominated fields, and unforwarded Trailer declarations are removed. A nominated Content-Length is reconstructed for fixed-length responses, including zero-length bodies and 304 representation-length metadata, so a truncated body is not mistaken for a complete close-delimited response. Upstream errors abort the stream without a final chunk marker, and downstream close cancels the upstream body. There is no complete-body buffer or body-size cap. Coverage: `test/ws-response.test.ts` for both WebSocket APIs.
 - Hop-by-hop stripping includes `Upgrade`, so a `426 Upgrade Required` reaches the client without it (RFC 9110 §7.6.1); `Sec-WebSocket-Version` is preserved. 1xx never reaches the relay (Node emits 100/102/103 as `information`, 101 as `upgrade`). The raw response head for both 101 and non-upgrade responses is serialized by `createHttpHeader()` in `src/_utils.ts`.
 - Bodyless response framing removes Content-Length from 204 and preserves valid 304 representation-length metadata. Status 205 is normalized to Content-Length: 0 with no Transfer-Encoding. Its upstream response is destroyed without piping or waiting for the body, and intentional cancellation does not report a relay error. Raw-wire regression tests cover both APIs, including fixed-length/chunked/close-delimited 205 bodies and a stalled upstream body.
+- `upgradeTimeout` (shared with `proxyUpgrade`, implemented in `src/_upgrade-timeout.ts`) is an opt-in total deadline, including connection setup, until the upstream upgrade or final response headers. Omitted, non-positive, and non-finite values disable it; finite values are capped at `2147483647` ms. Expiry reports `ERR_UPSTREAM_UPGRADE_TIMEOUT` (`statusCode: 504`) and destroys the upstream request and client socket without writing an HTTP response. It never limits an established tunnel or a non-upgrade response body.
+- While the deadline is active, closing or erroring the client socket also cancels the pending upstream request and reports the error (`ECONNRESET` on close), even while a custom agent has no free socket. The deadline's socket listeners are prepended so each failure is reported once, ahead of the `stream` pass's own `onSocketError`. Queued requests that were destroyed stay in the caller's `agent.requests` until capacity returns; the proxy does not edit the agent queue.
 
 ### Outgoing response semantics
 
@@ -130,7 +135,8 @@ Returns Promise<Socket> (the upstream proxy socket)
 - Hop-by-hop response headers `transfer-encoding`, `keep-alive`, `connection` are stripped.
 - Response body is `null` for `204` and `304`.
 - Network and request-body-stream errors reject the Promise.
-- Accepts optional `ProxyFetchOptions` as 4th argument with `timeout`, `xfwd`, `changeOrigin`, `agent`, `followRedirects`, and `ssl`.
+- Accepts optional `ProxyFetchOptions` as 4th argument with `timeout`, `xfwd`, `changeOrigin`, `agent`, `followRedirects`, `ssl`, and `Response`.
+- `Response` supplies a custom response constructor (e.g. srvx's `FastResponse`). When set, the upstream `IncomingMessage` is passed as the body as-is (no `Readable.toWeb()` conversion), so Node-to-Node proxies skip both stream conversions. Headers/status are built the same way as the default path. Without it, the global `Response` is used with a web stream body.
 - `timeout` sets a deadline on the upstream request; rejects with `"Proxy request timed out"` on expiry.
 - `xfwd` adds `x-forwarded-for`, `x-forwarded-port`, `x-forwarded-proto`, `x-forwarded-host` derived from the input URL (not from a socket, since there is no incoming connection). Existing headers are not overwritten.
 - `changeOrigin` rewrites the `Host` header to match the resolved target address (host:port for TCP, `localhost` for Unix sockets). Accounts for default ports (80 for HTTP, 443 for HTTPS).
@@ -152,6 +158,7 @@ Returns Promise<Socket> (the upstream proxy socket)
 - If the upstream responds without upgrading (e.g., 404), the response is relayed to the client socket.
 - For a non-upgrade response, the promise still rejects at response headers while the shared relay streams the body. Callers that want to preserve that response must not destroy the client socket merely because of this rejection.
 - Uses `setupOutgoing()` and `setupSocket()` from shared utils, consistent with `ProxyServer.ws()`.
+- Supports the same opt-in `upgradeTimeout` as `ProxyServer.ws()` (both covered in `test/upgrade-timeout.test.ts`).
 
 ## Tests (`test/`)
 
@@ -160,9 +167,11 @@ test/
 ├── index.test.ts                  — Main proxy: paths, headers, changeOrigin, xfwd, WebSocket, errors
 ├── fetch.test.ts                  — proxyFetch: TCP/Unix, GET/POST, redirects, cookies, 204/304, signal, timeout, xfwd, changeOrigin
 ├── upgrade.test.ts                — proxyUpgrade: WS proxy, addr formats, xfwd, error handling
+├── upgrade-timeout.test.ts        — upgradeTimeout for both proxyUpgrade and ProxyServer.ws
 ├── http-proxy.test.ts             — Forward, target, WebSocket, socket.io, SSE, timeouts, error events
 ├── https-proxy.test.ts            — HTTPS targets, SSL certs, certificate validation
 ├── _utils.test.ts                 — setupOutgoing, setupSocket, path joining, auth, changeOrigin
+├── early-response.test.ts         — Upstream replies before the request body is fully written (proxyFetch + proxy.web)
 ├── request-smuggling.test.ts      — End-to-end GHSA-ggv3-7p47-pfv8 reproduction (chunked payload hiding a smuggled request; asserts it never reaches a lenient upstream), ported from vercel/next.js
 ├── ws-response.test.ts            — Non-upgrade WS responses: chunked re-framing, fixed-length/bodyless preservation, hop-by-hop stripping, truncation, cancellation
 ├── types.test-d.ts                — TypeScript type assertions (vitest typecheck)
