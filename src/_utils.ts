@@ -322,6 +322,28 @@ export function setupSocket(socket: net.Socket): net.Socket {
 }
 
 /**
+ * Serialize a status line and headers into a raw HTTP/1.1 response head.
+ *
+ * Array values are written as repeated fields (e.g. multiple `Set-Cookie`)
+ * and `undefined` values are skipped.
+ *
+ * @api private
+ */
+export function createHttpHeader(
+  line: string,
+  headers: Record<string, string | string[] | number | undefined>,
+): string {
+  let head = line;
+  for (const [key, value] of Object.entries(headers)) {
+    if (value === undefined) continue;
+    for (const entry of Array.isArray(value) ? value : [value]) {
+      head += `\r\n${key}: ${entry}`;
+    }
+  }
+  return `${head}\r\n\r\n`;
+}
+
+/**
  * Get the port number from the host. Or guess it based on the connection type.
  *
  * @param req Incoming HTTP request.

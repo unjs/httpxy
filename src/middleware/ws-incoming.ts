@@ -2,8 +2,16 @@ import nodeHTTP from "node:http";
 import nodeHTTPS from "node:https";
 import type { Socket } from "node:net";
 import { type ProxyMiddleware, defineProxyMiddleware } from "./_utils.ts";
-import { getPort, hasEncryptedConnection, isSSL, setupOutgoing, setupSocket } from "../_utils.ts";
+import {
+  createHttpHeader,
+  getPort,
+  hasEncryptedConnection,
+  isSSL,
+  setupOutgoing,
+  setupSocket,
+} from "../_utils.ts";
 import { setUpgradeTimeout } from "../_upgrade-timeout.ts";
+import { pipeNonUpgradeResponse } from "../_ws-response.ts";
 
 /**
  * WebSocket requests must have the `GET` method and
@@ -50,29 +58,6 @@ export const XHeaders = defineProxyMiddleware<Socket>((req, socket, options) => 
 export const stream = defineProxyMiddleware<Socket>(
   (req, socket, options, server, head, callback) => {
     let upgradeFailed = false;
-    const createHttpHeader = function (line: string, headers: nodeHTTP.OutgoingHttpHeaders) {
-      return (
-        Object.keys(headers)
-          // eslint-disable-next-line unicorn/no-array-reduce
-          .reduce(
-            function (head, key) {
-              const value = headers[key];
-
-              if (!Array.isArray(value)) {
-                head.push(key + ": " + value);
-                return head;
-              }
-
-              for (const element of value) {
-                head.push(key + ": " + element);
-              }
-              return head;
-            },
-            [line],
-          )
-          .join("\r\n") + "\r\n\r\n"
-      );
-    };
 
     setupSocket(socket);
 
@@ -102,14 +87,7 @@ export const stream = defineProxyMiddleware<Socket>(
       // (https://github.com/http-party/node-http-proxy/pull/1433)
       if (!(res as any).upgrade) {
         if (!socket.destroyed && socket.writable) {
-          socket.write(
-            createHttpHeader(
-              "HTTP/" + res.httpVersion + " " + res.statusCode + " " + res.statusMessage,
-              res.headers,
-            ),
-          );
-          res.on("error", onOutgoingError);
-          res.pipe(socket);
+          pipeNonUpgradeResponse(res, socket, onOutgoingError);
         } else {
           // Socket already gone — consume response to avoid unhandled stream errors
           res.resume();
