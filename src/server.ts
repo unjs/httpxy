@@ -219,6 +219,11 @@ function _createProxyFn<
       _resolve();
     });
     res.on("error", (error: any) => {
+      // With an error listener, ws middleware reports socket errors through
+      // the callback (emit + resolve) and `close` resolves the rest.
+      if (type === "ws" && server.listenerCount("error") > 0) {
+        return;
+      }
       _reject(error);
     });
 

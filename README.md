@@ -78,9 +78,14 @@ server.on("upgrade", (req, socket, head) => {
   proxyUpgrade({ host: "127.0.0.1", port: 8080 }, req, socket, head, {
     // changeOrigin: true, // rewrite Host header
     // xfwd: false, // disable x-forwarded-* headers (enabled by default)
+    // upgradeTimeout: 5000, // wait up to 5 seconds for upstream response headers
   });
 });
 ```
+
+`upgradeTimeout` (also available on `ProxyServer`) is an optional deadline in milliseconds, including connection setup, for the upstream upgrade or a final response's headers. Informational responses and partial headers do not extend it, and it never limits an established WebSocket or a non-upgrade response body. Omitted, non-positive, and non-finite values disable it; values above `2147483647` are capped.
+
+On expiry, the upstream request and client socket are destroyed (no HTTP 504 is written) and an error with `code: "ERR_UPSTREAM_UPGRADE_TIMEOUT"` and `statusCode: 504` is reported. While the deadline is active, a client disconnect also cancels the pending upstream request and is reported as an `ECONNRESET` error.
 
 ## Proxy Server
 
@@ -137,6 +142,7 @@ server.listen(3000, () => {
 | `cookiePathRewrite`     | `false \| string \| object`            | `false`    | Rewrite path of `Set-Cookie` headers                                        |
 | `headers`               | `object`                               | —          | Extra headers to add to target requests                                     |
 | `proxyTimeout`          | `number`                               | `120000`   | Timeout (ms) for the proxy request to the target                            |
+| `upgradeTimeout`        | `number`                               | —          | Deadline (ms) for a WebSocket upgrade response; see Proxy Upgrade           |
 | `timeout`               | `number`                               | —          | Timeout (ms) for the incoming request                                       |
 | `selfHandleResponse`    | `boolean`                              | `false`    | Disable automatic response piping (handle `proxyRes` yourself)              |
 | `followRedirects`       | `boolean \| number`                    | `false`    | Follow HTTP redirects from target. `true` = max 5 hops; number = custom max |
