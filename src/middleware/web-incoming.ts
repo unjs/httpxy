@@ -89,10 +89,19 @@ export const stream = defineProxyMiddleware((req, res, options, server, head, ca
         ? 5
         : 0;
 
+  // Build all outgoing options before opening any request, so a throwing
+  // `rewrite` callback cannot leave a forward request dangling.
+  const forwardOutgoing = options.forward
+    ? setupOutgoing(options.ssl || {}, options, req, "forward")
+    : undefined;
+  const targetOutgoing = options.target
+    ? setupOutgoing(options.ssl || {}, options, req)
+    : undefined;
+
   if (options.forward) {
     // If forward enable, so just pipe the request
     const forwardReq = (isSSL.test(options.forward.protocol || "http") ? https : http).request(
-      setupOutgoing(options.ssl || {}, options, req, "forward"),
+      forwardOutgoing!,
     );
 
     // error handler (e.g. ECONNRESET, ECONNREFUSED)
@@ -110,7 +119,7 @@ export const stream = defineProxyMiddleware((req, res, options, server, head, ca
 
   // Request initalization
   const proxyReq = (isSSL.test(options.target.protocol || "http") ? https : http).request(
-    setupOutgoing(options.ssl || {}, options, req),
+    targetOutgoing!,
   );
 
   // Enable developers to modify the proxyReq before headers are sent

@@ -564,6 +564,100 @@ describe("lib/http-proxy/common.js", () => {
       });
     });
 
+    describe("when using rewrite", () => {
+      it("should rewrite the request path before joining it with the target path", () => {
+        const outgoing = createOutgoing();
+        const paths: string[] = [];
+        common.setupOutgoing(
+          outgoing,
+          {
+            target: URL.parse("http://localhost:3001/backend")!,
+            rewrite: (path) => {
+              paths.push(path);
+              return path.replace(/^\/api/, "");
+            },
+          },
+          stubIncomingMessage({ url: "/api/users?page=2" }),
+        );
+
+        expect(paths).to.eql(["/api/users?page=2"]);
+        expect(outgoing.path).to.eql("/backend/users?page=2");
+      });
+
+      it("should keep a leading slash when the rewritten path is empty or relative", () => {
+        const empty = createOutgoing();
+        common.setupOutgoing(
+          empty,
+          { target: URL.parse("http://localhost:3001")!, rewrite: () => "" },
+          stubIncomingMessage({ url: "/api" }),
+        );
+        expect(empty.path).to.eql("/");
+
+        const relative = createOutgoing();
+        common.setupOutgoing(
+          relative,
+          { target: URL.parse("http://localhost:3001")!, rewrite: () => "users?id=1" },
+          stubIncomingMessage({ url: "/api/users" }),
+        );
+        expect(relative.path).to.eql("/users?id=1");
+      });
+
+      it("should not double the leading slash of a rewritten path with toProxy", () => {
+        const outgoing = createOutgoing();
+        common.setupOutgoing(
+          outgoing,
+          {
+            target: URL.parse("http://sometarget.com:80")!,
+            toProxy: true,
+            rewrite: (path) => path.replace(/^\/api/, ""),
+          },
+          stubIncomingMessage({ url: "/api/users?id=1" }),
+        );
+        expect(outgoing.path).to.eql("/users?id=1");
+
+        const absolute = createOutgoing();
+        common.setupOutgoing(
+          absolute,
+          {
+            target: URL.parse("http://sometarget.com:80")!,
+            toProxy: true,
+            rewrite: (path) => path.replace("/old/", "/new/"),
+          },
+          stubIncomingMessage({ url: "https://google.com/old/x" }),
+        );
+        expect(absolute.path).to.eql("/https://google.com/new/x");
+      });
+
+      it("should keep the toProxy path of a relative url unchanged without rewrite", () => {
+        const outgoing = createOutgoing();
+        common.setupOutgoing(
+          outgoing,
+          {
+            target: URL.parse("http://sometarget.com:80")!,
+            toProxy: true,
+          },
+          stubIncomingMessage({ url: "/foo" }),
+        );
+        expect(outgoing.path).to.eql("//foo");
+      });
+
+      it("should be applied to forward requests", () => {
+        const outgoing = createOutgoing();
+        common.setupOutgoing(
+          outgoing,
+          {
+            target: "http://localhost",
+            forward: URL.parse("http://localhost:3002")!,
+            rewrite: (path) => path.replace(/^\/api/, "/v1"),
+          },
+          stubIncomingMessage({ url: "/api/users" }),
+          "forward",
+        );
+
+        expect(outgoing.path).to.eql("/v1/users");
+      });
+    });
+
     describe("when using changeOrigin", () => {
       it("should correctly set the port to the host when it is a non-standard port using URL.parse", () => {
         const outgoing = createOutgoing();

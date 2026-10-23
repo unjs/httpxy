@@ -76,6 +76,12 @@ export interface ProxyUpgradeOptions {
    */
   ignorePath?: boolean;
   /**
+   * Rewrite the incoming request path (including its query string) before it is joined with the
+   * target path, e.g. `(path) => path.replace(/^\/api/, "")`.
+   * Default: none.
+   */
+  rewrite?: (path: string) => string;
+  /**
    * Send absolute URL in request path when proxying to another proxy.
    * Default: `false` (path-only request target is used).
    */
@@ -135,11 +141,18 @@ export function proxyUpgrade(
     prependPath: opts?.prependPath !== false,
   };
 
-  const outgoing = setupOutgoing(
-    requestOptions.ssl || {},
-    requestOptions as Parameters<typeof setupOutgoing>[1],
-    req,
-  );
+  let outgoing: ReturnType<typeof setupOutgoing>;
+  try {
+    outgoing = setupOutgoing(
+      requestOptions.ssl || {},
+      requestOptions as Parameters<typeof setupOutgoing>[1],
+      req,
+    );
+  } catch (error) {
+    // e.g. a throwing `rewrite` callback: reject instead of throwing synchronously
+    socket.destroy();
+    return Promise.reject(error);
+  }
 
   const sock = socket as Socket;
 

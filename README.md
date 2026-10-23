@@ -135,6 +135,7 @@ server.listen(3000, () => {
 | `toProxy`               | `boolean`                              | `false`    | Pass absolute URL as path (proxy-to-proxy)                                  |
 | `prependPath`           | `boolean`                              | `true`     | Prepend the target's path to the proxy path                                 |
 | `ignorePath`            | `boolean`                              | `false`    | Ignore the incoming request path                                            |
+| `rewrite`               | `(path: string) => string`             | —          | Rewrite the incoming request path (with query) before joining the target    |
 | `localAddress`          | `string`                               | —          | Local interface to bind for outgoing connections                            |
 | `changeOrigin`          | `boolean`                              | `false`    | Change the `Host` header to match the target URL                            |
 | `preserveHeaderKeyCase` | `boolean`                              | `false`    | Keep original letter case of response header keys                           |

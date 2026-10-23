@@ -294,6 +294,39 @@ describe("proxyFetch", () => {
     });
   });
 
+  describe("rewrite", () => {
+    it("rewrites the request path (with query) before proxying", async () => {
+      const paths: string[] = [];
+      const res = await proxyFetch(
+        { host: "127.0.0.1", port: tcpPort },
+        `http://localhost/api/headers?foo=bar`,
+        undefined,
+        {
+          rewrite: (path) => {
+            paths.push(path);
+            return path.replace(/^\/api/, "");
+          },
+        },
+      );
+      expect(paths).toEqual(["/api/headers?foo=bar"]);
+      const body = (await res.json()) as { url: string };
+      expect(body.url).toBe("/headers?foo=bar");
+    });
+
+    it("joins the rewritten path with the addr base path", async () => {
+      const res = await proxyFetch(
+        `http://127.0.0.1:${tcpPort}/headers`,
+        `http://localhost/api`,
+        undefined,
+        {
+          rewrite: (path) => path.replace(/^\/api/, ""),
+        },
+      );
+      const body = (await res.json()) as { url: string };
+      expect(body.url).toBe("/headers");
+    });
+  });
+
   describe("string addr", () => {
     it("accepts http URL string as addr", async () => {
       const res = await proxyFetch(`http://127.0.0.1:${tcpPort}`, `http://localhost/json`);
