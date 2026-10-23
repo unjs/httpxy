@@ -40,16 +40,18 @@ function getBody(port: number, agent: Agent) {
 }
 
 for (const mode of ["proxyUpgrade", "ProxyServer.ws"] as const) {
-  describe(`${mode} establishmentTimeout`, () => {
+  describe(`${mode} upgradeTimeout`, () => {
     async function start(
       target: Server | number,
-      establishmentTimeout: number | undefined,
-      onProxy?: (socket: Socket) => void,
-      handleError = true,
-      agent?: Agent,
+      upgradeTimeout: number | undefined,
+      {
+        onProxy,
+        handleError = true,
+        agent,
+      }: { onProxy?: (socket: Socket) => void; handleError?: boolean; agent?: Agent } = {},
     ) {
       const targetPort = typeof target === "number" ? target : await listen(target);
-      const options = { establishmentTimeout, agent };
+      const options = { upgradeTimeout, agent };
       const proxy = createProxyServer({ target: `http://127.0.0.1:${targetPort}`, ...options });
       const errors: Error[] = [];
       const failed = Promise.withResolvers<Error>();
@@ -140,13 +142,10 @@ for (const mode of ["proxyUpgrade", "ProxyServer.ws"] as const) {
           const occupying = getBody(targetPort, agent);
           const heldResponse = await held.promise;
           try {
-            const fixture = await start(
-              targetPort,
-              failure === "timeout" ? 40 : 1000,
-              undefined,
+            const fixture = await start(targetPort, failure === "timeout" ? 40 : 1000, {
               handleError,
               agent,
-            );
+            });
             const downstream = await fixture.downstream;
             expect(Object.values(agent.requests).flat()).toHaveLength(1);
             const clientError = Object.assign(new Error("client reset"), { code: "ECONNRESET" });
@@ -202,7 +201,7 @@ for (const mode of ["proxyUpgrade", "ProxyServer.ws"] as const) {
       it("rejects the promise when no error listener handles the timeout", async () => {
         const target = createServer();
         target.on("upgrade", (_req, socket) => socket.resume());
-        const fixture = await start(target, 40, undefined, false);
+        const fixture = await start(target, 40, { handleError: false });
         expect(await fixture.failed).toMatchObject({
           code: "ERR_UPSTREAM_UPGRADE_TIMEOUT",
           statusCode: 504,
@@ -286,7 +285,7 @@ for (const mode of ["proxyUpgrade", "ProxyServer.ws"] as const) {
       target.on("upgrade", () => {
         requests++;
       });
-      const fixture = await start(target, 80, (socket) => socket.destroy());
+      const fixture = await start(target, 80, { onProxy: (socket) => socket.destroy() });
       expect(await fixture.failed).toMatchObject({ code: "ECONNRESET" });
       await fixture.closed;
       await delay(120);
@@ -295,7 +294,7 @@ for (const mode of ["proxyUpgrade", "ProxyServer.ws"] as const) {
     });
 
     it.each([undefined, 0, -1, Number.NaN, Number.POSITIVE_INFINITY, 2 ** 31])(
-      "does not immediately time out with establishmentTimeout=%s",
+      "does not immediately time out with upgradeTimeout=%s",
       async (timeout) => {
         const target = createServer();
         const connected = once(target, "upgrade");

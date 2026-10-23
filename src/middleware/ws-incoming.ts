@@ -3,7 +3,7 @@ import nodeHTTPS from "node:https";
 import type { Socket } from "node:net";
 import { type ProxyMiddleware, defineProxyMiddleware } from "./_utils.ts";
 import { getPort, hasEncryptedConnection, isSSL, setupOutgoing, setupSocket } from "../_utils.ts";
-import { setUpgradeTimeout } from "../_ws-timeout.ts";
+import { setUpgradeTimeout } from "../_upgrade-timeout.ts";
 
 /**
  * WebSocket requests must have the `GET` method and
@@ -49,7 +49,7 @@ export const XHeaders = defineProxyMiddleware<Socket>((req, socket, options) => 
  */
 export const stream = defineProxyMiddleware<Socket>(
   (req, socket, options, server, head, callback) => {
-    let establishmentFailed = false;
+    let upgradeFailed = false;
     const createHttpHeader = function (line: string, headers: nodeHTTP.OutgoingHttpHeaders) {
       return (
         Object.keys(headers)
@@ -154,20 +154,20 @@ export const stream = defineProxyMiddleware<Socket>(
       server.emit("proxySocket", proxySocket); // DEPRECATED.
     });
 
-    setUpgradeTimeout(proxyReq, socket, options.establishmentTimeout, (error) => {
-      establishmentFailed = true;
+    setUpgradeTimeout(proxyReq, socket, options.upgradeTimeout, (error) => {
+      upgradeFailed = true;
       reportError(error);
     });
     proxyReq.end(); // XXX: CHECK IF THIS IS THIS CORRECT
     // return;
 
     function onSocketError(err: Error) {
-      if (!establishmentFailed) reportError(err);
+      if (!upgradeFailed) reportError(err);
       proxyReq.destroy();
     }
 
     function onOutgoingError(err: Error) {
-      if (!establishmentFailed) reportError(err);
+      if (!upgradeFailed) reportError(err);
       socket.end();
     }
 

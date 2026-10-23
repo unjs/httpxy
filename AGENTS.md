@@ -16,7 +16,8 @@ src/
 ├── types.ts              — ProxyTarget, ProxyServerOptions, ProxyTargetDetailed
 ├── server.ts             — ProxyServer class (EventEmitter), createProxyServer()
 ├── fetch.ts              — proxyFetch() using Node.js http module → Web Response
-├── upgrade.ts            — proxyUpgrade() standalone WebSocket upgrade proxy
+├── ws.ts                 — proxyUpgrade() standalone WebSocket upgrade proxy
+├── _upgrade-timeout.ts   — setUpgradeTimeout(): opt-in upgrade deadline shared by ws() and proxyUpgrade()
 ├── _utils.ts             — setupOutgoing(), setupSocket(), joinURL(), cookie/header helpers
 └── middleware/
     ├── _utils.ts          — Middleware type definitions (ProxyMiddleware, ProxyOutgoingMiddleware)
@@ -62,6 +63,7 @@ Returns Promise<Socket> (the upstream proxy socket)
 ## Behavioral Notes (Source + Tests)
 
 - `proxy.web()` / `proxy.ws()` return a Promise and can either reject (no `error` listener, request/response error) or resolve after `res.close`.
+- For `ws()`, client socket errors follow the same rule: with an `error` listener they are emitted and the promise resolves; without one it rejects. The wrapper's socket `error` handler only rejects when there is no listener (pre-upgrade errors are emitted by the `stream` pass; post-upgrade errors resolve via `close` without being emitted). `web()` still rejects on response errors. Regression coverage: `should settle ws() on a pending-upgrade socket error` in `test/server.test.ts`.
 - Per-call options are merged as `{ ...opts, ...server.options }`, so constructor options override per-call options on key conflicts.
 - String `target`/`forward` values are normalized to `URL` objects before middleware execution.
 - Missing both `target` and `forward` emits `error` with message `"Must provide a proper URL as target"`.
@@ -89,8 +91,8 @@ Returns Promise<Socket> (the upstream proxy socket)
 - WS requests must be `GET` with `upgrade: websocket`; otherwise socket is destroyed and the chain stops.
 - `proxyReqWs`, `open`, `close`, and deprecated `proxySocket` events are part of tested flow.
 - Upgrade response headers preserve repeated headers like multiple `Set-Cookie` values.
-- `establishmentTimeout` sets an optional total deadline until upstream upgrade or final HTTP response headers, including connection setup. It is shared with `proxyUpgrade`. Omitted, non-positive, and non-finite values disable it; larger finite values are capped at `2147483647` ms. Expiry reports `ERR_UPSTREAM_UPGRADE_TIMEOUT` with `statusCode: 504` and destroys the upstream request and client socket, without writing an HTTP response. The timer and its establishment-only listeners are removed on completion, request error/close, or downstream close. An enabled deadline also cancels the pending upstream request when the downstream socket closes; it does not change post-upgrade socket ownership or limit response bodies.
-- While the deadline is active, timeout, downstream cancellation, and downstream socket errors report failure directly before the wrapper's socket listeners settle `ProxyServer.ws()`, including while a custom agent has no available socket. Later request errors do not repeat an establishment failure. With an error listener, middleware emits the error and resolves; without one, it rejects. Destroyed queued requests remain caller-agent-owned until capacity returns; the proxy does not edit `agent.requests`. Regression coverage includes queued timeout/cancellation/socket error, both error-listener modes, and late agent release without transmitting the canceled upgrade.
+- `upgradeTimeout` (shared with `proxyUpgrade`, implemented in `src/_upgrade-timeout.ts`) is an opt-in total deadline, including connection setup, until the upstream upgrade or final response headers. Omitted, non-positive, and non-finite values disable it; finite values are capped at `2147483647` ms. Expiry reports `ERR_UPSTREAM_UPGRADE_TIMEOUT` (`statusCode: 504`) and destroys the upstream request and client socket without writing an HTTP response. It never limits an established tunnel or a non-upgrade response body.
+- While the deadline is active, closing or erroring the client socket also cancels the pending upstream request and reports the error (`ECONNRESET` on close), even while a custom agent has no free socket. The deadline's socket listeners are prepended so each failure is reported once, ahead of the `stream` pass's own `onSocketError`. Queued requests that were destroyed stay in the caller's `agent.requests` until capacity returns; the proxy does not edit the agent queue.
 
 ### Outgoing response semantics
 
@@ -149,7 +151,7 @@ Returns Promise<Socket> (the upstream proxy socket)
 - Returns `Promise<Socket>` — resolves with the upstream proxy socket on successful upgrade, rejects on connection or socket error.
 - If the upstream responds without upgrading (e.g., 404), the response is relayed to the client socket.
 - Uses `setupOutgoing()` and `setupSocket()` from shared utils, consistent with `ProxyServer.ws()`.
-- Supports the same opt-in `establishmentTimeout` as `ProxyServer.ws()`, implemented by `src/_ws-timeout.ts` and covered for both APIs in `test/ws-timeout.test.ts`.
+- Supports the same opt-in `upgradeTimeout` as `ProxyServer.ws()` (both covered in `test/upgrade-timeout.test.ts`).
 
 ## Tests (`test/`)
 
@@ -158,6 +160,7 @@ test/
 ├── index.test.ts                  — Main proxy: paths, headers, changeOrigin, xfwd, WebSocket, errors
 ├── fetch.test.ts                  — proxyFetch: TCP/Unix, GET/POST, redirects, cookies, 204/304, signal, timeout, xfwd, changeOrigin
 ├── upgrade.test.ts                — proxyUpgrade: WS proxy, addr formats, xfwd, error handling
+├── upgrade-timeout.test.ts        — upgradeTimeout for both proxyUpgrade and ProxyServer.ws
 ├── http-proxy.test.ts             — Forward, target, WebSocket, socket.io, SSE, timeouts, error events
 ├── https-proxy.test.ts            — HTTPS targets, SSL certs, certificate validation
 ├── _utils.test.ts                 — setupOutgoing, setupSocket, path joining, auth, changeOrigin
