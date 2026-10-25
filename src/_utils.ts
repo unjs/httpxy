@@ -1,20 +1,118 @@
 import httpNative from "node:http";
 import httpsNative from "node:https";
 import net from "node:net";
-import { Readable, type Stream } from "node:stream";
+import { Readable, type Duplex, type Stream } from "node:stream";
 import type { ProxyAddr, ProxyServerOptions, ProxyTarget, ProxyTargetDetailed } from "./types.ts";
 import type { Http2ServerRequest } from "node:http2";
 
 const upgradeHeader = /(^|,)\s*upgrade\s*($|,)/i;
 const transferEncodingConnectionToken = /(^|,)\s*transfer-encoding\s*($|,)/i;
+const keepAliveTimeoutHint = /^timeout=(\d+)/;
 
 /**
  * Default keep-alive agents for connection reuse.
  */
-export const defaultAgents = {
-  http: new httpNative.Agent({ keepAlive: true, maxSockets: 256, maxFreeSockets: 64 }),
-  https: new httpsNative.Agent({ keepAlive: true, maxSockets: 256, maxFreeSockets: 64 }),
+export const defaultAgents: { http: httpNative.Agent; https: httpsNative.Agent } = {
+  http: new (withIdleDeadline(httpNative.Agent))({
+    keepAlive: true,
+    maxSockets: 256,
+    maxFreeSockets: 64,
+  }),
+  https: new (withIdleDeadline(httpsNative.Agent))({
+    keepAlive: true,
+    maxSockets: 256,
+    maxFreeSockets: 64,
+  }),
 };
+
+/**
+ * Keep-alive agent that never hands out a pooled socket after the upstream's
+ * `Keep-Alive: timeout=N` hint (minus `agentKeepAliveTimeoutBuffer`) has passed.
+ *
+ * Node.js retires idle sockets only through timers and socket events, which cannot run while
+ * the event loop is blocked. A request sent right after a long synchronous task could otherwise
+ * pick a socket the upstream has already closed and fail with `ECONNRESET`
+ * (https://github.com/nitrojs/nitro/issues/4693). The deadline is checked by the clock when a
+ * request asks for a socket instead.
+ *
+ * The deadline counts from when the request was handed to the agent: the upstream cannot start
+ * its idle timer earlier, while Node pools the socket only once the response body has been read
+ * and its `end` handlers have run, which can be much later.
+ *
+ * Trade-offs: a socket whose request took longer than the hint minus the buffer (a long poll or
+ * a long stream) is not reused; the next request opens a new connection. Upstreams that send no
+ * `Keep-Alive` hint are pooled as before, so this does not cover them. A socket freed while
+ * requests are queued (`maxSockets` reached) is handed to the next one directly by Node, without
+ * passing through `addRequest()`, so its deadline is not checked.
+ */
+function withIdleDeadline<T extends new (...args: any[]) => httpNative.Agent>(BaseAgent: T) {
+  const requestStarts = new WeakMap<object, number>();
+  const deadlines = new WeakMap<Duplex, number>();
+  const addRequest = (BaseAgent.prototype as unknown as AgentInternals).addRequest;
+
+  return class IdleDeadlineAgent extends BaseAgent {
+    // Earliest deadline among the pooled sockets, so a request scans the pools only when some
+    // socket may have expired.
+    #nextExpiry = Infinity;
+
+    override keepSocketAlive(socket: Duplex): boolean {
+      // Node.js returns whether the socket may be pooled; @types/node declares `void`.
+      const keep: unknown = super.keepSocketAlive(socket);
+      if (!keep) {
+        return false;
+      }
+      const req = (socket as PooledSocket)._httpMessage;
+      const hint = keepAliveTimeoutHint.exec(String(req?.res?.headers["keep-alive"] ?? ""))?.[1];
+      if (hint) {
+        const buffer = (this as AgentInternals).agentKeepAliveTimeoutBuffer ?? 1000;
+        const start = (req && requestStarts.get(req)) ?? performance.now();
+        const deadline = start + Number(hint) * 1000 - buffer;
+        deadlines.set(socket, deadline);
+        this.#nextExpiry = Math.min(this.#nextExpiry, deadline);
+      } else {
+        deadlines.delete(socket);
+      }
+      return true;
+    }
+
+    addRequest(req: httpNative.ClientRequest, ...rest: unknown[]): void {
+      const now = performance.now();
+      requestStarts.set(req, now);
+      if (this.#nextExpiry <= now) {
+        let nextExpiry = Infinity;
+        for (const name in this.freeSockets) {
+          const sockets = this.freeSockets[name] || [];
+          for (let i = sockets.length - 1; i >= 0; i--) {
+            const socket = sockets[i]!;
+            const deadline = deadlines.get(socket) ?? Infinity;
+            if (deadline <= now) {
+              sockets.splice(i, 1);
+              socket.destroy();
+            } else {
+              nextExpiry = Math.min(nextExpiry, deadline);
+            }
+          }
+          if (sockets.length === 0) {
+            // As Node.js does, so emptied pools do not accumulate.
+            delete (this.freeSockets as NodeJS.Dict<Duplex[]>)[name];
+          }
+        }
+        this.#nextExpiry = nextExpiry;
+      }
+      addRequest.call(this, req, ...rest);
+    }
+  };
+}
+
+/** Members of `http.Agent` and its pooled sockets that @types/node does not declare. */
+interface AgentInternals {
+  addRequest(req: httpNative.ClientRequest, ...rest: unknown[]): void;
+  agentKeepAliveTimeoutBuffer?: number;
+}
+
+interface PooledSocket extends Duplex {
+  _httpMessage?: { res?: httpNative.IncomingMessage } | null;
+}
 
 /**
  * Simple Regex for testing if protocol is https
