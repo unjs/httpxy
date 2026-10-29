@@ -88,7 +88,10 @@ afterAll(() => {
 // --- Unix socket server ---
 
 let socketServer: Server;
-const socketPath = join(tmpdir(), `httpxy-test-${process.pid}-${Date.now()}.sock`);
+const isWindows = process.platform === "win32";
+const socketPath = isWindows
+  ? `\\\\.\\pipe\\httpxy-test-${process.pid}-${Date.now()}`
+  : join(tmpdir(), `httpxy-test-${process.pid}-${Date.now()}.sock`);
 
 beforeAll(async () => {
   socketServer = createServer((req, res) => {
@@ -351,11 +354,67 @@ describe("proxyFetch", () => {
       ).rejects.toThrow();
     });
 
+    it("aborts request with already-aborted signal on Request input", async () => {
+      const controller = new AbortController();
+      controller.abort();
+      const req = new Request(`http://localhost/json`, {
+        signal: controller.signal,
+      });
+      await expect(
+        proxyFetch({ host: "127.0.0.1", port: tcpPort }, req),
+      ).rejects.toThrow();
+    });
+
+    it("aborts in-flight request from Request input signal", async () => {
+      const controller = new AbortController();
+      const req = new Request(`http://localhost/slow`, {
+        signal: controller.signal,
+      });
+      setTimeout(() => controller.abort(), 50);
+      await expect(
+        proxyFetch({ host: "127.0.0.1", port: tcpPort }, req),
+      ).rejects.toThrow();
+    });
+
+    it("aborts when inputInit is a Request with aborted signal", async () => {
+      const controller = new AbortController();
+      controller.abort();
+      const initReq = new Request(`http://localhost/json`, {
+        signal: controller.signal,
+      });
+      await expect(
+        proxyFetch({ host: "127.0.0.1", port: tcpPort }, `http://localhost/json`, initReq),
+      ).rejects.toThrow();
+    });
+
+    it("allows inputInit signal to override Request input signal", async () => {
+      const controller1 = new AbortController(); // does not abort
+      const controller2 = new AbortController(); // aborts
+      controller2.abort();
+      const req = new Request(`http://localhost/json`, {
+        signal: controller1.signal,
+      });
+      await expect(
+        proxyFetch({ host: "127.0.0.1", port: tcpPort }, req, {
+          signal: controller2.signal,
+        }),
+      ).rejects.toThrow();
+    });
+
     it("succeeds when signal is not aborted", async () => {
       const controller = new AbortController();
       const res = await proxyFetch({ host: "127.0.0.1", port: tcpPort }, `http://localhost/json`, {
         signal: controller.signal,
       });
+      expect(res.status).toBe(200);
+    });
+
+    it("succeeds with Request input when signal is not aborted", async () => {
+      const controller = new AbortController();
+      const req = new Request(`http://localhost/json`, {
+        signal: controller.signal,
+      });
+      const res = await proxyFetch({ host: "127.0.0.1", port: tcpPort }, req);
       expect(res.status).toBe(200);
     });
   });
@@ -446,7 +505,9 @@ describe("proxyFetch", () => {
         res.writeHead(200, { "content-type": "application/json" });
         res.end(JSON.stringify({ host: req.headers.host }));
       });
-      const tmpSocket = join(tmpdir(), `httpxy-co-${process.pid}-${Date.now()}.sock`);
+      const tmpSocket = isWindows
+        ? `\\\\.\\pipe\\httpxy-co-${process.pid}-${Date.now()}`
+        : join(tmpdir(), `httpxy-co-${process.pid}-${Date.now()}.sock`);
       await new Promise<void>((resolve) => unixHeaders.listen(tmpSocket, resolve));
       try {
         const res = await proxyFetch(
