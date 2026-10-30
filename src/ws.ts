@@ -136,7 +136,7 @@ export function proxyUpgrade(
   };
 
   const outgoing = setupOutgoing(
-    requestOptions.ssl || {},
+    { ...(requestOptions.ssl || {}) },
     requestOptions as Parameters<typeof setupOutgoing>[1],
     req,
   );

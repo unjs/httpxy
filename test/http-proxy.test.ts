@@ -33,6 +33,63 @@ describe("http-proxy", () => {
       expect(obj.ws).to.instanceOf(Function);
       expect(obj.listen).to.instanceOf(Function);
     });
+
+    it("should allow per-request target to override the default target", async () => {
+      const serverA = http.createServer((_req, res) => {
+        res.end("server A");
+      });
+      const serverB = http.createServer((_req, res) => {
+        res.end("server B");
+      });
+
+      const portA = await listenOn(serverA);
+      const portB = await listenOn(serverB);
+
+      const proxy = httpProxy.createProxyServer({
+        target: `http://127.0.0.1:${portA}`,
+      });
+
+      const proxyServer = http.createServer((req, res) => {
+        void proxy
+          .web(req, res, {
+            target: `http://127.0.0.1:${portB}`,
+          })
+          .catch((error) => {
+            if (!res.headersSent) {
+              res.writeHead(502);
+            }
+            res.end(String(error));
+          });
+      });
+
+      const proxyPort = await listenOn(proxyServer);
+
+      try {
+        const body = await new Promise<string>((resolve, reject) => {
+          const req = http.get(`http://127.0.0.1:${proxyPort}/`, (res) => {
+            let data = "";
+            res.setEncoding("utf8");
+            res.on("data", (chunk) => {
+              data += chunk;
+            });
+            res.on("end", () => resolve(data));
+            res.on("error", reject);
+          });
+
+          req.setTimeout(2000, () => {
+            req.destroy(new Error("Timed out waiting for proxy response"));
+          });
+          req.on("error", reject);
+        });
+
+        expect(body).toBe("server B");
+      } finally {
+        proxyServer.close();
+        proxy.close();
+        serverA.close();
+        serverB.close();
+      }
+    }, 10000);
   });
 
   describe("#createProxyServer with forward options and using web-incoming passes", () => {
@@ -425,8 +482,14 @@ describe("http-proxy", () => {
       proxy.on("proxyReq", (proxyReq, req) => {
         setTimeout(() => {
           const socket = req.socket;
-          Object.defineProperty(socket, "writable", { value: false, configurable: true });
-          Object.defineProperty(socket, "destroyed", { value: false, configurable: true });
+          Object.defineProperty(socket, "writable", {
+            value: false,
+            configurable: true,
+          });
+          Object.defineProperty(socket, "destroyed", {
+            value: false,
+            configurable: true,
+          });
           proxyReq.emit(
             "error",
             Object.assign(new Error("read ECONNRESET"), { code: "ECONNRESET" }),

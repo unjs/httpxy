@@ -195,7 +195,7 @@ function _createProxyFn<
     opts?: ProxyServerOptions,
     head?: any,
   ): Promise<void> {
-    const requestOptions = { ...opts, ...server.options };
+    const requestOptions = { ...server.options, ...opts };
 
     for (const key of ["target", "forward"] as const) {
       if (typeof requestOptions[key] === "string") {
