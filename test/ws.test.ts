@@ -129,6 +129,45 @@ describe("proxyUpgrade", () => {
     });
   });
 
+  it("should not mutate shared SSL options across proxyUpgrade calls", async () => {
+    const ssl = {
+      rejectUnauthorized: false,
+      customOption: "preserve-me",
+    };
+
+    const originalSSL = { ...ssl };
+
+    for (let i = 0; i < 2; i++) {
+      const socket = connect({ host: "127.0.0.1", port: 1 });
+
+      const req = {
+        method: "GET",
+        url: "/",
+        headers: {
+          host: "127.0.0.1",
+          upgrade: "websocket",
+          connection: "Upgrade",
+        },
+        socket: {
+          remoteAddress: "127.0.0.1",
+          remotePort: 12345,
+          encrypted: false,
+        },
+        httpVersionMajor: 1,
+      } as any;
+
+      const result = proxyUpgrade({ host: "127.0.0.1", port: 1 }, req, socket, undefined, { ssl });
+
+      // The original shared SSL object must remain untouched.
+      expect(ssl).toEqual(originalSSL);
+
+      await result.catch(() => {});
+      socket.destroy();
+    }
+
+    expect(ssl).toEqual(originalSSL);
+  });
+
   it("should proxy websocket messages", async () => {
     const proxy = createProxyServer({ host: "127.0.0.1", port: wsPort });
     const proxyPort = await listenServer(proxy);
