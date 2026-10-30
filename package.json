@@ -42,8 +42,8 @@
     "expect.js": "^0.3.1",
     "obuild": "^0.4.45",
     "ofetch": "^1.5.1",
-    "oxfmt": ">=0.74.0",
-    "oxlint": "^1.89.0",
+    "oxfmt": ">=0.75.0",
+    "oxlint": "^1.90.0",
     "semver": "^7.8.5",
     "socket.io": "^4.8.4",
     "socket.io-client": "^4.8.4",
@@ -53,5 +53,5 @@
     "vitest": "^5.0.5",
     "ws": "^8.22.0"
   },
-  "packageManager": "pnpm@11.28.6"
+  "packageManager": "pnpm@11.28.9"
 }
