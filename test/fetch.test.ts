@@ -1,3 +1,4 @@
+import { subscribe, unsubscribe } from "node:diagnostics_channel";
 import { createServer, IncomingMessage, type Server } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -68,6 +69,11 @@ beforeAll(async () => {
     }
     if (req.url === "/no-content") {
       res.writeHead(204);
+      res.end();
+      return;
+    }
+    if (req.url === "/not-modified") {
+      res.writeHead(304);
       res.end();
       return;
     }
@@ -377,6 +383,32 @@ describe("proxyFetch", () => {
         { timeout: 5000 },
       );
       expect(res.status).toBe(200);
+    });
+
+    it.each([
+      [204, "/no-content"],
+      [304, "/not-modified"],
+    ])("does not time out after a %i response", async (_status, path) => {
+      const errors: Error[] = [];
+      const onError = (message: unknown) => {
+        const { request, error } = message as { request: { path: string }; error: Error };
+        if (request.path === path) errors.push(error);
+      };
+      subscribe("http.client.request.error", onError);
+      try {
+        await proxyFetch(
+          { host: "127.0.0.1", port: tcpPort },
+          `http://localhost${path}`,
+          undefined,
+          {
+            timeout: 50,
+          },
+        );
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        expect(errors).toEqual([]);
+      } finally {
+        unsubscribe("http.client.request.error", onError);
+      }
     });
   });
 
