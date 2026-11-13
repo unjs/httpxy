@@ -247,7 +247,7 @@ export function setupOutgoing(
   const qIdx = reqUrl.indexOf("?");
   const reqPath = qIdx === -1 ? reqUrl : reqUrl.slice(0, qIdx);
   const reqSearch = qIdx === -1 ? "" : reqUrl.slice(qIdx);
-  const normalizedPath = reqPath ? (reqPath[0] === "/" ? reqPath : "/" + reqPath) : "/";
+  const normalizedPath = reqPath ? (reqPath[0] === "/" ? reqPath : "/" + reqPath) : "";
   let outgoingPath = options.toProxy ? "/" + reqUrl : normalizedPath + reqSearch;
 
   //
@@ -277,6 +277,9 @@ export function setupOutgoing(
 
 // From https://github.com/unjs/h3/blob/e8adfa/src/utils/internal/path.ts#L16C1-L36C2
 export function joinURL(base: string | undefined, path: string | undefined): string {
+  if (path?.[0] === "?") {
+    return (base || "/") + path;
+  }
   if (!base || base === "/") {
     return path || "/";
   }
