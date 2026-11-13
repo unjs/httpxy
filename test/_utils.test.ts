@@ -391,6 +391,19 @@ describe("lib/http-proxy/common.js", () => {
       expect(outgoing.path).to.eql("/api");
     });
 
+    it("should not add a slash before the query when request path is empty", () => {
+      const outgoing = createOutgoing();
+      common.setupOutgoing(
+        outgoing,
+        {
+          target: URL.parse("http://localhost/addresses/summary")!,
+        },
+        stubIncomingMessage({ url: "?id=abc" }),
+      );
+
+      expect(outgoing.path).to.eql("/addresses/summary?id=abc");
+    });
+
     it("should preserve multiple consecutive slashes in path (#80)", () => {
       const outgoing = createOutgoing();
       common.setupOutgoing(
