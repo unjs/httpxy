@@ -77,6 +77,7 @@ Returns Promise<Socket> (the upstream proxy socket)
 - `deleteLength` applies to both `DELETE` and `OPTIONS`; it sets `content-length: 0` **only when the request carries neither `content-length` nor `transfer-encoding`**. It never strips `transfer-encoding` — a chunked request keeps its body and framing (request-smuggling fix, GHSA-ggv3-7p47-pfv8).
 - `proxyReq` event is intentionally skipped when request has `expect` header (`100-continue` advisory coverage).
 - `selfHandleResponse: true` skips outgoing passes and auto-pipe; callers must finish the response in `proxyRes`.
+- Response `close` handlers (settling `web()`, destroying `proxyReq`, destroying `proxyRes`) share one listener through `onClose()` in `_utils.ts`. Together with `proxyRes.pipe(res)`, httpxy adds at most two `close` listeners per response (one with `selfHandleResponse`).
 - `proxyTimeout` aborts upstream request and surfaces timeout errors (tested as `ECONNRESET`).
 - `followRedirects: true | number` enables native redirect following (301/302/303/307/308). `true` = max 5 hops, number = custom max.
 - On 301/302/303 redirects, method changes to GET and request body is dropped.

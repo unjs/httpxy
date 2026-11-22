@@ -4,6 +4,7 @@ import http2 from "node:http2";
 import { EventEmitter } from "node:events";
 import { webIncomingMiddleware } from "./middleware/web-incoming.ts";
 import { websocketIncomingMiddleware } from "./middleware/ws-incoming.ts";
+import { onClose } from "./_utils.ts";
 import type { ProxyServerOptions, ProxyTarget } from "./types.ts";
 import type { ProxyMiddleware, ResOfType } from "./middleware/_utils.ts";
 import type net from "node:net";
@@ -215,7 +216,7 @@ function _createProxyFn<
       _reject = reject;
     });
 
-    res.on("close", () => {
+    onClose(res, () => {
       _resolve();
     });
     res.on("error", (error: any) => {
