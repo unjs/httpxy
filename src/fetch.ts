@@ -215,6 +215,9 @@ export async function proxyFetch(
   }
 
   const hasBody = res.statusCode !== 204 && res.statusCode !== 304;
+  if (!hasBody) {
+    res.resume();
+  }
   const resInit: ResponseInit = {
     status: res.statusCode,
     statusText: res.statusMessage,

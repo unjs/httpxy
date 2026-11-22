@@ -1,4 +1,5 @@
 import { createServer, IncomingMessage, type Server } from "node:http";
+import dc from "node:diagnostics_channel";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -71,6 +72,11 @@ beforeAll(async () => {
       res.end();
       return;
     }
+    if (req.url === "/not-modified") {
+      res.writeHead(304);
+      res.end();
+      return;
+    }
     res.writeHead(404);
     res.end("Not found");
   });
@@ -88,7 +94,10 @@ afterAll(() => {
 // --- Unix socket server ---
 
 let socketServer: Server;
-const socketPath = join(tmpdir(), `httpxy-test-${process.pid}-${Date.now()}.sock`);
+const socketPath =
+  process.platform === "win32"
+    ? `\\\\.\\pipe\\httpxy-test-${process.pid}-${Date.now()}`
+    : join(tmpdir(), `httpxy-test-${process.pid}-${Date.now()}.sock`);
 
 beforeAll(async () => {
   socketServer = createServer((req, res) => {
@@ -378,6 +387,36 @@ describe("proxyFetch", () => {
       );
       expect(res.status).toBe(200);
     });
+
+    it("resumes 204/304 responses so socket timeout is disarmed", async () => {
+      let clientError: Error | undefined;
+      const onClientError = (msg: unknown) => {
+        clientError = (msg as { error: Error }).error;
+      };
+      dc.subscribe("http.client.request.error", onClientError);
+      try {
+        const res204 = await proxyFetch(
+          { host: "127.0.0.1", port: tcpPort },
+          `http://localhost/no-content`,
+          undefined,
+          { timeout: 50 },
+        );
+        expect(res204.status).toBe(204);
+
+        const res304 = await proxyFetch(
+          { host: "127.0.0.1", port: tcpPort },
+          `http://localhost/not-modified`,
+          undefined,
+          { timeout: 50 },
+        );
+        expect(res304.status).toBe(304);
+
+        await new Promise((resolve) => setTimeout(resolve, 80));
+        expect(clientError).toBeUndefined();
+      } finally {
+        dc.unsubscribe("http.client.request.error", onClientError);
+      }
+    });
   });
 
   describe("xfwd", () => {
@@ -446,7 +485,10 @@ describe("proxyFetch", () => {
         res.writeHead(200, { "content-type": "application/json" });
         res.end(JSON.stringify({ host: req.headers.host }));
       });
-      const tmpSocket = join(tmpdir(), `httpxy-co-${process.pid}-${Date.now()}.sock`);
+      const tmpSocket =
+        process.platform === "win32"
+          ? `\\\\.\\pipe\\httpxy-co-${process.pid}-${Date.now()}`
+          : join(tmpdir(), `httpxy-test-${process.pid}-${Date.now()}.sock`);
       await new Promise<void>((resolve) => unixHeaders.listen(tmpSocket, resolve));
       try {
         const res = await proxyFetch(
