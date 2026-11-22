@@ -4,6 +4,7 @@ import net from "node:net";
 import { Readable, type Stream } from "node:stream";
 import type { ProxyAddr, ProxyServerOptions, ProxyTarget, ProxyTargetDetailed } from "./types.ts";
 import type { Http2ServerRequest } from "node:http2";
+import type { EventEmitter } from "node:events";
 
 const upgradeHeader = /(^|,)\s*upgrade\s*($|,)/i;
 const transferEncodingConnectionToken = /(^|,)\s*transfer-encoding\s*($|,)/i;
@@ -499,4 +500,27 @@ export function requiresPort(_port: string | number, _protocol: string | undefin
   }
 
   return port !== 0;
+}
+
+const closeHandlers = new WeakMap<EventEmitter, (() => void)[]>();
+
+/**
+ * Run `handler` when `emitter` emits `close`. Handlers run in the order they
+ * were added and share a single `close` listener per emitter.
+ *
+ * @api private
+ */
+export function onClose(emitter: EventEmitter, handler: () => void): void {
+  const handlers = closeHandlers.get(emitter);
+  if (handlers) {
+    handlers.push(handler);
+    return;
+  }
+  const list = [handler];
+  closeHandlers.set(emitter, list);
+  emitter.on("close", () => {
+    for (const fn of list) {
+      fn();
+    }
+  });
 }

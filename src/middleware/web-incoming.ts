@@ -8,6 +8,7 @@ import {
   getPort,
   hasEncryptedConnection,
   isSSL,
+  onClose,
   setupOutgoing,
 } from "../_utils.ts";
 import { webOutgoingMiddleware } from "./web-outgoing.ts";
@@ -129,7 +130,7 @@ export const stream = defineProxyMiddleware((req, res, options, server, head, ca
   }
 
   // Abort proxy request when client disconnects
-  res.on("close", function () {
+  onClose(res, function () {
     if (!res.writableFinished) {
       proxyReq.destroy();
     }
@@ -291,7 +292,7 @@ export const stream = defineProxyMiddleware((req, res, options, server, head, ca
         server.emit("end", req, res, proxyRes);
       }
     } else {
-      res.on("close", function () {
+      onClose(res, function () {
         proxyRes.destroy();
       });
       proxyRes.on("close", function () {

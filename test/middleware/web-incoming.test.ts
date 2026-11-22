@@ -1391,3 +1391,139 @@ describe("#stream proxyReq header mutation under socket contention", () => {
     await run(true);
   });
 });
+
+describe("#response close listeners", () => {
+  async function measureCloseListeners(
+    options: httpProxy.ProxyServerOptions,
+    path = "/",
+  ): Promise<{ added: number; status: number; body: string }> {
+    const source = http.createServer((req, res) => {
+      const match = req.url!.match(/^\/hop-(\d+)$/);
+      if (match && Number(match[1]) > 0) {
+        res.writeHead(302, { location: `/hop-${Number(match[1]) - 1}` });
+        res.end();
+        return;
+      }
+      res.end("ok");
+    });
+    const sourcePort = await listenOn(source);
+
+    const proxy = httpProxy.createProxyServer({
+      target: `http://127.0.0.1:${sourcePort}`,
+      ...options,
+    });
+    if (options.selfHandleResponse) {
+      proxy.on("proxyRes", (proxyRes, _req, res) => {
+        proxyRes.resume();
+        proxyRes.on("end", () => res.end("self"));
+      });
+    }
+
+    const { promise, resolve } = Promise.withResolvers<number>();
+    const proxyServer = http.createServer((req, res) => {
+      const baseline = res.listenerCount("close");
+      let peak = baseline;
+      res.on("newListener", (event) => {
+        if (event === "close") {
+          peak = Math.max(peak, res.listenerCount("close") + 1);
+        }
+      });
+      proxy.web(req, res).then(() => resolve(peak - baseline));
+    });
+    const proxyPort = await listenOn(proxyServer);
+
+    const response = await fetch(`http://127.0.0.1:${proxyPort}${path}`);
+    const body = await response.text();
+    const added = await promise;
+
+    source.close();
+    proxyServer.close();
+    return { added, status: response.status, body };
+  }
+
+  it("should add at most two `close` listeners to the response", async () => {
+    const result = await measureCloseListeners({});
+    expect(result).toMatchObject({ status: 200, body: "ok" });
+    expect(result.added).toBeLessThanOrEqual(2);
+  });
+
+  it("should not accumulate `close` listeners when following redirects", async () => {
+    const result = await measureCloseListeners({ followRedirects: true }, "/hop-3");
+    expect(result).toMatchObject({ status: 200, body: "ok" });
+    expect(result.added).toBeLessThanOrEqual(2);
+  });
+
+  it("should add a single `close` listener with selfHandleResponse", async () => {
+    const result = await measureCloseListeners({ selfHandleResponse: true });
+    expect(result).toMatchObject({ status: 200, body: "self" });
+    expect(result.added).toBe(1);
+  });
+
+  it("should destroy proxyReq and proxyRes and settle web() when the client disconnects mid-response", async () => {
+    const source = http.createServer((_req, res) => {
+      res.writeHead(200, { "content-type": "text/plain" });
+      res.write("start");
+    });
+    const sourcePort = await listenOn(source);
+
+    const proxy = httpProxy.createProxyServer({
+      target: `http://127.0.0.1:${sourcePort}`,
+    });
+    let proxyReq: http.ClientRequest | undefined;
+    let proxyRes: http.IncomingMessage | undefined;
+    proxy.on("proxyReq", (_proxyReq) => (proxyReq = _proxyReq));
+    proxy.on("proxyRes", (_proxyRes) => (proxyRes = _proxyRes));
+
+    const { promise, resolve } = Promise.withResolvers<boolean>();
+    const proxyServer = http.createServer((req, res) => {
+      proxy.web(req, res).then(() => resolve(res.writableFinished));
+    });
+    const proxyPort = await listenOn(proxyServer);
+
+    const clientReq = http.get(`http://127.0.0.1:${proxyPort}/`, (res) => {
+      res.once("data", () => clientReq.destroy());
+    });
+    clientReq.on("error", () => {});
+
+    expect(await promise).toBe(false);
+    expect(proxyReq?.destroyed).toBe(true);
+    expect(proxyRes?.destroyed).toBe(true);
+
+    source.closeAllConnections();
+    source.close();
+    proxyServer.close();
+  });
+
+  it("should deliver a slow streamed response in full and emit end", async () => {
+    const chunks = ["one", "two", "three"];
+    const source = http.createServer(async (_req, res) => {
+      res.writeHead(200, { "content-type": "text/plain" });
+      for (const chunk of chunks) {
+        res.write(chunk);
+        await new Promise((r) => setTimeout(r, 20));
+      }
+      res.end();
+    });
+    const sourcePort = await listenOn(source);
+
+    const proxy = httpProxy.createProxyServer({
+      target: `http://127.0.0.1:${sourcePort}`,
+    });
+    let ended = false;
+    proxy.on("end", () => (ended = true));
+
+    const { promise, resolve } = Promise.withResolvers<boolean>();
+    const proxyServer = http.createServer((req, res) => {
+      proxy.web(req, res).then(() => resolve(res.writableFinished));
+    });
+    const proxyPort = await listenOn(proxyServer);
+
+    const response = await fetch(`http://127.0.0.1:${proxyPort}/`);
+    expect(await response.text()).toBe(chunks.join(""));
+    expect(await promise).toBe(true);
+    expect(ended).toBe(true);
+
+    source.close();
+    proxyServer.close();
+  });
+});
